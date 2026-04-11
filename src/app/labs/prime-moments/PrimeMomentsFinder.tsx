@@ -75,7 +75,7 @@ export default function PrimeMomentsFinder() {
                 placeholder="name"
                 value={d.name}
                 onChange={(e) => updateDraft(d.id, { name: e.target.value })}
-                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 w-32 placeholder:opacity-40 focus:outline-none"
+                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 w-32 placeholder:opacity-40"
               />
               <label className="sr-only" htmlFor={`${formId}-date-${d.id}`}>
                 Birthday for member {idx + 1}
@@ -85,7 +85,7 @@ export default function PrimeMomentsFinder() {
                 type="date"
                 value={d.birthDate}
                 onChange={(e) => updateDraft(d.id, { birthDate: e.target.value })}
-                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 focus:outline-none"
+                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5"
               />
               {drafts.length > 1 && (
                 <button

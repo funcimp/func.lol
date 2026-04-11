@@ -25,8 +25,9 @@ export default function Home() {
       </div>
 
       <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 gap-7">
+        <h1 className="sr-only">func.lol</h1>
         <FuncImpMark className="w-[260px] h-auto sm:w-[320px]" />
-        <p className="text-[16px] opacity-85 max-w-[38ch] leading-[1.55]">
+        <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch]">
           Lab experiments by Functionally Imperative.
         </p>
         <Link
