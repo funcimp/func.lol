@@ -61,7 +61,7 @@ function PrimeMomentsEmblem() {
 function NumberLine() {
   return (
     <figure className="my-8">
-      <div className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-55 mb-2 flex justify-between">
+      <div className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-[0.55] mb-2 flex justify-between">
         <span>primes under 122</span>
         <span>solid = toups primes</span>
       </div>
@@ -70,7 +70,7 @@ function NumberLine() {
           <div key={i} className={NL_CELL_CLASS[kind]} />
         ))}
       </div>
-      <div className="font-mono text-[9px] opacity-55 mt-1 flex justify-between">
+      <div className="font-mono text-[10px] opacity-[0.55] mt-1 flex justify-between">
         <span>1</span>
         <span>30</span>
         <span>60</span>
@@ -109,10 +109,13 @@ export default function PrimeMomentsPage() {
           same time.
         </p>
 
-        <div className="font-mono text-[11px] opacity-50 flex gap-5 mb-9">
+        <div className="font-mono text-[11px] uppercase tracking-[0.12em] opacity-[0.55] flex gap-5 mb-9">
           <span>lab 01</span>
           <span>2026-04-10</span>
-          <span>~6 min read</span>
+        </div>
+
+        <div className="mb-14">
+          <PrimeMomentsFinder />
         </div>
 
         <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
@@ -138,20 +141,15 @@ export default function PrimeMomentsPage() {
           <p>
             A <em>prime constellation</em> is the offset shape. A{" "}
             <em>prime moment</em> is what happens when a real family with real
-            birthdays lines up with one of those shapes on the calendar. Try
-            yours below.
+            birthdays lines up with one of those shapes on the calendar.
           </p>
-          <p className="text-[14px] opacity-70">
+          <p className="text-[16px] opacity-70">
             Footnote on 2: 2 is the only even prime, so any constellation that
             contains it has odd offsets to every other member. Such patterns can
             occur at most once (at base 2) and never repeat. The finder uses
             only odd primes for the recurring patterns &mdash; that&rsquo;s
             where the interesting structure lives.
           </p>
-        </div>
-
-        <div className="mt-10">
-          <PrimeMomentsFinder />
         </div>
 
         <footer className="mt-14 pt-5 border-t border-ink font-mono text-[11px] opacity-55">
