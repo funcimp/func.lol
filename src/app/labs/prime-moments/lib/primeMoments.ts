@@ -1,9 +1,9 @@
 // Pure-function finder for prime moments.
 //
-// A prime moment is a maximal date range during which every member of a
-// family simultaneously has a prime age. The finder walks the calendar
+// A prime moment is a maximal date range during which every person in a
+// group simultaneously has a prime age. The finder walks the calendar
 // from `from` to `through`, partitioning the range into windows at every
-// member's birthday (because ages are constant inside each window), and
+// person's birthday (because ages are constant inside each window), and
 // emits the windows where every age is prime and within `maxLifespan`.
 //
 // Results are grouped by offset pattern: each Constellation collects all
@@ -13,8 +13,8 @@ import { isPrime } from "./primes";
 import type {
   AgeAt,
   Constellation,
-  FamilyMember,
   FindOptions,
+  Person,
   PrimeMoment,
 } from "./types";
 
@@ -64,14 +64,14 @@ function offsetPattern(ages: number[]): number[] {
 }
 
 export function findPrimeMoments(
-  family: FamilyMember[],
+  group: Person[],
   opts: FindOptions = {},
 ): Constellation[] {
-  if (family.length === 0) return [];
+  if (group.length === 0) return [];
 
-  const births = family.map((m) => ({
-    name: m.name,
-    birth: parseISODate(m.birthDate),
+  const births = group.map((p) => ({
+    name: p.name,
+    birth: parseISODate(p.birthDate),
   }));
 
   const maxLifespan = opts.maxLifespan ?? DEFAULT_MAX_LIFESPAN;

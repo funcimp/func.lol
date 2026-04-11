@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { findPrimeMoments } from "./primeMoments";
-import type { FamilyMember } from "./types";
+import type { Person } from "./types";
 
 // Helpers ----------------------------------------------------------------
 
@@ -9,21 +9,21 @@ function utc(y: number, m: number, d: number): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-const TOUPS_FAMILY: FamilyMember[] = [
-  { id: "lyra", name: "Lyra", birthDate: "2014-09-20" },
-  { id: "sarah", name: "Sarah", birthDate: "1984-03-15" },
-  { id: "nathan", name: "Nathan", birthDate: "1982-08-22" },
+const REF_GROUP: Person[] = [
+  { id: "eve", name: "Eve", birthDate: "2013-07-01" },
+  { id: "alice", name: "Alice", birthDate: "1982-10-05" },
+  { id: "bob", name: "Bob", birthDate: "1981-09-05" },
 ];
 
 // Tests ------------------------------------------------------------------
 
 describe("findPrimeMoments — Toups Primes canonical case", () => {
-  // The synthetic Toups family above is constructed so that within
-  // [2025, 2090] there are exactly four prime moments, all instances of
+  // The synthetic reference group above is constructed so that within
+  // [2024, 2090] there are exactly four prime moments, all instances of
   // the [0, 30, 32] constellation: (11,41,43), (29,59,61), (41,71,73),
   // (71,101,103). These are the well-known Toups Prime triples under 122.
-  const result = findPrimeMoments(TOUPS_FAMILY, {
-    from: utc(2025, 1, 1),
+  const result = findPrimeMoments(REF_GROUP, {
+    from: utc(2024, 1, 1),
     through: utc(2090, 1, 1),
   });
 
@@ -51,25 +51,25 @@ describe("findPrimeMoments — Toups Primes canonical case", () => {
     ]);
   });
 
-  test("each moment spans Sep 20 of one year to Mar 14 of the next", () => {
+  test("each moment spans Sep 5 to Oct 4 of the same year", () => {
     const ranges = result[0].moments.map((m) => [m.startDate, m.endDate]);
     expect(ranges).toEqual([
-      ["2025-09-20", "2026-03-14"],
-      ["2043-09-20", "2044-03-14"],
-      ["2055-09-20", "2056-03-14"],
-      ["2085-09-20", "2086-03-14"],
+      ["2024-09-05", "2024-10-04"],
+      ["2042-09-05", "2042-10-04"],
+      ["2054-09-05", "2054-10-04"],
+      ["2084-09-05", "2084-10-04"],
     ]);
   });
 
-  test("each moment carries ages in the original family input order", () => {
+  test("each moment carries ages in the original group input order", () => {
     for (const m of result[0].moments) {
-      expect(m.ages.map((a) => a.name)).toEqual(["Lyra", "Sarah", "Nathan"]);
+      expect(m.ages.map((a) => a.name)).toEqual(["Eve", "Alice", "Bob"]);
     }
   });
 });
 
-describe("findPrimeMoments — single-member family", () => {
-  // A single-member family always has offset pattern [0]. Within
+describe("findPrimeMoments — single-person group", () => {
+  // A single-person group always has offset pattern [0]. Within
   // [2020, 2030], a person born 2010-01-01 hits prime ages at 11, 13,
   // 17, and 19 — four moments, each a full calendar year.
   const result = findPrimeMoments(
@@ -115,7 +115,7 @@ describe("findPrimeMoments — no shared moments", () => {
   });
 });
 
-describe("findPrimeMoments — empty family", () => {
+describe("findPrimeMoments — empty group", () => {
   test("returns no constellations", () => {
     expect(findPrimeMoments([])).toEqual([]);
   });
@@ -151,7 +151,7 @@ describe("findPrimeMoments — leap-day birthday", () => {
 
 describe("findPrimeMoments — through < from", () => {
   test("returns no constellations", () => {
-    const result = findPrimeMoments(TOUPS_FAMILY, {
+    const result = findPrimeMoments(REF_GROUP, {
       from: utc(2030, 1, 1),
       through: utc(2025, 1, 1),
     });
@@ -160,18 +160,19 @@ describe("findPrimeMoments — through < from", () => {
 });
 
 describe("findPrimeMoments — maxLifespan caps reported moments", () => {
-  // Same Toups family, but cap maxLifespan at 50. Only the first
+  // Same reference group, but cap maxLifespan at 50. Only the first
   // instance (11, 41, 43) qualifies — every later instance contains an
   // age over 50.
   test("clips to instances under the cap", () => {
-    const result = findPrimeMoments(TOUPS_FAMILY, {
-      from: utc(2025, 1, 1),
+    const result = findPrimeMoments(REF_GROUP, {
+      from: utc(2024, 1, 1),
       through: utc(2090, 1, 1),
       maxLifespan: 50,
     });
     expect(result).toHaveLength(1);
     expect(result[0].moments).toHaveLength(1);
-    expect(result[0].moments[0].ages.map((a) => a.age).sort((a, b) => a - b))
-      .toEqual([11, 41, 43]);
+    expect(
+      result[0].moments[0].ages.map((a) => a.age).sort((a, b) => a - b),
+    ).toEqual([11, 41, 43]);
   });
 });

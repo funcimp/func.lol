@@ -1,8 +1,8 @@
 // Pure data types for the Prime Moments finder.
 // No React, no DOM. Imported by both the lib and the React component.
 
-export type FamilyMember = {
-  id: string;        // unique within a family input — used as React key
+export type Person = {
+  id: string;        // unique within a group input — used as React key
   name: string;
   birthDate: string; // ISO YYYY-MM-DD
 };
@@ -15,7 +15,7 @@ export type AgeAt = {
 export type PrimeMoment = {
   startDate: string; // ISO YYYY-MM-DD, inclusive
   endDate: string;   // ISO YYYY-MM-DD, inclusive
-  ages: AgeAt[];     // in family input order
+  ages: AgeAt[];     // in group input order
 };
 
 // A constellation groups every PrimeMoment that shares the same offset shape

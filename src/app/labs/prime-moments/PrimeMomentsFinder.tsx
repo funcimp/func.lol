@@ -5,9 +5,9 @@ import { useId, useState } from "react";
 import { formatDate } from "@/lib/dates";
 
 import { findPrimeMoments } from "./lib/primeMoments";
-import type { Constellation, FamilyMember } from "./lib/types";
+import type { Constellation, Person } from "./lib/types";
 
-type Draft = Pick<FamilyMember, "id" | "name" | "birthDate">;
+type Draft = Pick<Person, "id" | "name" | "birthDate">;
 
 const newDraft = (): Draft => ({
   id: crypto.randomUUID(),
@@ -41,7 +41,7 @@ export default function PrimeMomentsFinder() {
       .filter((d) => d.name.trim() && d.birthDate)
       .map((d) => ({ id: d.id, name: d.name.trim(), birthDate: d.birthDate }));
     if (valid.length === 0) {
-      setError("Add at least one family member with a name and birthday.");
+      setError("Add at least one person with a name and birthday.");
       setResults(null);
       return;
     }
@@ -57,7 +57,7 @@ export default function PrimeMomentsFinder() {
           id={`${formId}-heading`}
           className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-3"
         >
-          your family
+          your group
         </h2>
         <p className="text-[11px] opacity-50 mb-5 font-mono">
           everything runs in your browser. nothing is sent or stored.
@@ -67,7 +67,7 @@ export default function PrimeMomentsFinder() {
           {drafts.map((d, idx) => (
             <div key={d.id} className="flex flex-wrap gap-3 items-baseline">
               <label className="sr-only" htmlFor={`${formId}-name-${d.id}`}>
-                Name for member {idx + 1}
+                Name for person {idx + 1}
               </label>
               <input
                 id={`${formId}-name-${d.id}`}
@@ -78,7 +78,7 @@ export default function PrimeMomentsFinder() {
                 className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 w-32 placeholder:opacity-40"
               />
               <label className="sr-only" htmlFor={`${formId}-date-${d.id}`}>
-                Birthday for member {idx + 1}
+                Birthday for person {idx + 1}
               </label>
               <input
                 id={`${formId}-date-${d.id}`}
@@ -91,7 +91,7 @@ export default function PrimeMomentsFinder() {
                 <button
                   type="button"
                   onClick={() => removeDraft(d.id)}
-                  aria-label={`Remove member ${idx + 1}`}
+                  aria-label={`Remove person ${idx + 1}`}
                   className="font-mono text-[14px] opacity-40 hover:opacity-100 bg-transparent border-0 p-1 cursor-pointer"
                 >
                   ×

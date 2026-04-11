@@ -22,7 +22,7 @@ const labs: Lab[] = [
     slug: "prime-moments",
     title: "Prime Moments",
     blurb:
-      "Find the calendar windows when every member of your family has a prime age at the same time.",
+      "Find the calendar windows when every person in a group has a prime age at the same time.",
     publishedAt: "2026-04-10",
     links: {
       github: "https://github.com/funcimp/func.lol/tree/main/research/prime-moments",

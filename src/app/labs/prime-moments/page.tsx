@@ -9,7 +9,7 @@ import PrimeMomentsFinder from "./PrimeMomentsFinder";
 export const metadata: Metadata = {
   title: "Prime Moments — func.lol",
   description:
-    "Find the calendar windows when every member of your family has a prime age at the same time.",
+    "Find the calendar windows when every person in a group has a prime age at the same time.",
 };
 
 const RESEARCH_URL =
@@ -105,7 +105,7 @@ export default function PrimeMomentsPage() {
         </div>
 
         <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch] mb-7">
-          Calendar windows when every member of a family has a prime age at the
+          Calendar windows when every person in a group has a prime age at the
           same time.
         </p>
 
@@ -140,8 +140,8 @@ export default function PrimeMomentsPage() {
         <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
           <p>
             A <em>prime constellation</em> is the offset shape. A{" "}
-            <em>prime moment</em> is what happens when a real family with real
-            birthdays lines up with one of those shapes on the calendar.
+            <em>prime moment</em> is what happens when real people with real
+            birthdays line up with one of those shapes on the calendar.
           </p>
           <p className="text-[16px] opacity-70">
             Footnote on 2: 2 is the only even prime, so any constellation that
