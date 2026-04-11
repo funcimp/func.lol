@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { formatDate } from "@/lib/dates";
 
 import { findPrimeMoments } from "./lib/primeMoments";
+import { encodeShareParam } from "./lib/share";
 import type { Constellation, Person } from "./lib/types";
 
 type Draft = Pick<Person, "id" | "name" | "birthDate">;
@@ -20,6 +21,7 @@ export default function PrimeMomentsFinder() {
   const [drafts, setDrafts] = useState<Draft[]>([newDraft(), newDraft()]);
   const [results, setResults] = useState<Constellation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const updateDraft = (id: string, patch: Partial<Draft>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
@@ -46,6 +48,22 @@ export default function PrimeMomentsFinder() {
       return;
     }
     setResults(findPrimeMoments(valid));
+  };
+
+  const onShare = async () => {
+    if (!results || results.length === 0) return;
+    const offsets = results[0].offsets;
+    const url = `${window.location.origin}/labs/prime-moments?share=${encodeShareParam(offsets)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Clipboard API unavailable (e.g. non-HTTPS dev context).
+      // Fall back to showing the URL so the sharer can copy manually.
+      alert(url);
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const totalMoments = results?.reduce((n, c) => n + c.moments.length, 0) ?? 0;
@@ -158,6 +176,19 @@ export default function PrimeMomentsFinder() {
               )),
             )}
           </div>
+
+          {totalMoments > 0 && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onShare}
+                aria-label={copied ? "Share URL copied" : "Copy share URL"}
+                className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-transparent text-ink border border-ink cursor-pointer hover:bg-ink/5"
+              >
+                {copied ? "copied ✓" : "share"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>
