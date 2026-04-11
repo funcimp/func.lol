@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { isPrime, primesUpTo } from "./primes";
+import {
+  isAdmissibleConstellation,
+  isPrime,
+  primesUpTo,
+} from "./primes";
 
 describe("isPrime", () => {
   const primeCases: Array<[number, boolean]> = [
@@ -67,6 +71,45 @@ describe("primesUpTo", () => {
   for (const [n, want] of cases) {
     test(`primesUpTo(${n})`, () => {
       expect(primesUpTo(n)).toEqual(want);
+    });
+  }
+});
+
+describe("isAdmissibleConstellation", () => {
+  // Admissible patterns — can mathematically produce multiple all-prime
+  // instances. Check the mod-q residues don't cover all of {0..q-1}.
+  const admissibleCases: Array<[number[], string]> = [
+    [[0], "singleton"],
+    [[0, 10], "2-tuple with even gap"],
+    [[0, 30, 32], "Toups Primes"],
+    [[0, 6, 12], "[0, 6, 12]"],
+    [[0, 6, 8], "[0, 6, 8]"],
+    [[0, 2, 6, 8], "[0, 2, 6, 8]"],
+    [[0, 12, 18, 30], "[0, 12, 18, 30]"],
+  ];
+
+  for (const [offsets, label] of admissibleCases) {
+    test(`admissible: ${label} (${JSON.stringify(offsets)})`, () => {
+      expect(isAdmissibleConstellation(offsets)).toBe(true);
+    });
+  }
+
+  // Inadmissible patterns — provably at most one all-prime instance
+  // (reachable only via the base-2 escape or similar singletons).
+  const inadmissibleCases: Array<[number[], string]> = [
+    [[0, 1], "[0, 1] — covers {0,1} mod 2"],
+    [[0, 11], "[0, 11] — covers {0,1} mod 2, (2, 13) only"],
+    [[0, 29, 32], "[0, 29, 32] — 29 is odd, parity mismatch"],
+    [[0, 2, 4], "[0, 2, 4] — covers {0,1,2} mod 3, (3, 5, 7) only"],
+    [
+      [0, 6, 12, 18, 24],
+      "[0, 6, 12, 18, 24] — covers {0..4} mod 5, (5,11,17,23,29) only",
+    ],
+  ];
+
+  for (const [offsets, label] of inadmissibleCases) {
+    test(`inadmissible: ${label}`, () => {
+      expect(isAdmissibleConstellation(offsets)).toBe(false);
     });
   }
 });

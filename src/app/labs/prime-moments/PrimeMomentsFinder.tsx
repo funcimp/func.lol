@@ -130,7 +130,7 @@ export default function PrimeMomentsFinder() {
           <h3 className="text-lg font-semibold mb-4">
             {totalMoments === 0
               ? "No prime moments found."
-              : `${totalMoments} prime moment${totalMoments === 1 ? "" : "s"} · ${results.length} constellation${results.length === 1 ? "" : "s"}`}
+              : `${totalMoments} prime moment${totalMoments === 1 ? "" : "s"} — constellation [${results[0].offsets.join(", ")}]`}
           </h3>
 
           <div className="flex flex-col">
@@ -145,19 +145,14 @@ export default function PrimeMomentsFinder() {
                     <br />
                     {formatDate(m.endDate)}
                   </div>
-                  <div>
-                    <div className="text-[14px]">
-                      {m.ages.map((a, i) => (
-                        <span key={a.name}>
-                          {i > 0 && " · "}
-                          {a.name}{" "}
-                          <span className="font-mono font-bold">{a.age}</span>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="font-mono text-[11px] opacity-55 mt-1">
-                      [{c.offsets.join(", ")}]
-                    </div>
+                  <div className="text-[14px]">
+                    {m.ages.map((a, i) => (
+                      <span key={a.name}>
+                        {i > 0 && " · "}
+                        {a.name}{" "}
+                        <span className="font-mono font-bold">{a.age}</span>
+                      </span>
+                    ))}
                   </div>
                 </div>
               )),

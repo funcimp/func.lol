@@ -159,6 +159,47 @@ describe("findPrimeMoments — through < from", () => {
   });
 });
 
+describe("findPrimeMoments — inadmissible constellations are filtered", () => {
+  // A 2-person group where the only in-range all-prime window is
+  // (2, 13), produced by the constellation [0, 11]. Since [0, 11]
+  // covers both residues mod 2, it's inadmissible and gets filtered.
+  // Result: empty.
+  test("drops [0, 11] singleton (2, 13)", () => {
+    // Person A born Mar 1 2000, Person B born Jun 1 2010.
+    // Range is narrowed to the Mar–May 2013 window where A has turned
+    // 13 but B is still 2 — ages (2, 13), offsets [0, 11], both prime
+    // but inadmissible. The [0, 10] window (Jun 1 onward, ages 3 and
+    // 13) is deliberately excluded from the range so the test isolates
+    // the inadmissible moment.
+    const result = findPrimeMoments(
+      [
+        { id: "a", name: "A", birthDate: "2000-03-01" },
+        { id: "b", name: "B", birthDate: "2010-06-01" },
+      ],
+      { from: utc(2013, 3, 15), through: utc(2013, 5, 31) },
+    );
+    expect(result).toEqual([]);
+  });
+
+  // A 3-person group whose only in-range all-prime window is
+  // (3, 5, 7), producing [0, 2, 4]. Inadmissible mod 3 — the
+  // offsets cover all residues {0, 1, 2} mod 3. Filtered out.
+  test("drops [0, 2, 4] singleton (3, 5, 7)", () => {
+    // Three people aged 3, 5, 7 at the same moment.
+    // Born 4 / 2 / 0 years before 2024-01-01 respectively, with
+    // matching birth month/day so the window aligns.
+    const result = findPrimeMoments(
+      [
+        { id: "a", name: "A", birthDate: "2020-06-01" },
+        { id: "b", name: "B", birthDate: "2018-06-01" },
+        { id: "c", name: "C", birthDate: "2016-06-01" },
+      ],
+      { from: utc(2023, 6, 1), through: utc(2024, 6, 1) },
+    );
+    expect(result).toEqual([]);
+  });
+});
+
 describe("findPrimeMoments — maxLifespan caps reported moments", () => {
   // Same reference group, but cap maxLifespan at 50. Only the first
   // instance (11, 41, 43) qualifies — every later instance contains an

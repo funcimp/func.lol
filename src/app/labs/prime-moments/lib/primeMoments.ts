@@ -9,7 +9,7 @@
 // Results are grouped by offset pattern: each Constellation collects all
 // moments whose sorted ages share the same shape relative to the youngest.
 
-import { isPrime } from "./primes";
+import { isAdmissibleConstellation, isPrime } from "./primes";
 import type {
   AgeAt,
   Constellation,
@@ -155,8 +155,18 @@ export function findPrimeMoments(
     g.moments.push(m);
   }
 
+  // Filter to constellations that could repeat. Patterns like [0, 11]
+  // or [0, 2, 4] are dropped — they're mathematically limited to at
+  // most one prime instance (via the base-2 or base-3 escape) and
+  // aren't interesting as "prime moments". Under this filter, any
+  // single group has at most one qualifying constellation, so the
+  // returned array has length 0 or 1 in practice.
+  const admissible = [...groups.values()].filter((c) =>
+    isAdmissibleConstellation(c.offsets),
+  );
+
   // Most-frequent first; break ties by lexicographic offset string.
-  return [...groups.values()].sort((a, b) => {
+  return admissible.sort((a, b) => {
     if (b.moments.length !== a.moments.length) {
       return b.moments.length - a.moments.length;
     }
