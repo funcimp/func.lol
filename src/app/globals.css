@@ -1,4 +1,90 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-  themes: dark --default;
+
+/* ============================================================
+   Design tokens
+   ------------------------------------------------------------
+   Human-readable names (paper, ink, subtle) are used in DESIGN.md.
+   In Tailwind v4's @theme they require the --color- prefix, which
+   generates utilities like bg-paper and text-ink.
+   ============================================================ */
+
+@theme {
+  --color-paper: #f5f3ec;
+  --color-ink: #161616;
+  --color-subtle: #ebe7d4;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* Dark-mode override. The server-rendered layout sets
+   data-theme="dark" or "light" on <html>; this rule flips the tokens
+   when dark is active. */
+[data-theme="dark"] {
+  --color-paper: #0f0e0c;
+  --color-ink: #ede9d8;
+  --color-subtle: #1c1a16;
+}
+
+/* ============================================================
+   Base typography and prose niceties
+   ============================================================ */
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    line-height: 1.5;
+  }
+
+  .prose-hyphens {
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    border-radius: 0;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    background-color: var(--color-subtle);
+    padding: 1px 6px;
+    font-size: 0.9em;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  /* ============================================================
+     Prime Moments — number line data viz (V2 dither)
+     ============================================================ */
+  .number-line {
+    display: grid;
+    grid-template-columns: repeat(122, 1fr);
+    gap: 1px;
+    height: 22px;
+  }
+  .nl-cell {
+    background: transparent;
+  }
+  .nl-cell.prime {
+    background-image: radial-gradient(
+      circle at 50% 50%,
+      var(--color-ink) 38%,
+      transparent 39%
+    );
+    background-size: 2px 2px;
+  }
+  .nl-cell.toups {
+    background: var(--color-ink);
+  }
 }

@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 
+import { formatDate } from "@/lib/dates";
+
 import { findPrimeMoments } from "./lib/primeMoments";
 import type { Constellation, FamilyMember } from "./lib/types";
 
@@ -12,17 +14,6 @@ const newDraft = (): Draft => ({
   name: "",
   birthDate: "",
 });
-
-const formatDate = (iso: string): string => {
-  // iso is YYYY-MM-DD; render in UTC to avoid TZ drift in display.
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-};
 
 export default function PrimeMomentsFinder() {
   const formId = useId();
@@ -49,13 +40,11 @@ export default function PrimeMomentsFinder() {
     const valid = drafts
       .filter((d) => d.name.trim() && d.birthDate)
       .map((d) => ({ id: d.id, name: d.name.trim(), birthDate: d.birthDate }));
-
     if (valid.length === 0) {
       setError("Add at least one family member with a name and birthday.");
       setResults(null);
       return;
     }
-
     setResults(findPrimeMoments(valid));
   };
 
@@ -63,131 +52,116 @@ export default function PrimeMomentsFinder() {
 
   return (
     <section aria-labelledby={`${formId}-heading`} className="w-full">
-      <div className="card bg-base-200 border border-base-300">
-        <div className="card-body gap-6">
-          <div>
-            <h2 id={`${formId}-heading`} className="card-title text-2xl">
-              Find your prime moments
-            </h2>
-            <p className="text-sm opacity-70 mt-1">
-              Add everyone in your family. We&rsquo;ll find every future window
-              when all of you have prime ages at the same time.
-            </p>
-            <p className="text-xs opacity-50 mt-2">
-              Everything runs in your browser. Nothing is sent or stored.
-            </p>
-          </div>
+      <div className="border-t border-ink pt-7">
+        <h2
+          id={`${formId}-heading`}
+          className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-3"
+        >
+          your family
+        </h2>
+        <p className="text-[11px] opacity-50 mb-5 font-mono">
+          everything runs in your browser. nothing is sent or stored.
+        </p>
 
-          <div className="flex flex-col gap-3">
-            {drafts.map((d, idx) => (
-              <div key={d.id} className="flex flex-wrap gap-2 items-center">
-                <label className="sr-only" htmlFor={`${formId}-name-${d.id}`}>
-                  Name for member {idx + 1}
-                </label>
-                <input
-                  id={`${formId}-name-${d.id}`}
-                  type="text"
-                  placeholder="Name"
-                  value={d.name}
-                  onChange={(e) => updateDraft(d.id, { name: e.target.value })}
-                  className="input input-bordered w-40"
-                />
-                <label className="sr-only" htmlFor={`${formId}-date-${d.id}`}>
-                  Birthday for member {idx + 1}
-                </label>
-                <input
-                  id={`${formId}-date-${d.id}`}
-                  type="date"
-                  value={d.birthDate}
-                  onChange={(e) =>
-                    updateDraft(d.id, { birthDate: e.target.value })
-                  }
-                  className="input input-bordered"
-                />
-                {drafts.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeDraft(d.id)}
-                    aria-label={`Remove member ${idx + 1}`}
-                    className="btn btn-ghost btn-sm btn-square"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={addDraft} className="btn btn-ghost">
-              + Add member
-            </button>
-            <button
-              type="button"
-              onClick={calculate}
-              className="btn btn-primary"
-            >
-              Find prime moments
-            </button>
-          </div>
-
-          {error && (
-            <div role="alert" className="alert alert-warning">
-              <span>{error}</span>
+        <div className="flex flex-col gap-2.5">
+          {drafts.map((d, idx) => (
+            <div key={d.id} className="flex flex-wrap gap-3 items-baseline">
+              <label className="sr-only" htmlFor={`${formId}-name-${d.id}`}>
+                Name for member {idx + 1}
+              </label>
+              <input
+                id={`${formId}-name-${d.id}`}
+                type="text"
+                placeholder="name"
+                value={d.name}
+                onChange={(e) => updateDraft(d.id, { name: e.target.value })}
+                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 w-32 placeholder:opacity-40 focus:outline-none"
+              />
+              <label className="sr-only" htmlFor={`${formId}-date-${d.id}`}>
+                Birthday for member {idx + 1}
+              </label>
+              <input
+                id={`${formId}-date-${d.id}`}
+                type="date"
+                value={d.birthDate}
+                onChange={(e) => updateDraft(d.id, { birthDate: e.target.value })}
+                className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 focus:outline-none"
+              />
+              {drafts.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDraft(d.id)}
+                  aria-label={`Remove member ${idx + 1}`}
+                  className="font-mono text-[14px] opacity-40 hover:opacity-100 bg-transparent border-0 p-1 cursor-pointer"
+                >
+                  ×
+                </button>
+              )}
             </div>
-          )}
+          ))}
         </div>
+
+        <div className="flex flex-wrap gap-2 mt-5">
+          <button
+            type="button"
+            onClick={addDraft}
+            className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-transparent text-ink border border-ink cursor-pointer hover:bg-ink/5"
+          >
+            + add
+          </button>
+          <button
+            type="button"
+            onClick={calculate}
+            className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-ink text-paper border border-ink cursor-pointer hover:opacity-90"
+          >
+            find prime moments
+          </button>
+        </div>
+
+        {error && (
+          <div role="alert" className="mt-4 font-mono text-[12px] border-t border-ink pt-3">
+            {error}
+          </div>
+        )}
       </div>
 
       {results && (
-        <div className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">
+        <div className="mt-10">
+          <h3 className="text-lg font-semibold mb-4">
             {totalMoments === 0
               ? "No prime moments found."
-              : `Found ${totalMoments} prime moment${totalMoments === 1 ? "" : "s"} across ${results.length} constellation${results.length === 1 ? "" : "s"}.`}
+              : `${totalMoments} prime moment${totalMoments === 1 ? "" : "s"} · ${results.length} constellation${results.length === 1 ? "" : "s"}`}
           </h3>
 
-          <div className="flex flex-col gap-4">
-            {results.map((c) => (
-              <div
-                key={c.offsets.join(",")}
-                className="card bg-base-200 border border-base-300"
-              >
-                <div className="card-body">
-                  <h4 className="card-title text-lg">
-                    Constellation [{c.offsets.join(", ")}]
-                    <span className="text-sm font-normal opacity-60">
-                      &mdash; {c.moments.length} occurrence
-                      {c.moments.length === 1 ? "" : "s"}
-                    </span>
-                  </h4>
-
-                  <ul className="flex flex-col gap-2 mt-2">
-                    {c.moments.map((m) => (
-                      <li
-                        key={`${m.startDate}-${m.endDate}`}
-                        className="bg-base-100 rounded p-3 border border-base-300"
-                      >
-                        <div className="font-medium">
-                          {formatDate(m.startDate)} &rarr; {formatDate(m.endDate)}
-                        </div>
-                        <div className="text-sm opacity-70 mt-1">
-                          {m.ages.map((a, i) => (
-                            <span key={a.name}>
-                              {i > 0 && ", "}
-                              {a.name}:{" "}
-                              <span className="font-semibold opacity-100">
-                                {a.age}
-                              </span>
-                            </span>
-                          ))}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+          <div className="flex flex-col">
+            {results.flatMap((c) =>
+              c.moments.map((m) => (
+                <div
+                  key={`${c.offsets.join(",")}-${m.startDate}-${m.endDate}`}
+                  className="border-t border-ink py-4 grid grid-cols-[140px_1fr] gap-6"
+                >
+                  <div className="font-mono text-[12px]">
+                    {formatDate(m.startDate)}
+                    <br />
+                    {formatDate(m.endDate)}
+                  </div>
+                  <div>
+                    <div className="text-[14px]">
+                      {m.ages.map((a, i) => (
+                        <span key={a.name}>
+                          {i > 0 && " · "}
+                          {a.name}{" "}
+                          <span className="font-mono font-bold">{a.age}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="font-mono text-[11px] opacity-55 mt-1">
+                      [{c.offsets.join(", ")}]
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )),
+            )}
           </div>
         </div>
       )}
