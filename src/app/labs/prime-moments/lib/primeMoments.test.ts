@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { findPrimeMoments } from "./primeMoments";
+import { findLifetimeInstances, findPrimeMoments } from "./primeMoments";
 import type { Person } from "./types";
 
 // Helpers ----------------------------------------------------------------
@@ -215,5 +215,41 @@ describe("findPrimeMoments — maxLifespan caps reported moments", () => {
     expect(
       result[0].moments[0].ages.map((a) => a.age).sort((a, b) => a - b),
     ).toEqual([11, 41, 43]);
+  });
+});
+
+describe("findLifetimeInstances", () => {
+  test("returns all four Toups Primes triples for [0, 30, 32]", () => {
+    expect(findLifetimeInstances([0, 30, 32])).toEqual([
+      [11, 41, 43],
+      [29, 59, 61],
+      [41, 71, 73],
+      [71, 101, 103],
+    ]);
+  });
+
+  test("returns every odd prime ≤ 122 for [0]", () => {
+    const result = findLifetimeInstances([0]);
+    expect(result.length).toBe(29); // 29 odd primes ≤ 122
+    expect(result[0]).toEqual([3]);
+    expect(result[result.length - 1]).toEqual([113]);
+  });
+
+  test("returns multiple instances for [0, 6, 12]", () => {
+    const result = findLifetimeInstances([0, 6, 12]);
+    expect(result.length).toBeGreaterThan(1);
+    // Spot check: (5, 11, 17) should be one of them
+    expect(result).toContainEqual([5, 11, 17]);
+  });
+
+  test("respects maxLifespan parameter", () => {
+    const result = findLifetimeInstances([0, 30, 32], 50);
+    // Only (11, 41, 43) fits — every other Toups Primes instance has
+    // at least one age above 50.
+    expect(result).toEqual([[11, 41, 43]]);
+  });
+
+  test("returns empty for empty offsets", () => {
+    expect(findLifetimeInstances([])).toEqual([]);
   });
 });

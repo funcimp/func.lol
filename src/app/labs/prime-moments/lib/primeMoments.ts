@@ -173,3 +173,30 @@ export function findPrimeMoments(
     return a.offsets.join(",").localeCompare(b.offsets.join(","));
   });
 }
+
+/**
+ * For a given constellation pattern (sorted offsets starting at 0),
+ * return every all-prime age tuple that fits within maxLifespan. Used
+ * by the share view to display "lifetime instances" from offsets alone,
+ * with no group data.
+ *
+ * Walks odd base primes p = 3, 5, 7, ... up to maxLifespan - max(offsets).
+ * For each p, checks whether every (p + offset) is prime. If so, records
+ * the tuple. Returns an array of age tuples, earliest-base-first.
+ *
+ * Returns [] for empty offsets.
+ */
+export function findLifetimeInstances(
+  offsets: number[],
+  maxLifespan: number = DEFAULT_MAX_LIFESPAN,
+): number[][] {
+  if (offsets.length === 0) return [];
+  const maxOffset = offsets[offsets.length - 1];
+  const instances: number[][] = [];
+  for (let p = 3; p + maxOffset <= maxLifespan; p += 2) {
+    if (offsets.every((o) => isPrime(p + o))) {
+      instances.push(offsets.map((o) => p + o));
+    }
+  }
+  return instances;
+}
