@@ -37,8 +37,20 @@ yarn-error.log*
 .vercel
 
 # claude
-.claude
+.claude/settings.local.json
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# scratch directories
+tmp/
+logs/
+scratch/
