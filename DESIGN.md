@@ -20,8 +20,9 @@ The contrast is sans vs. mono, not sans vs. serif.
 | Subsection h3 | Inter | 18px | 600 | normal |
 | Body prose | Inter | 16px | 400 | line-height 1.65 |
 | Lede | Inter | 18px | 400 | opacity 0.85 |
-| Mono data / inputs / code | JetBrains Mono | 13px | 400 | normal |
+| Mono data / inputs | JetBrains Mono | 13px | 400 | for standalone mono (inputs, result numbers, dates) |
 | Mono labels / metadata | JetBrains Mono | 10–11px UPPERCASE | 400 | letter-spacing 0.12–0.16em |
+| Inline `code` in prose | JetBrains Mono | `0.9em` | 400 | scales with parent so it stays proportional |
 
 If a piece of UI doesn't fit one of these, rethink the UI.
 
@@ -68,9 +69,10 @@ The visual signature. Three roles, strict territories, strict density.
 
 ### Implementation
 
-- Emblem and texture: inline SVG with `<pattern>` + `<circle>`. No image assets.
+- Emblem: inline SVG with `<pattern>` + `<circle>`. No image assets.
 - Data viz: HTML/CSS grid, cells tagged `prime` / `toups`, `radial-gradient` paints the dots.
-- No dithering library.
+- Texture: absolutely-positioned `<div>` with a CSS `radial-gradient` fill and a `mask-image` gradient to fade it into the page edge.
+- No dithering library. No image assets. Everything uses `currentColor` or `var(--color-ink)` so it inverts with the theme.
 
 ### What this rules out
 
@@ -101,7 +103,8 @@ The visual signature. Three roles, strict territories, strict density.
 ## Forms
 
 - Bare inputs: `1px` ink underline, mono font, no background, no box.
-- Labels above, mono, UPPERCASE, 10–11px, opacity `0.5`.
+- Labels above each field in single-column forms: mono, UPPERCASE, 10–11px, opacity `0.5`.
+- Compact multi-column forms (e.g., name + date on one row) use a group heading + placeholder text instead, with `sr-only` labels for screen readers.
 - Buttons: flat rectangles. Mono, lowercase. Primary = ink-on-paper inverted. Secondary = paper-on-ink inverted.
 - No icon buttons except the toggle and row-delete `×`.
 
