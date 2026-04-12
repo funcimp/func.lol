@@ -15,6 +15,12 @@
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Constellation ring — the only color on the site */
+  --color-moment-1: #C89B3C;
+  --color-moment-2: #C64F3C;
+  --color-moment-3: #8B4670;
+  --color-moment-4: #3E6B7C;
 }
 
 /* Dark-mode override. The server-rendered layout sets
@@ -69,7 +75,7 @@
      ============================================================ */
   .number-line {
     display: grid;
-    grid-template-columns: repeat(122, 1fr);
+    grid-template-columns: repeat(120, 1fr);
     gap: 1px;
     height: 22px;
   }
@@ -84,7 +90,5 @@
     );
     background-size: 2px 2px;
   }
-  .nl-cell.toups {
-    background: var(--color-ink);
-  }
+  /* Toups prime cells use inline styles with --color-moment-N */
 }

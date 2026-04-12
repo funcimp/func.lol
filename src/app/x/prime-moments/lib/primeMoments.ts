@@ -18,7 +18,7 @@ import type {
   PrimeMoment,
 } from "./types";
 
-const DEFAULT_MAX_LIFESPAN = 122;
+const DEFAULT_MAX_LIFESPAN = 120;
 
 // All date math is done in UTC to avoid timezone drift. We only care about
 // year/month/day, never about clock time.

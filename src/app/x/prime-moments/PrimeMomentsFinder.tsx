@@ -4,9 +4,10 @@ import { useId, useState } from "react";
 
 import { formatDate } from "@/lib/dates";
 
-import { findPrimeMoments } from "./lib/primeMoments";
+import ConstellationRing from "./ConstellationRing";
+import { findLifetimeInstances, findPrimeMoments } from "./lib/primeMoments";
 import { encodeShareParam } from "./lib/share";
-import type { Constellation, Person } from "./lib/types";
+import type { Constellation, Person, PrimeMoment } from "./lib/types";
 
 type Draft = Pick<Person, "id" | "name" | "birthDate">;
 
@@ -22,6 +23,7 @@ export default function PrimeMomentsFinder() {
   const [results, setResults] = useState<Constellation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [hoveredInstance, setHoveredInstance] = useState<number | null>(null);
 
   const updateDraft = (id: string, patch: Partial<Draft>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
@@ -53,7 +55,7 @@ export default function PrimeMomentsFinder() {
   const onShare = async () => {
     if (!results || results.length === 0) return;
     const offsets = results[0].offsets;
-    const url = `${window.location.origin}/labs/prime-moments?share=${encodeShareParam(offsets)}`;
+    const url = `${window.location.origin}/x/prime-moments?s=${encodeShareParam(offsets)}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
@@ -67,6 +69,17 @@ export default function PrimeMomentsFinder() {
   };
 
   const totalMoments = results?.reduce((n, c) => n + c.moments.length, 0) ?? 0;
+  const offsets = results?.[0]?.offsets ?? [];
+  const instances = offsets.length > 0 ? findLifetimeInstances(offsets) : [];
+
+  function instanceIndexOf(m: PrimeMoment): number {
+    const sorted = [...m.ages].map((a) => a.age).sort((a, b) => a - b);
+    return instances.findIndex(
+      (inst) =>
+        inst.length === sorted.length &&
+        inst.every((v, i) => v === sorted[i]),
+    );
+  }
 
   return (
     <section aria-labelledby={`${formId}-heading`} className="w-full">
@@ -151,29 +164,53 @@ export default function PrimeMomentsFinder() {
               : `${totalMoments} prime moment${totalMoments === 1 ? "" : "s"} — constellation [${results[0].offsets.join(", ")}]`}
           </h3>
 
+          {instances.length > 0 && (
+            <div className="flex justify-center mb-8">
+              <ConstellationRing
+                instances={instances}
+                highlightedInstance={hoveredInstance}
+                className="w-[200px] h-[200px] sm:w-[240px] sm:h-[240px]"
+              />
+            </div>
+          )}
+
           <div className="flex flex-col">
             {results.flatMap((c) =>
-              c.moments.map((m) => (
-                <div
-                  key={`${c.offsets.join(",")}-${m.startDate}-${m.endDate}`}
-                  className="border-t border-ink py-4 grid grid-cols-[140px_1fr] gap-6"
-                >
-                  <div className="font-mono text-[12px]">
-                    {formatDate(m.startDate)}
-                    <br />
-                    {formatDate(m.endDate)}
+              c.moments.map((m) => {
+                const idx = instanceIndexOf(m);
+                return (
+                  <div
+                    key={`${c.offsets.join(",")}-${m.startDate}-${m.endDate}`}
+                    className="border-t border-ink py-4 grid grid-cols-[8px_140px_1fr] gap-4 items-baseline cursor-default"
+                    onMouseEnter={() => setHoveredInstance(idx)}
+                    onMouseLeave={() => setHoveredInstance(null)}
+                  >
+                    <div
+                      className="w-[8px] h-[8px] rounded-full mt-[3px] flex-shrink-0"
+                      style={{
+                        backgroundColor:
+                          idx >= 0
+                            ? `var(--color-moment-${(idx % 4) + 1})`
+                            : "currentColor",
+                      }}
+                    />
+                    <div className="font-mono text-[12px]">
+                      {formatDate(m.startDate)}
+                      <br />
+                      {formatDate(m.endDate)}
+                    </div>
+                    <div className="text-[14px]">
+                      {m.ages.map((a, i) => (
+                        <span key={a.name}>
+                          {i > 0 && " · "}
+                          {a.name}{" "}
+                          <span className="font-mono font-bold">{a.age}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-[14px]">
-                    {m.ages.map((a, i) => (
-                      <span key={a.name}>
-                        {i > 0 && " · "}
-                        {a.name}{" "}
-                        <span className="font-mono font-bold">{a.age}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )),
+                );
+              }),
             )}
           </div>
 

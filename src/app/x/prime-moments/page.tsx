@@ -3,10 +3,11 @@ import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
 
-import { isAdmissibleConstellation, isPrime } from "./lib/primes";
+import { isAdmissibleConstellation } from "./lib/primes";
 import { parseShareParam } from "./lib/share";
 import PrimeMomentsFinder from "./PrimeMomentsFinder";
 import SharedConstellation from "./SharedConstellation";
+import ToupsNumberLine from "./ToupsNumberLine";
 
 export const metadata: Metadata = {
   title: "Prime Moments — func.lol",
@@ -17,79 +18,13 @@ export const metadata: Metadata = {
 const RESEARCH_URL =
   "https://github.com/funcimp/func.lol/tree/main/research/prime-moments";
 
-const TOUPS_PRIMES = new Set([11, 41, 43, 29, 59, 61, 71, 73, 101, 103]);
-
-type CellKind = "prime" | "toups" | "none";
-
-const NL_CELL_CLASS: Record<CellKind, string> = {
-  none: "nl-cell",
-  prime: "nl-cell prime",
-  toups: "nl-cell toups",
-};
-
-// Precomputed at import time — the 1..122 cell labels never change.
-const NUMBER_LINE_CELLS: CellKind[] = Array.from({ length: 122 }, (_, i) => {
-  const n = i + 1;
-  if (TOUPS_PRIMES.has(n)) return "toups";
-  if (isPrime(n)) return "prime";
-  return "none";
-});
-
-function PrimeMomentsEmblem() {
-  return (
-    <svg
-      viewBox="0 0 96 96"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-[72px] h-[72px] sm:w-[96px] sm:h-[96px] flex-shrink-0"
-      role="img"
-      aria-label="Prime Moments [0, 30, 32] constellation"
-    >
-      <defs>
-        <pattern id="pm-emblem-dot" width="3" height="3" patternUnits="userSpaceOnUse">
-          <circle cx="1.5" cy="1.5" r="0.6" fill="currentColor" />
-        </pattern>
-      </defs>
-      <circle cx="14" cy="72" r="6" fill="currentColor" />
-      <circle cx="62" cy="36" r="6" fill="currentColor" />
-      <circle cx="80" cy="30" r="6" fill="currentColor" />
-      <line x1="14" y1="72" x2="62" y2="36" stroke="currentColor" strokeWidth="0.7" />
-      <line x1="14" y1="72" x2="80" y2="30" stroke="currentColor" strokeWidth="0.7" />
-      <line x1="62" y1="36" x2="80" y2="30" stroke="currentColor" strokeWidth="0.7" />
-      <path d="M 14 72 L 62 36 L 80 30 Z" fill="url(#pm-emblem-dot)" opacity="0.7" />
-    </svg>
-  );
-}
-
-function NumberLine() {
-  return (
-    <figure className="my-8">
-      <div className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-[0.55] mb-2 flex justify-between">
-        <span>primes under 122</span>
-        <span>solid = toups primes</span>
-      </div>
-      <div className="number-line">
-        {NUMBER_LINE_CELLS.map((kind, i) => (
-          <div key={i} className={NL_CELL_CLASS[kind]} />
-        ))}
-      </div>
-      <div className="font-mono text-[10px] opacity-[0.55] mt-1 flex justify-between">
-        <span>1</span>
-        <span>30</span>
-        <span>60</span>
-        <span>90</span>
-        <span>122</span>
-      </div>
-    </figure>
-  );
-}
-
 interface PageProps {
-  searchParams: Promise<{ share?: string | string[] }>;
+  searchParams: Promise<{ s?: string | string[] }>;
 }
 
 export default async function PrimeMomentsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const parsed = parseShareParam(params.share);
+  const parsed = parseShareParam(params.s);
   const sharedOffsets =
     parsed !== null && isAdmissibleConstellation(parsed) ? parsed : null;
 
@@ -98,10 +33,10 @@ export default async function PrimeMomentsPage({ searchParams }: PageProps) {
       <div className="mx-auto max-w-[720px]">
         <div className="flex items-center justify-between mb-7">
           <Link
-            href="/labs"
+            href="/x"
             className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 hover:opacity-100 no-underline"
           >
-            ← func imp labs
+            ← experiments
           </Link>
           <ThemeToggle />
         </div>
@@ -110,14 +45,11 @@ export default async function PrimeMomentsPage({ searchParams }: PageProps) {
           <SharedConstellation offsets={sharedOffsets} />
         ) : (
           <>
-            <div className="flex items-start justify-between gap-6 mb-7">
-              <h1 className="text-[40px] sm:text-[56px] font-bold leading-[0.95] tracking-[-0.04em]">
-                Prime
-                <br />
-                Moments
-              </h1>
-              <PrimeMomentsEmblem />
-            </div>
+            <h1 className="text-[40px] sm:text-[56px] font-bold leading-[0.95] tracking-[-0.04em] mb-7">
+              Prime
+              <br />
+              Moments
+            </h1>
 
             <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch] mb-7">
               Calendar windows when every person in a group has a prime age at the
@@ -125,7 +57,7 @@ export default async function PrimeMomentsPage({ searchParams }: PageProps) {
             </p>
 
             <div className="font-mono text-[11px] uppercase tracking-[0.12em] opacity-[0.55] flex gap-5 mb-9">
-              <span>lab 01</span>
+              <span>experiment 01</span>
               <span>2026-04-10</span>
             </div>
 
@@ -150,7 +82,7 @@ export default async function PrimeMomentsPage({ searchParams }: PageProps) {
               </p>
             </div>
 
-            <NumberLine />
+            <ToupsNumberLine />
 
             <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
               <p>

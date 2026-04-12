@@ -3,14 +3,14 @@
 // Pure syntactic helpers — no dependency on primality or admissibility.
 // The caller is responsible for the admissibility check after parsing.
 
-const MAX_LIFESPAN = 122;
+const MAX_LIFESPAN = 120;
 
 /**
  * Serialize a constellation's offsets as a share-URL-friendly string.
- * Output is comma-separated, no brackets, no spaces. Example: "0,30,32".
+ * Dot-separated so no characters need URL-encoding. Example: "0.30.32".
  */
 export function encodeShareParam(offsets: number[]): string {
-  return offsets.join(",");
+  return offsets.join(".");
 }
 
 /**
@@ -20,7 +20,7 @@ export function encodeShareParam(offsets: number[]): string {
  *
  * Validation rules:
  * - Must be a non-empty string (not undefined, not string[]).
- * - Parts after comma-splitting must all be integers.
+ * - Parts after dot-splitting must all be integers.
  * - Integers must be in [0, MAX_LIFESPAN].
  * - The array must start with 0 (canonical form, offsets are relative
  *   to the youngest member).
@@ -36,7 +36,7 @@ export function parseShareParam(
   if (raw.trim() === "") return null;
 
   const firstConstellation = raw.split(";")[0];
-  const parts = firstConstellation.split(",").map((s) => s.trim());
+  const parts = firstConstellation.split(".").map((s) => s.trim());
   const offsets = parts.map((s) => Number(s));
 
   if (

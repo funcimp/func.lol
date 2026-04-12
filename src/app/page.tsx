@@ -31,10 +31,10 @@ export default function Home() {
           Lab experiments by Functionally Imperative.
         </p>
         <Link
-          href="/labs"
+          href="/x"
           className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 border border-ink no-underline hover:bg-ink/5"
         >
-          enter the labs →
+          experiments →
         </Link>
       </div>
     </main>

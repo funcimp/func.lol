@@ -5,8 +5,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { formatDate } from "@/lib/dates";
 
 export const metadata: Metadata = {
-  title: "Labs — func.lol",
-  description: "Lab experiments by Functionally Imperative.",
+  title: "Experiments — func.lol",
+  description: "Experiments by Functionally Imperative.",
 };
 
 type Lab = {
@@ -46,7 +46,7 @@ export default function LabsIndexPage() {
 
         <header className="mb-9">
           <h1 className="text-[40px] sm:text-[56px] font-bold leading-[0.95] tracking-[-0.04em]">
-            func imp labs
+            experiments
           </h1>
           <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch] mt-3">
             Small, self-contained experiments. Built in public.
@@ -57,7 +57,7 @@ export default function LabsIndexPage() {
           {labs.map((lab) => (
             <li key={lab.slug} className="border-t border-ink last:border-b">
               <Link
-                href={`/labs/${lab.slug}`}
+                href={`/x/${lab.slug}`}
                 className="block py-6 hover:bg-ink/5 transition-colors no-underline"
               >
                 <div className="flex items-baseline justify-between gap-4 flex-wrap">
