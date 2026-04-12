@@ -11,8 +11,9 @@ import type { Constellation, Person, PrimeMoment } from "./lib/types";
 
 type Draft = Pick<Person, "id" | "name" | "birthDate">;
 
+let nextDraftId = 0;
 const newDraft = (): Draft => ({
-  id: crypto.randomUUID(),
+  id: String(nextDraftId++),
   name: "",
   birthDate: "",
 });
