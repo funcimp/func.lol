@@ -14,14 +14,20 @@ export default function SharedConstellationView({
   instances,
 }: Props) {
   const [hoveredInstance, setHoveredInstance] = useState<number | null>(null);
-  const n = offsets.length;
   const instanceCount = instances.length;
 
   return (
     <>
-      <div className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-[0.55] mb-5">
-        someone shared a prime constellation
-      </div>
+      <h1 className="text-[40px] sm:text-[56px] font-bold leading-[0.95] tracking-[-0.04em] mb-7">
+        Prime
+        <br />
+        Moments
+      </h1>
+
+      <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch] mb-7">
+        Constellation{" "}
+        <span className="font-mono">[{offsets.join(", ")}]</span>
+      </p>
 
       {instanceCount > 0 && (
         <div className="flex justify-center mb-8">
@@ -32,13 +38,6 @@ export default function SharedConstellationView({
           />
         </div>
       )}
-
-      <h1 className="text-[28px] sm:text-[40px] font-bold leading-[1] tracking-[-0.03em] mb-2">
-        a group of {n}
-      </h1>
-      <div className="font-mono text-[12px] opacity-70 mb-8">
-        constellation [{offsets.join(", ")}]
-      </div>
 
       <div className="mb-10">
         <div className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-[0.55] mb-2">
@@ -61,8 +60,11 @@ export default function SharedConstellationView({
                     backgroundColor: `var(--color-moment-${(i % 4) + 1})`,
                   }}
                 />
-                <div className="font-mono text-[13px]">
-                  ({ages.join(", ")})
+                <div className="text-[14px]">
+                  Ages:{" "}
+                  <span className="font-mono font-bold">
+                    {ages.join(", ")}
+                  </span>
                 </div>
               </div>
             ))}

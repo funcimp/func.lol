@@ -13,7 +13,7 @@ type Draft = Pick<Person, "id" | "name" | "birthDate">;
 
 let nextDraftId = 0;
 const newDraft = (): Draft => ({
-  id: String(nextDraftId++),
+  id: String(++nextDraftId),
   name: "",
   birthDate: "",
 });
@@ -23,7 +23,6 @@ export default function PrimeMomentsFinder() {
   const [drafts, setDrafts] = useState<Draft[]>([newDraft(), newDraft()]);
   const [results, setResults] = useState<Constellation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [hoveredInstance, setHoveredInstance] = useState<number | null>(null);
 
   const updateDraft = (id: string, patch: Partial<Draft>) => {
@@ -43,30 +42,18 @@ export default function PrimeMomentsFinder() {
   const calculate = () => {
     setError(null);
     const valid = drafts
-      .filter((d) => d.name.trim() && d.birthDate)
-      .map((d) => ({ id: d.id, name: d.name.trim(), birthDate: d.birthDate }));
+      .filter((d) => d.birthDate)
+      .map((d, i) => ({
+        id: d.id,
+        name: d.name.trim() || `Person ${i + 1}`,
+        birthDate: d.birthDate,
+      }));
     if (valid.length === 0) {
-      setError("Add at least one person with a name and birthday.");
+      setError("Add at least one person with a birthday.");
       setResults(null);
       return;
     }
     setResults(findPrimeMoments(valid));
-  };
-
-  const onShare = async () => {
-    if (!results || results.length === 0) return;
-    const offsets = results[0].offsets;
-    const url = `${window.location.origin}/x/prime-moments?s=${encodeShareParam(offsets)}`;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // Clipboard API unavailable (e.g. non-HTTPS dev context).
-      // Fall back to showing the URL so the sharer can copy manually.
-      alert(url);
-      return;
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const totalMoments = results?.reduce((n, c) => n + c.moments.length, 0) ?? 0;
@@ -104,7 +91,7 @@ export default function PrimeMomentsFinder() {
               <input
                 id={`${formId}-name-${d.id}`}
                 type="text"
-                placeholder="name"
+                placeholder={`Person ${idx + 1}`}
                 value={d.name}
                 onChange={(e) => updateDraft(d.id, { name: e.target.value })}
                 className="font-mono text-[13px] bg-transparent border-0 border-b border-ink px-0 py-0.5 w-32 placeholder:opacity-40"
@@ -201,13 +188,19 @@ export default function PrimeMomentsFinder() {
                       {formatDate(m.endDate)}
                     </div>
                     <div className="text-[14px]">
-                      {m.ages.map((a, i) => (
-                        <span key={a.name}>
-                          {i > 0 && " · "}
-                          {a.name}{" "}
-                          <span className="font-mono font-bold">{a.age}</span>
-                        </span>
-                      ))}
+                      Ages:{" "}
+                      {m.ages.map((a, i) => {
+                        const hasName = !/^Person \d+$/.test(a.name);
+                        return (
+                          <span key={a.name}>
+                            {i > 0 && ", "}
+                            <span className="font-mono font-bold">{a.age}</span>
+                            {hasName && (
+                              <span className="opacity-70"> ({a.name})</span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -217,14 +210,14 @@ export default function PrimeMomentsFinder() {
 
           {totalMoments > 0 && (
             <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onShare}
-                aria-label={copied ? "Share URL copied" : "Copy share URL"}
-                className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-transparent text-ink border border-ink cursor-pointer hover:bg-ink/5"
+              <a
+                href={`/x/prime-moments/${encodeShareParam(offsets)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-transparent text-ink border border-ink no-underline hover:bg-ink/5"
               >
-                {copied ? "copied ✓" : "share"}
-              </button>
+                view constellation →
+              </a>
             </div>
           )}
         </div>

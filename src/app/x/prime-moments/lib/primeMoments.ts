@@ -76,7 +76,10 @@ export function findPrimeMoments(
 
   const maxLifespan = opts.maxLifespan ?? DEFAULT_MAX_LIFESPAN;
 
-  const fromUTC = opts.from ? toUTCDay(opts.from) : toUTCDay(new Date());
+  const latestBirth = new Date(
+    Math.max(...births.map((b) => b.birth.getTime())),
+  );
+  const fromUTC = opts.from ? toUTCDay(opts.from) : toUTCDay(latestBirth);
 
   const oldestBirthYear = Math.min(
     ...births.map((b) => b.birth.getUTCFullYear()),

@@ -26,8 +26,8 @@ for (let n = 2; n < RING_MAX; n++) {
 function primePosition(p: number): { x: number; y: number } {
   const angle = (p * Math.PI) / 60 - Math.PI / 2;
   return {
-    x: CX + RADIUS * Math.cos(angle),
-    y: CY + RADIUS * Math.sin(angle),
+    x: Math.round((CX + RADIUS * Math.cos(angle)) * 100) / 100,
+    y: Math.round((CY + RADIUS * Math.sin(angle)) * 100) / 100,
   };
 }
 
