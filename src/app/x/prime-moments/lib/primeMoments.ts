@@ -10,15 +10,14 @@
 // moments whose sorted ages share the same shape relative to the youngest.
 
 import { isAdmissibleConstellation, isPrime } from "./primes";
-import type {
-  AgeAt,
-  Constellation,
-  FindOptions,
-  Person,
-  PrimeMoment,
+import {
+  MAX_LIFESPAN,
+  type AgeAt,
+  type Constellation,
+  type FindOptions,
+  type Person,
+  type PrimeMoment,
 } from "./types";
-
-const DEFAULT_MAX_LIFESPAN = 120;
 
 // All date math is done in UTC to avoid timezone drift. We only care about
 // year/month/day, never about clock time.
@@ -74,7 +73,7 @@ export function findPrimeMoments(
     birth: parseISODate(p.birthDate),
   }));
 
-  const maxLifespan = opts.maxLifespan ?? DEFAULT_MAX_LIFESPAN;
+  const maxLifespan = opts.maxLifespan ?? MAX_LIFESPAN;
 
   const latestBirth = new Date(
     Math.max(...births.map((b) => b.birth.getTime())),
@@ -191,7 +190,7 @@ export function findPrimeMoments(
  */
 export function countLifetimeInstances(
   offsets: number[],
-  maxLifespan: number = DEFAULT_MAX_LIFESPAN,
+  maxLifespan: number = MAX_LIFESPAN,
 ): number {
   if (offsets.length === 0) return 0;
   const maxOffset = offsets[offsets.length - 1];
@@ -206,7 +205,7 @@ export function countLifetimeInstances(
 
 export function findLifetimeInstances(
   offsets: number[],
-  maxLifespan: number = DEFAULT_MAX_LIFESPAN,
+  maxLifespan: number = MAX_LIFESPAN,
 ): number[][] {
   if (offsets.length === 0) return [];
   const maxOffset = offsets[offsets.length - 1];

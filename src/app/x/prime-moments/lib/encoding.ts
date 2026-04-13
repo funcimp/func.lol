@@ -1,3 +1,5 @@
+import { MAX_LIFESPAN } from "./types";
+
 // Prime constellation bitmask encoding.
 //
 // Each constellation is encoded as a uint32 bitmask over the 29 odd primes
@@ -102,7 +104,7 @@ export function decodeConstellation(s: string): number[] | null {
 export function encodeConstellation(offsets: number[]): string | null {
   // Find the first all-prime instance (smallest odd base prime).
   const maxOff = offsets[offsets.length - 1];
-  for (let p = 3; p + maxOff <= 120; p += 2) {
+  for (let p = 3; p + maxOff <= MAX_LIFESPAN; p += 2) {
     const ages = offsets.map((o) => o + p);
     if (ages.every((a) => PRIME_TO_INDEX.has(a))) {
       return toBase62(agesToBitmask(ages));

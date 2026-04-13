@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { INSTANCE_COLORS, instanceColor } from "./lib/colors";
 import { isPrime } from "./lib/primes";
 
 const TOUPS_INSTANCES = [
@@ -19,12 +20,7 @@ for (let i = 0; i < TOUPS_INSTANCES.length; i++) {
   }
 }
 
-const COLORS = [
-  "var(--color-moment-1)",
-  "var(--color-moment-2)",
-  "var(--color-moment-3)",
-  "var(--color-moment-4)",
-];
+const COLORS = INSTANCE_COLORS;
 
 function cellStyle(
   n: number,
@@ -91,7 +87,7 @@ export default function ToupsNumberLine() {
           >
             <span
               className="w-[8px] h-[8px] rounded-full flex-shrink-0"
-              style={{ backgroundColor: COLORS[i] }}
+              style={{ backgroundColor: instanceColor(i) }}
             />
             <span className="font-mono text-[11px]">
               ({ages.join(", ")})

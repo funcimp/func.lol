@@ -1,18 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { encodeShareParam, parseShareParam } from "./share";
-
-describe("encodeShareParam", () => {
-  test("dot-joins offsets", () => {
-    expect(encodeShareParam([0, 30, 32])).toBe("0.30.32");
-  });
-  test("handles single-element", () => {
-    expect(encodeShareParam([0])).toBe("0");
-  });
-  test("handles larger constellations", () => {
-    expect(encodeShareParam([0, 6, 12, 18, 24])).toBe("0.6.12.18.24");
-  });
-});
+import { parseShareParam } from "./share";
 
 describe("parseShareParam — valid inputs", () => {
   const cases: Array<[string, number[]]> = [
@@ -48,14 +36,4 @@ describe("parseShareParam — invalid inputs", () => {
       expect(parseShareParam(input)).toBeNull();
     });
   }
-});
-
-describe("parseShareParam round-trip", () => {
-  test("encode → parse recovers the original offsets", () => {
-    const offsets = [0, 30, 32];
-    expect(parseShareParam(encodeShareParam(offsets))).toEqual(offsets);
-  });
-  test("single-element round-trip", () => {
-    expect(parseShareParam(encodeShareParam([0]))).toEqual([0]);
-  });
 });

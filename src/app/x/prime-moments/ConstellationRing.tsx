@@ -1,27 +1,15 @@
 "use client";
 
-import { isPrime } from "./lib/primes";
-
-// 120-position ring. Each age = exactly 3°. Primes ≤ 119 get dots.
-// Constellation instances are drawn as colored polygons.
+import { INSTANCE_COLORS } from "./lib/colors";
 
 const CX = 60;
 const CY = 60;
 const RADIUS = 46;
-const RING_MAX = 120;
 
-const INSTANCE_COLORS = [
-  "var(--color-moment-1)",
-  "var(--color-moment-2)",
-  "var(--color-moment-3)",
-  "var(--color-moment-4)",
+const RING_PRIMES = [
+  2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+  73, 79, 83, 89, 97, 101, 103, 107, 109, 113,
 ];
-
-// Precompute the 30 primes that appear on the ring.
-const RING_PRIMES: number[] = [];
-for (let n = 2; n < RING_MAX; n++) {
-  if (isPrime(n)) RING_PRIMES.push(n);
-}
 
 function primePosition(p: number): { x: number; y: number } {
   const angle = (p * Math.PI) / 60 - Math.PI / 2;

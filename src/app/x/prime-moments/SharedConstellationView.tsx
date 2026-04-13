@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import ConstellationRing from "./ConstellationRing";
+import { instanceColor } from "./lib/colors";
 
 interface Props {
   offsets: number[];
@@ -57,7 +58,7 @@ export default function SharedConstellationView({
                 <div
                   className="w-[8px] h-[8px] rounded-full flex-shrink-0"
                   style={{
-                    backgroundColor: `var(--color-moment-${(i % 4) + 1})`,
+                    backgroundColor: instanceColor(i),
                   }}
                 />
                 <div className="text-[14px]">

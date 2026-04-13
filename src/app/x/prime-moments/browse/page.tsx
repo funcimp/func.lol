@@ -104,9 +104,13 @@ export default function BrowsePage() {
     });
   }, [sorted, cache]);
 
-  const totalForFilter = sizeFilter
-    ? entries.filter((c) => c.size === sizeFilter).length
-    : entries.length;
+  const totalForFilter = useMemo(
+    () =>
+      sizeFilter
+        ? entries.filter((c) => c.size === sizeFilter).length
+        : entries.length,
+    [entries, sizeFilter],
+  );
 
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">

@@ -1,5 +1,6 @@
-// Pure data types for the Prime Moments finder.
-// No React, no DOM. Imported by both the lib and the React component.
+// Pure data types and constants for Prime Moments.
+
+export const MAX_LIFESPAN = 120;
 
 export type Person = {
   id: string;        // unique within a group input — used as React key
@@ -30,6 +31,6 @@ export type FindOptions = {
   from?: Date;
   // Last date to consider. Defaults to (oldestBirthYear + maxLifespan)-12-31.
   through?: Date;
-  // Hard cap on age. Defaults to 122 (Jeanne Calment).
+  // Hard cap on age. Defaults to MAX_LIFESPAN (120).
   maxLifespan?: number;
 };

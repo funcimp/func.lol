@@ -1,17 +1,4 @@
-// Share encoding for Prime Moments constellations.
-//
-// Pure syntactic helpers — no dependency on primality or admissibility.
-// The caller is responsible for the admissibility check after parsing.
-
-const MAX_LIFESPAN = 120;
-
-/**
- * Serialize a constellation's offsets as a share-URL-friendly string.
- * Dot-separated so no characters need URL-encoding. Example: "0.30.32".
- */
-export function encodeShareParam(offsets: number[]): string {
-  return offsets.join(".");
-}
+import { MAX_LIFESPAN } from "./types";
 
 /**
  * Parse a raw share-URL query value into a validated offsets array.

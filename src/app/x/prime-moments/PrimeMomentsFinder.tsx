@@ -1,26 +1,26 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { formatDate } from "@/lib/dates";
 
 import ConstellationRing from "./ConstellationRing";
-import { findLifetimeInstances, findPrimeMoments } from "./lib/primeMoments";
+import { instanceColor } from "./lib/colors";
 import { encodeConstellation } from "./lib/encoding";
+import { findLifetimeInstances, findPrimeMoments } from "./lib/primeMoments";
 import type { Constellation, Person, PrimeMoment } from "./lib/types";
 
 type Draft = Pick<Person, "id" | "name" | "birthDate">;
 
-let nextDraftId = 0;
-const newDraft = (): Draft => ({
-  id: String(++nextDraftId),
-  name: "",
-  birthDate: "",
-});
-
 export default function PrimeMomentsFinder() {
   const formId = useId();
-  const [drafts, setDrafts] = useState<Draft[]>([newDraft(), newDraft()]);
+  const nextId = useRef(0);
+  const newDraft = (): Draft => ({
+    id: String(++nextId.current),
+    name: "",
+    birthDate: "",
+  });
+  const [drafts, setDrafts] = useState<Draft[]>(() => [newDraft(), newDraft()]);
   const [results, setResults] = useState<Constellation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoveredInstance, setHoveredInstance] = useState<number | null>(null);
@@ -58,15 +58,27 @@ export default function PrimeMomentsFinder() {
 
   const totalMoments = results?.reduce((n, c) => n + c.moments.length, 0) ?? 0;
   const offsets = results?.[0]?.offsets ?? [];
-  const instances = offsets.length > 0 ? findLifetimeInstances(offsets) : [];
+
+  const instances = useMemo(
+    () => (offsets.length > 0 ? findLifetimeInstances(offsets) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [offsets.join(",")],
+  );
+
+  const instanceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < instances.length; i++) {
+      map.set(instances[i].join(","), i);
+    }
+    return map;
+  }, [instances]);
 
   function instanceIndexOf(m: PrimeMoment): number {
-    const sorted = [...m.ages].map((a) => a.age).sort((a, b) => a - b);
-    return instances.findIndex(
-      (inst) =>
-        inst.length === sorted.length &&
-        inst.every((v, i) => v === sorted[i]),
-    );
+    const key = [...m.ages]
+      .map((a) => a.age)
+      .sort((a, b) => a - b)
+      .join(",");
+    return instanceMap.get(key) ?? -1;
   }
 
   return (
@@ -177,9 +189,7 @@ export default function PrimeMomentsFinder() {
                       className="w-[8px] h-[8px] rounded-full mt-[3px] flex-shrink-0"
                       style={{
                         backgroundColor:
-                          idx >= 0
-                            ? `var(--color-moment-${(idx % 4) + 1})`
-                            : "currentColor",
+                          idx >= 0 ? instanceColor(idx) : "currentColor",
                       }}
                     />
                     <div className="font-mono text-[12px]">
