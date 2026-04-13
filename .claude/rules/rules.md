@@ -17,7 +17,7 @@
 
 ## Philosophy of Software Design
 
-- Strategy is better than tactics.
+- Strategy, then tactics. Never the other way around.
 - The best way to get a good idea is to have lots of ideas.
 - Interfaces must be simple and obvious.
 - Strive for deep modularity, not shallow modularity.
@@ -30,10 +30,14 @@
 
 - Say it once, then stop.
 - Cut every word that doesn't earn its keep.
-- No hedges. No apologies. No fillers. No fluff. No waffle. No weasel words.
+- No hedges. No apologies. No fillers.
 - If you believe it, say it. If you don't, cut it.
-- Lead with the verb.
-- Delete the intro. Start in the middle.
+- Short sentences carry weight. Let them.
+- Longer sentences are fine when the thought needs room to land.
+- Never use emdashes. Use periods. Use commas. Restructure.
+- Invite the reader in. Write as if they're standing next to you.
+- Start with something concrete. A name, a number, a moment.
+- Explain like a friend who happens to know the thing, not a teacher.
 
 ## Shape
 

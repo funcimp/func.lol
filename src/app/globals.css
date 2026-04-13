@@ -91,4 +91,26 @@
     background-size: 2px 2px;
   }
   /* Toups prime cells use inline styles with --color-moment-N */
+
+  /* ============================================================
+     DOS-style drop-shadow container
+     ============================================================ */
+  .dither-box {
+    position: relative;
+    border: 1px solid var(--color-ink);
+    padding: 24px;
+    background: var(--color-paper);
+  }
+  .dither-box::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: var(--color-ink);
+    opacity: 0.15;
+    pointer-events: none;
+  }
 }

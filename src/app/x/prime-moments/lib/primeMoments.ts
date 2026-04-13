@@ -189,6 +189,21 @@ export function findPrimeMoments(
  *
  * Returns [] for empty offsets.
  */
+export function countLifetimeInstances(
+  offsets: number[],
+  maxLifespan: number = DEFAULT_MAX_LIFESPAN,
+): number {
+  if (offsets.length === 0) return 0;
+  const maxOffset = offsets[offsets.length - 1];
+  let count = 0;
+  for (let p = 3; p + maxOffset <= maxLifespan; p += 2) {
+    if (offsets.every((o) => isPrime(p + o))) {
+      count++;
+    }
+  }
+  return count;
+}
+
 export function findLifetimeInstances(
   offsets: number[],
   maxLifespan: number = DEFAULT_MAX_LIFESPAN,

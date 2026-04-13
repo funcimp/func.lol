@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/dates";
 
 import ConstellationRing from "./ConstellationRing";
 import { findLifetimeInstances, findPrimeMoments } from "./lib/primeMoments";
-import { encodeShareParam } from "./lib/share";
+import { encodeConstellation } from "./lib/encoding";
 import type { Constellation, Person, PrimeMoment } from "./lib/types";
 
 type Draft = Pick<Person, "id" | "name" | "birthDate">;
@@ -71,15 +71,15 @@ export default function PrimeMomentsFinder() {
 
   return (
     <section aria-labelledby={`${formId}-heading`} className="w-full">
-      <div className="border-t border-ink pt-7">
+      <div className="pt-4">
         <h2
           id={`${formId}-heading`}
-          className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-3"
+          className="text-[18px] font-bold tracking-[-0.02em] mb-1"
         >
-          your group
+          Find your prime moments
         </h2>
         <p className="text-[11px] opacity-50 mb-5 font-mono">
-          everything runs in your browser. nothing is sent or stored.
+          enter birthdays. everything runs in your browser. nothing is sent or stored.
         </p>
 
         <div className="flex flex-col gap-2.5">
@@ -211,7 +211,7 @@ export default function PrimeMomentsFinder() {
           {totalMoments > 0 && (
             <div className="mt-6 flex flex-wrap gap-2">
               <a
-                href={`/x/prime-moments/${encodeShareParam(offsets)}`}
+                href={`/x/prime-moments/${encodeConstellation(offsets) ?? ""}`}
                 target="_blank"
                 rel="noreferrer"
                 className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 bg-transparent text-ink border border-ink no-underline hover:bg-ink/5"

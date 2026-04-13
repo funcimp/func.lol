@@ -2,7 +2,7 @@
 
 Prime constellations in family ages: the calendar windows when every member of a family has a prime age at once.
 
-Backs the [Prime Moments lab](../../src/app/labs/prime-moments/). The lab is the finder; this folder is the math and the Go enumerator.
+Backs the [Prime Moments lab](../../src/app/x/prime-moments/). The lab is the finder; this folder is the math and the Go enumerator.
 
 ## Origin
 
@@ -37,12 +37,12 @@ Three ages, all prime, all at once — an instance of a pattern. The offset shap
 
 ## The biological constraints
 
-| Constraint              | Value | Source                         |
-| ----------------------- | ----- | ------------------------------ |
-| Min parent age at birth | 18    | age of consent floor           |
-| Max mother age at birth | 67    | oldest documented mother (IVF) |
-| Max father age at birth | 90    | oldest documented father       |
-| Max lifespan            | 122   | Jeanne Calment                 |
+| Constraint              | Value | Source                              |
+| ----------------------- | ----- | ----------------------------------- |
+| Min parent age at birth | 18    | age of consent floor                |
+| Max mother age at birth | 67    | oldest documented mother (IVF)      |
+| Max father age at birth | 90    | oldest documented father            |
+| Max lifespan            | 120   | practical cap (113 is last prime)   |
 
 Hard caps on the search space, not biological law. Parameters, not invariants.
 
@@ -93,7 +93,7 @@ The finder that runs in your browser:
 3. If every age is prime, record the window.
 4. Group results by offset pattern (sorted, relative to the youngest).
 
-Pure-function logic in [`src/app/labs/prime-moments/lib/`](../../src/app/labs/prime-moments/lib/), covered by `bun test`.
+Pure-function logic in [`src/app/x/prime-moments/lib/`](../../src/app/x/prime-moments/lib/), covered by `bun test`.
 
 ## Running the Go code
 

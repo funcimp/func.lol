@@ -27,15 +27,26 @@ export default function Home() {
       <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 gap-7">
         <h1 className="sr-only">func.lol</h1>
         <FuncImpMark className="w-[260px] h-auto sm:w-[320px]" />
-        <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch]">
-          Lab experiments by Functionally Imperative.
+        <p className="text-[14px] leading-[1.45] opacity-55 max-w-[38ch]">
+          Experiments by{" "}
+          <a
+            href="https://n.2p5.xyz"
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            nathan toups
+          </a>
+          .
         </p>
-        <Link
-          href="/x"
-          className="font-mono text-[12px] lowercase tracking-[0.04em] px-4 py-2 border border-ink no-underline hover:bg-ink/5"
-        >
-          experiments →
-        </Link>
+        <nav className="flex flex-col gap-1">
+          <Link
+            href="/x/prime-moments"
+            className="font-mono text-[20px] underline hover:opacity-70"
+          >
+            Prime Moments
+          </Link>
+        </nav>
       </div>
     </main>
   );

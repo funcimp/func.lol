@@ -3,9 +3,24 @@ import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
 
+import { decodeConstellation } from "../lib/encoding";
 import { isAdmissibleConstellation } from "../lib/primes";
 import { parseShareParam } from "../lib/share";
 import SharedConstellation from "../SharedConstellation";
+
+/**
+ * Parse the constellation slug. Accepts:
+ * - base62 bitmask (e.g. "4so")
+ * - dot-separated offsets (e.g. "0.30.32")
+ */
+function parseSlug(slug: string): number[] | null {
+  // Try dot-separated first (contains a dot).
+  if (slug.includes(".")) {
+    return parseShareParam(slug);
+  }
+  // Otherwise try base62 bitmask.
+  return decodeConstellation(slug);
+}
 
 interface PageProps {
   params: Promise<{ constellation: string }>;
@@ -15,7 +30,7 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { constellation } = await params;
-  const offsets = parseShareParam(constellation);
+  const offsets = parseSlug(constellation);
   if (offsets && isAdmissibleConstellation(offsets)) {
     return {
       title: `Constellation [${offsets.join(", ")}] — Prime Moments`,
@@ -27,7 +42,7 @@ export async function generateMetadata({
 
 export default async function ConstellationPage({ params }: PageProps) {
   const { constellation } = await params;
-  const offsets = parseShareParam(constellation);
+  const offsets = parseSlug(constellation);
   const valid =
     offsets !== null && isAdmissibleConstellation(offsets) ? offsets : null;
 

@@ -25,7 +25,8 @@ const labs: Lab[] = [
       "Find the calendar windows when every person in a group has a prime age at the same time.",
     publishedAt: "2026-04-10",
     links: {
-      github: "https://github.com/funcimp/func.lol/tree/main/research/prime-moments",
+      github:
+        "https://github.com/funcimp/func.lol/tree/main/research/prime-moments",
     },
   },
 ];
@@ -49,7 +50,18 @@ export default function LabsIndexPage() {
             experiments
           </h1>
           <p className="text-[18px] leading-[1.45] opacity-85 max-w-[38ch] mt-3">
-            Small, self-contained experiments. Built in public.
+            Small, self-contained experiments
+            <br />
+            by{" "}
+            <a
+              href="https://n.2p5.xyz"
+              className="underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              nathan toups
+            </a>
+            .
           </p>
         </header>
 
