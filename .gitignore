@@ -37,8 +37,24 @@ yarn-error.log*
 .vercel
 
 # claude
-.claude
+.claude/settings.local.json
+
+# superpowers brainstorming companion (mockups, server state)
+.superpowers/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# scratch directories
+tmp/
+logs/
+scratch/
+research/prime-moments/go/interesting
