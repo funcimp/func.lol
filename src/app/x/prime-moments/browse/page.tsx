@@ -7,7 +7,7 @@ import ConstellationRing from "../ConstellationRing";
 import {
   agesToOffsets,
   bitmaskToAges,
-  fromBase62,
+  toBase62,
 } from "../lib/encoding";
 import {
   countLifetimeInstances,
@@ -15,7 +15,7 @@ import {
 } from "../lib/primeMoments";
 
 type Entry = {
-  b62: string;
+  mask: number;
   offsets: number[];
   size: number;
   spread: number;
@@ -26,9 +26,9 @@ type Rendered = Entry & {
   instances: number[][];
 };
 
-// Decode: bitmask → offsets + instance count. No tuple allocation.
-function decodeEntry(line: string): Entry | null {
-  const mask = fromBase62(line);
+// Decode a uint32 bitmask into an Entry. Returns null if invalid or
+// has fewer than 2 lifetime instances.
+function decodeEntry(mask: number): Entry | null {
   if (mask <= 0) return null;
   const ages = bitmaskToAges(mask);
   if (ages.length < 2) return null;
@@ -36,7 +36,7 @@ function decodeEntry(line: string): Entry | null {
   const instanceCount = countLifetimeInstances(offsets);
   if (instanceCount < 2) return null;
   return {
-    b62: line,
+    mask,
     offsets,
     size: offsets.length,
     spread: offsets[offsets.length - 1],
@@ -61,16 +61,18 @@ export default function BrowsePage() {
   const [sortBy, setSortBy] = useState<SortKey>("instanceCount");
   const [limit, setLimit] = useState(100);
 
-  const [cache] = useState(() => new Map<string, Rendered>());
+  const [cache] = useState(() => new Map<number, Rendered>());
 
   useEffect(() => {
-    fetch("/data/constellations.b62")
-      .then((r) => r.text())
-      .then((text) => {
-        const lines = text.trim().split("\n");
+    fetch("/data/x/prime-moments/constellations.bin")
+      .then((r) => r.arrayBuffer())
+      .then((buf) => {
+        const view = new DataView(buf);
+        const count = Math.floor(buf.byteLength / 4);
         const decoded: Entry[] = [];
-        for (const line of lines) {
-          const e = decodeEntry(line.trim());
+        for (let i = 0; i < count; i++) {
+          const mask = view.getUint32(i * 4, true); // little-endian
+          const e = decodeEntry(mask);
           if (e) decoded.push(e);
         }
         setEntries(decoded);
@@ -95,10 +97,10 @@ export default function BrowsePage() {
   // Full-decode only the visible slice (compute instance tuples for rendering).
   const visible: Rendered[] = useMemo(() => {
     return sorted.map((entry) => {
-      let full = cache.get(entry.b62);
+      let full = cache.get(entry.mask);
       if (!full) {
         full = renderEntry(entry);
-        cache.set(entry.b62, full);
+        cache.set(entry.mask, full);
       }
       return full;
     });
@@ -184,10 +186,12 @@ export default function BrowsePage() {
           </p>
         ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {visible.map((c) => (
+          {visible.map((c) => {
+            const slug = toBase62(c.mask);
+            return (
             <a
-              key={c.b62}
-              href={`/x/prime-moments/${c.b62}`}
+              key={c.mask}
+              href={`/x/prime-moments/${slug}`}
               target="_blank"
               rel="noreferrer"
               className="border border-ink/20 hover:border-ink/60 p-3 no-underline transition-colors"
@@ -204,7 +208,8 @@ export default function BrowsePage() {
                 k={c.size}
               </div>
             </a>
-          ))}
+            );
+          })}
         </div>
 
         )}

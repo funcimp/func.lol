@@ -1,6 +1,6 @@
 // interesting enumerates all admissible prime constellations of size 2..6
-// with offsets ≤ 120, counts their lifetime instances, and outputs one
-// base62-encoded bitmask per line.
+// with offsets ≤ 120, counts their lifetime instances, and outputs each
+// one as a 4-byte little-endian uint32 bitmask.
 //
 // The bitmask encodes the first lifetime instance as set bits over the
 // 29 odd primes [3, 5, 7, 11, ..., 113]. The client decodes the bitmask
@@ -8,10 +8,11 @@
 //
 // Run from research/prime-moments/go:
 //
-//	go run ./cmd/interesting > constellations.b62
+//	go run ./cmd/interesting > constellations.bin
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"os"
@@ -30,21 +31,6 @@ func init() {
 	}
 }
 
-const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func toBase62(n uint32) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [6]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = base62Chars[n%62]
-		n /= 62
-	}
-	return string(buf[i:])
-}
 
 var primeCache = make(map[int64]bool)
 
@@ -85,11 +71,10 @@ func isAdmissible(offsets []int) bool {
 }
 
 type result struct {
-	offsets   []int
-	first     []int // first instance ages
-	count     int   // number of instances
-	bitmask   uint32
-	base62    string
+	offsets []int
+	first   []int // first instance ages
+	count   int   // number of instances
+	bitmask uint32
 }
 
 func findInstances(offsets []int) ([][]int, int) {
@@ -158,13 +143,11 @@ func main() {
 			if n < 2 {
 				continue
 			}
-			mask := agesToBitmask(instances[0])
 			all = append(all, result{
 				offsets: offsets,
 				first:   instances[0],
 				count:   n,
-				bitmask: mask,
-				base62:  toBase62(mask),
+				bitmask: agesToBitmask(instances[0]),
 			})
 			count++
 		}
@@ -181,7 +164,12 @@ func main() {
 
 	fmt.Fprintf(os.Stderr, "total: %d constellations\n", len(all))
 
+	var buf [4]byte
 	for _, r := range all {
-		fmt.Println(r.base62)
+		binary.LittleEndian.PutUint32(buf[:], r.bitmask)
+		if _, err := os.Stdout.Write(buf[:]); err != nil {
+			fmt.Fprintf(os.Stderr, "write error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
