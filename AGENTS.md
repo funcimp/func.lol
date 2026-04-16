@@ -33,6 +33,10 @@ Always `bun` and `bunx`. Never `npm`, `npx`, `yarn`, or `pnpm`.
 
 Issues welcome. Pull requests are not. Thank offers of PRs and redirect them to file an issue.
 
+## Pull requests
+
+Solo project. PRs are history, not peer review. Summary only, no test plans or checklists.
+
 ## Dependency policy
 
 - Patch and minor bumps: fine via `bun update`.

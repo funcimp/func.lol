@@ -40,12 +40,18 @@ function toUTCDay(d: Date): Date {
   );
 }
 
+// Birthday in a given year. Feb 29 birthdays always use Feb 28 so that
+// the age gap between two people doesn't wobble across leap years.
+function birthdayInYear(birth: Date, year: number): Date {
+  if (birth.getUTCMonth() === 1 && birth.getUTCDate() === 29) {
+    return new Date(Date.UTC(year, 1, 28));
+  }
+  return new Date(Date.UTC(year, birth.getUTCMonth(), birth.getUTCDate()));
+}
+
 function ageAt(birth: Date, on: Date): number {
   let age = on.getUTCFullYear() - birth.getUTCFullYear();
-  const birthdayThisYear = new Date(
-    Date.UTC(on.getUTCFullYear(), birth.getUTCMonth(), birth.getUTCDate()),
-  );
-  if (on < birthdayThisYear) age--;
+  if (on < birthdayInYear(birth, on.getUTCFullYear())) age--;
   return age;
 }
 
@@ -57,7 +63,7 @@ function addDays(d: Date, days: number): Date {
 
 // Sorted ascending, shifted so the smallest entry is 0.
 function offsetPattern(ages: number[]): number[] {
-  const sorted = [...ages].sort((a, b) => a - b);
+  const sorted = [...new Set(ages)].sort((a, b) => a - b);
   const base = sorted[0];
   return sorted.map((a) => a - base);
 }
@@ -104,9 +110,7 @@ export function findPrimeMoments(
 
   for (const b of births) {
     for (let y = startYear; y <= endYear + 1; y++) {
-      const birthday = new Date(
-        Date.UTC(y, b.birth.getUTCMonth(), b.birth.getUTCDate()),
-      );
+      const birthday = birthdayInYear(b.birth, y);
       if (birthday >= fromUTC && birthday <= exclusiveEnd) {
         boundarySet.add(birthday.getTime());
       }

@@ -98,6 +98,28 @@ describe("findPrimeMoments — single-person group", () => {
   });
 });
 
+describe("findPrimeMoments — duplicate ages collapse (constellations are sets)", () => {
+  // Two people born on the same day have identical ages at every point.
+  // The offset pattern [0, 0] should collapse to [0].
+  const result = findPrimeMoments(
+    [
+      { id: "a", name: "A", birthDate: "2010-01-01" },
+      { id: "b", name: "B", birthDate: "2010-01-01" },
+    ],
+    { from: utc(2021, 1, 1), through: utc(2022, 1, 1) },
+  );
+
+  test("produces constellation [0], not [0, 0]", () => {
+    expect(result).toHaveLength(1);
+    expect(result[0].offsets).toEqual([0]);
+  });
+
+  test("finds the age-11 moment in that range", () => {
+    expect(result[0].moments).toHaveLength(1);
+    expect(result[0].moments[0].ages[0].age).toBe(11);
+  });
+});
+
 describe("findPrimeMoments — no shared moments", () => {
   // Two people 91 years apart. For both ages to be prime, we'd need
   // (p, p+91) all prime. 91 is odd, so p and p+91 have opposite parity;
@@ -122,11 +144,9 @@ describe("findPrimeMoments — empty group", () => {
 });
 
 describe("findPrimeMoments — leap-day birthday", () => {
-  // A person born on Feb 29 2000 reaches age 29 (prime) on the
-  // canonical "birthday" boundary. JS Date treats Feb 29 in a non-leap
-  // year as Mar 1, and so does the finder — internally consistent.
-  // We just verify the algorithm produces the correct moment without
-  // crashing on the leap-day input.
+  // A person born on Feb 29 2000 reaches age 29 (prime) on their
+  // birthday boundary. In non-leap years, Feb 29 clamps to Feb 28
+  // (the way most people with leap-day birthdays celebrate).
   const result = findPrimeMoments(
     [{ id: "leap", name: "Leap", birthDate: "2000-02-29" }],
     { from: utc(2029, 1, 1), through: utc(2030, 1, 1) },
@@ -139,13 +159,40 @@ describe("findPrimeMoments — leap-day birthday", () => {
     expect(result[0].moments[0].ages[0].age).toBe(29);
   });
 
-  test("the moment runs from the rolled birthday to the search end", () => {
+  test("the moment starts on Feb 28 (clamped from Feb 29)", () => {
     const m = result[0].moments[0];
-    // 2029 is non-leap; the algorithm rolls Feb 29 → Mar 1 consistently.
-    // The next birthday is 2030-03-01 — past `through` — so the window
+    // 2029 is non-leap; Feb 29 clamps to Feb 28.
+    // The next birthday is 2030-02-28, past `through`, so the window
     // is clipped to `through` (which is inclusive).
-    expect(m.startDate).toBe("2029-03-01");
+    expect(m.startDate).toBe("2029-02-28");
     expect(m.endDate).toBe("2030-01-01");
+  });
+});
+
+describe("findPrimeMoments — leap-day pair produces stable age gap", () => {
+  // Person 1 born Feb 28, Person 2 born Feb 29 the next year.
+  // They are ~1 year apart. Without leap-day clamping, the finder
+  // would see phantom single-day windows where the age gap jumps
+  // from 1 to 2. With clamping, the gap stays at 1.
+  const result = findPrimeMoments(
+    [
+      { id: "a", name: "A", birthDate: "2023-02-28" },
+      { id: "b", name: "B", birthDate: "2024-02-29" },
+    ],
+    { from: utc(2028, 1, 1), through: utc(2029, 1, 1) },
+  );
+
+  test("produces constellation [0, 1], not [0, 2]", () => {
+    if (result.length === 0) return; // no admissible constellation is also valid
+    expect(result[0].offsets).toEqual([0, 1]);
+  });
+
+  test("no single-day phantom moments", () => {
+    for (const c of result) {
+      for (const m of c.moments) {
+        expect(m.startDate).not.toBe(m.endDate);
+      }
+    }
   });
 });
 
