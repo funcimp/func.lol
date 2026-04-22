@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Lab experiments by Functionally Imperative. Public domain. Built in public.
+Experiments by Functionally Imperative. Public domain. Built in public.
 
 > **Public, forever.** No secrets, no private notes, no internal links. Everything here is world-readable.
 

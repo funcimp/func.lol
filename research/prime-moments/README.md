@@ -2,7 +2,7 @@
 
 Prime constellations in family ages: the calendar windows when every member of a family has a prime age at once.
 
-Backs the [Prime Moments lab](../../src/app/x/prime-moments/). The lab is the finder; this folder is the math and the Go enumerator.
+Backs the [Prime Moments experiment](../../src/app/x/prime-moments/). The experiment is the finder; this folder is the math and the Go enumerator.
 
 ## Origin
 
@@ -84,7 +84,7 @@ For every pair of parents drawn from the odd primes `[3..113]`:
 5. For each unique constellation, scan base primes `p` and record every `p` where all `p + offset` are prime and the largest fits inside `MaxLifespan`. These are the lifetime instances.
 6. Filter to constellations with `MinInstances` or more occurrences.
 
-### Prime moment search (lab runtime)
+### Prime moment search (experiment runtime)
 
 The finder that runs in your browser:
 

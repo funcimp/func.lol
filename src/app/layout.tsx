@@ -20,7 +20,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "func.lol",
-  description: "Lab experiments by Functionally Imperative.",
+  description: "Experiments by Functionally Imperative.",
   icons: { icon: "/func-imp-favicon.png" },
 };
 
