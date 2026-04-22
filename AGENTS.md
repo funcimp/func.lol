@@ -16,6 +16,7 @@ Experiments by Functionally Imperative. Public domain. Built in public.
 
 - Start simple. Add only what survives scrutiny.
 - Ask if you're confused. Don't guess.
+- Experiments are self-contained. No sibling apps, no separate hosts. Experiments ship with func.lol.
 
 ## Influences
 
