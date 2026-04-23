@@ -25,9 +25,7 @@ describe("robots.ts", () => {
     const disallow = rule.disallow as string[]
     const substringTokens = PATTERNS.filter((p) => p.shape === "substring").map((p) => p.token)
     for (const token of substringTokens) {
-      if (!token.startsWith("/")) {
-        expect(disallow).not.toContain(token)
-      }
+      expect(disallow).not.toContain(token)
     }
   })
 
@@ -48,6 +46,6 @@ describe("robots.ts", () => {
   })
 
   test("sitemap points to func.lol", () => {
-    expect(output.sitemap).toContain("func.lol")
+    expect(output.sitemap).toBe("https://func.lol/sitemap.xml")
   })
 })
