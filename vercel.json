@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "bunVersion": "1.x",
   "crons": [
-    { "path": "/api/cron/tripwire-archive", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/tripwire-archive", "schedule": "0 3,15 * * *" }
   ]
 }

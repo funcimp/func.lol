@@ -15,8 +15,8 @@ Rough brainstorming. Not promises. Concrete enough to act on → graduates to a 
 
 ## Tripwire
 
-- v2: live stats panel on `/x/tripwire`. Read the daily archived JSONL files from Blob (produced by v1's cron archiver), aggregate, render. No new plumbing; v1 already writes the archive.
-- v3: intelligent pattern discovery. Capture all 4xx responses on func.lol (not just 404; 403 on admin panels, 405 on verb probes, 422 on payload probes all carry signal) via a daily cron that queries the Vercel Logs API and filters `status >= 400 AND status < 500 AND path NOT IN known_bait`. Archive to Blob at `tripwire/candidates/YYYY-MM-DD.jsonl.gz` alongside the existing `tripwire/events/` stream. Analyze for scanner-like clusters (high frequency from one IP/ASN, suspicious UA family, repeated path prefixes). Surface candidates, a human promotes the real ones into `patterns.ts`. The 4xx archive becomes the input to a discovery tool.
+- v2: live stats panel on `/x/tripwire`. Read the half-day archived JSONL files from Blob (produced by the cron archiver at `tripwire/events/YYYY-MM-DDTHH.jsonl.gz`), aggregate, render. No new plumbing; the archive exists.
+- v3: intelligent pattern discovery tool. The candidate 4xx archive at `tripwire/candidates/YYYY-MM-DDTHH.jsonl.gz` already captures non-bait 4xx responses twice a day. What's left is the analysis: cluster by IP/ASN/UA family/path prefix, threshold by frequency, surface the top N candidates as suggestions for `patterns.ts`. The output format is "here are N scanner-looking paths you aren't matching yet — promote the ones that look like real exploit bait."
 - Contextual bomb variants beyond the v1 four: YAML billion-laughs (alias bomb), ZIP/tarball bombs for `/backup.zip`-style probes, per-pattern bombs instead of per-category.
 - `Accept`-header-based bomb selection for scanners that set a meaningful Accept.
 - UA allowlist paired with reverse-DNS verification for known-good crawlers. The only defensible way to treat UA as signal (plain UA-string trust is a free bypass for spoofers). Add if we ever see evidence a real crawler is getting bombed.
