@@ -61,6 +61,8 @@ describe("matchBait", () => {
     ["/actuator/env",                            "actuator"],
     ["/cgi-bin/",                                "cgi"],
     ["/shell.php",                               "webshell"],
+    ["/latest/meta-data/",                       "metadata"],
+    ["/anything?target=169.254.169.254/latest",  "metadata"],
   ]
 
   for (const [path, expectedCategory] of baitCases) {
