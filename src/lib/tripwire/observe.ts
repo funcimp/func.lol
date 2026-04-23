@@ -10,12 +10,35 @@ export function hashIP(ip: string): string {
   return `sha256:${digest}`
 }
 
-// Stubs. Real implementations land in Tasks 8 (uaFamily) and 9-10 (guard).
-// These exist only so the shared test file imports resolve today.
-export function uaFamily(_ua: string): string {
-  return "stub"
+const UA_FAMILIES: Array<[RegExp, string]> = [
+  [/nuclei/i,                   "nuclei"],
+  [/zgrab/i,                    "zgrab"],
+  [/masscan/i,                  "masscan"],
+  [/nmap/i,                     "nmap"],
+  [/gobuster/i,                 "gobuster"],
+  [/\bffuf\b/i,                 "ffuf"],
+  [/python-requests/i,          "requests"],
+  [/python-urllib|\bpython\b/i, "python"],
+  [/\bcurl\//i,                 "curl"],
+  [/\bwget\//i,                 "wget"],
+  [/go-http-client/i,           "go-http-client"],
+  [/googlebot/i,                "googlebot"],
+  [/bingbot/i,                  "bingbot"],
+  [/duckduckbot/i,              "duckduckbot"],
+  [/applebot/i,                 "applebot"],
+  [/yandexbot/i,                "yandexbot"],
+  [/baiduspider/i,              "baiduspider"],
+]
+
+export function uaFamily(ua: string): string {
+  for (const [re, family] of UA_FAMILIES) {
+    if (re.test(ua)) return family
+  }
+  return "unknown"
 }
 
+// Stub. Real implementation lands in Tasks 9-10.
+// Exists so the shared test file imports resolve today.
 export function guard(_ipHash: string): boolean {
   return true
 }

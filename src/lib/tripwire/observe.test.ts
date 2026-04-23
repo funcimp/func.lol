@@ -47,3 +47,30 @@ describe("hashIP", () => {
     }
   })
 })
+
+describe("uaFamily", () => {
+  const cases: Array<[string, string]> = [
+    ["Nuclei - Open-source project (github.com/projectdiscovery/nuclei)", "nuclei"],
+    ["Mozilla/5.0 zgrab/0.x", "zgrab"],
+    ["masscan/1.3", "masscan"],
+    ["Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)", "nmap"],
+    ["gobuster/3.6", "gobuster"],
+    ["Mozilla/5.0 ffuf/2.1", "ffuf"],
+    ["python-requests/2.31.0", "requests"],
+    ["Python-urllib/3.11", "python"],
+    ["curl/8.4.0", "curl"],
+    ["Wget/1.21.4", "wget"],
+    ["Go-http-client/1.1", "go-http-client"],
+    ["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "googlebot"],
+    ["Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", "bingbot"],
+    ["DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)", "duckduckbot"],
+    ["", "unknown"],
+    ["Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/537.36", "unknown"],
+  ]
+
+  for (const [ua, expected] of cases) {
+    test(`classifies ${JSON.stringify(ua.slice(0, 40))} as ${expected}`, () => {
+      expect(uaFamily(ua)).toBe(expected)
+    })
+  }
+})
