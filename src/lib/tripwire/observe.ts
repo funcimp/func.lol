@@ -3,6 +3,9 @@ import { createHash } from "node:crypto"
 
 export function hashIP(ip: string): string {
   const salt = process.env.TRIPWIRE_IP_SALT ?? ""
+  if (!salt && process.env.NODE_ENV === "production") {
+    throw new Error("TRIPWIRE_IP_SALT is required in production")
+  }
   const digest = createHash("sha256").update(ip + salt).digest("hex").slice(0, 16)
   return `sha256:${digest}`
 }
