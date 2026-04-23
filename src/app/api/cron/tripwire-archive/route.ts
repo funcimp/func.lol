@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server"
 import { put, list, get } from "@vercel/blob"
 import { gzipSync, gunzipSync } from "node:zlib"
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 // Lightweight shape of the event lines we care about.
 interface TripwireEvent {
   event: "tripwire.hit" | "tripwire.throttled"
@@ -10,6 +13,9 @@ interface TripwireEvent {
   [k: string]: unknown
 }
 
+// Cron fires at 03:00 UTC (see vercel.json crons entry). This function and
+// the Logs API query window below must agree on UTC — do not "fix" one
+// without the other.
 function yesterdayUTC(now = new Date()): string {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
   d.setUTCDate(d.getUTCDate() - 1)
@@ -17,9 +23,7 @@ function yesterdayUTC(now = new Date()): string {
 }
 
 function eventKey(e: TripwireEvent): string {
-  const pattern = (e as Record<string, unknown>).pattern ?? ""
-  const ipHash = (e as Record<string, unknown>).ip_hash ?? ""
-  return `${e.ts}|${e.event}|${pattern}|${ipHash}`
+  return `${e.ts}|${e.event}|${e.pattern ?? ""}|${e.ip_hash ?? ""}`
 }
 
 function verifyCronAuth(req: NextRequest): boolean {
@@ -46,7 +50,8 @@ async function fetchLogLinesForDate(date: string): Promise<string[]> {
   if (!token || !projectId) return []
 
   const from = new Date(`${date}T00:00:00.000Z`).getTime()
-  const to = new Date(`${date}T23:59:59.999Z`).getTime()
+  const nextDay = new Date(from + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const to = new Date(`${nextDay}T00:00:00.000Z`).getTime()
   const url = new URL(`https://api.vercel.com/v1/projects/${projectId}/logs`)
   url.searchParams.set("since", String(from))
   url.searchParams.set("until", String(to))
@@ -54,26 +59,46 @@ async function fetchLogLinesForDate(date: string): Promise<string[]> {
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
-    console.error(`[tripwire-archive] Vercel Logs API ${res.status}`)
+    console.error(
+      `[tripwire-archive] Vercel Logs API failed (status=${res.status}). ` +
+      `Archive will be empty for ${date}. Verify VERCEL_API_TOKEN and endpoint shape.`,
+    )
     return []
   }
   const text = await res.text()
   return text.split("\n").filter(Boolean)
 }
 
+function parseEventLine(line: string): TripwireEvent | null {
+  // Try whole-line parse first (the happy path for our console.log JSON).
+  try {
+    const obj = JSON.parse(line) as Partial<TripwireEvent>
+    if (obj.event === "tripwire.hit" || obj.event === "tripwire.throttled") {
+      return obj as TripwireEvent
+    }
+  } catch {
+    // Fall through to substring extraction.
+  }
+  // Fallback: carve out the first balanced {...} on the line.
+  const first = line.indexOf("{")
+  const last = line.lastIndexOf("}")
+  if (first < 0 || last <= first) return null
+  try {
+    const obj = JSON.parse(line.slice(first, last + 1)) as Partial<TripwireEvent>
+    if (obj.event === "tripwire.hit" || obj.event === "tripwire.throttled") {
+      return obj as TripwireEvent
+    }
+  } catch {
+    // Skip unparseable line.
+  }
+  return null
+}
+
 function extractTripwireEvents(lines: string[]): TripwireEvent[] {
   const out: TripwireEvent[] = []
   for (const line of lines) {
-    const i = line.indexOf("{")
-    if (i < 0) continue
-    try {
-      const obj = JSON.parse(line.slice(i)) as Partial<TripwireEvent>
-      if (obj.event === "tripwire.hit" || obj.event === "tripwire.throttled") {
-        out.push(obj as TripwireEvent)
-      }
-    } catch {
-      // not a JSON line; skip
-    }
+    const e = parseEventLine(line)
+    if (e) out.push(e)
   }
   return out
 }
@@ -86,11 +111,7 @@ async function readExistingArchive(date: string): Promise<TripwireEvent[]> {
   // Private blob: read back via get(), not fetch(). Returns { stream, ... }.
   const file = await get(hit.url, { access: "private" })
   if (!file || file.statusCode !== 200) return []
-  const chunks: Uint8Array[] = []
-  for await (const chunk of file.stream as unknown as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk)
-  }
-  const buf = Buffer.concat(chunks)
+  const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
   const text = gunzipSync(buf).toString("utf8")
   const out: TripwireEvent[] = []
   for (const line of text.split("\n")) {
@@ -109,11 +130,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const lines = await fetchLogLinesForDate(date)
   const incoming = extractTripwireEvents(lines)
 
+  const existing = incoming.length === 0 ? [] : await readExistingArchive(date)
+
   if (incoming.length === 0) {
-    return NextResponse.json({ ok: true, date, count: 0, message: "no events to archive" })
+    return NextResponse.json({
+      ok: true,
+      date,
+      existingCount: 0,
+      incomingCount: 0,
+      mergedCount: 0,
+      added: 0,
+      message: "no events to archive",
+    })
   }
 
-  const existing = await readExistingArchive(date)
   const merged = new Map<string, TripwireEvent>()
   for (const e of existing) merged.set(eventKey(e), e)
   for (const e of incoming) merged.set(eventKey(e), e)
@@ -132,5 +162,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     allowOverwrite: true,
   })
 
-  return NextResponse.json({ ok: true, date, count: merged.size })
+  return NextResponse.json({
+    ok: true,
+    date,
+    existingCount: existing.length,
+    incomingCount: incoming.length,
+    mergedCount: merged.size,
+    added: merged.size - existing.length,
+  })
 }
