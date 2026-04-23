@@ -1,14 +1,4 @@
 // src/lib/tripwire/observe.ts
-import { createHash } from "node:crypto"
-
-export function hashIP(ip: string): string {
-  const salt = process.env.TRIPWIRE_IP_SALT ?? ""
-  if (!salt && process.env.NODE_ENV === "production") {
-    throw new Error("TRIPWIRE_IP_SALT is required in production")
-  }
-  const digest = createHash("sha256").update(ip + salt).digest("hex").slice(0, 16)
-  return `sha256:${digest}`
-}
 
 // First match wins. Ordering matters: narrower patterns (python-requests)
 // must appear before broader ones (python) so the more specific label
@@ -64,12 +54,12 @@ let globalResetAt = 0
 const SWEEP_THRESHOLD = 10_000
 
 function sweepExpired(now: number): void {
-  for (const [ip, entry] of perIp) {
-    if (now > entry.resetAt) perIp.delete(ip)
+  for (const [key, entry] of perIp) {
+    if (now > entry.resetAt) perIp.delete(key)
   }
 }
 
-export function guard(ipHash: string, now: number = Date.now()): boolean {
+export function guard(ip: string, now: number = Date.now()): boolean {
   if (now > globalResetAt) {
     globalCount = 0
     globalResetAt = now + WINDOW_MS
@@ -78,10 +68,10 @@ export function guard(ipHash: string, now: number = Date.now()): boolean {
 
   if (perIp.size > SWEEP_THRESHOLD) sweepExpired(now)
 
-  let entry = perIp.get(ipHash)
+  let entry = perIp.get(ip)
   if (!entry || now > entry.resetAt) {
     entry = { count: 0, resetAt: now + WINDOW_MS }
-    perIp.set(ipHash, entry)
+    perIp.set(ip, entry)
   }
   if (entry.count >= PER_IP_LIMIT) return false
 

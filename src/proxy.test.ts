@@ -5,10 +5,6 @@ import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs"
 import path from "node:path"
 import { NextRequest } from "next/server"
 
-beforeAll(() => {
-  process.env.TRIPWIRE_IP_SALT = "test-salt-deterministic"
-})
-
 import { proxy } from "./proxy"
 import { resetGuardForTests } from "@/lib/tripwire/observe"
 

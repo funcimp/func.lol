@@ -1,7 +1,7 @@
 // src/proxy.ts
 import { NextResponse, type NextRequest } from "next/server"
 import { matchBait, categoryToBomb, type BombKind } from "@/lib/tripwire/patterns"
-import { guard, hashIP, uaFamily } from "@/lib/tripwire/observe"
+import { guard, uaFamily } from "@/lib/tripwire/observe"
 
 export async function proxy(req: NextRequest): Promise<Response | undefined> {
   // Active in production by default. TRIPWIRE_FORCE=1 overrides the gate so
@@ -15,21 +15,24 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
 
   const ua = req.headers.get("user-agent") ?? ""
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? ""
-  const ipHash = hashIP(ip)
 
-  if (!guard(ipHash)) {
+  if (!guard(ip)) {
     console.log(JSON.stringify({
       event: "tripwire.throttled",
       ts: new Date().toISOString(),
       path: req.nextUrl.pathname,
       pattern: pattern.token,
-      ip_hash: ipHash,
+      ip,
     }))
     return
   }
 
   const bomb: BombKind = pattern.bomb ?? categoryToBomb[pattern.category]
 
+  // Raw IPs are stored intentionally so later analysis can correlate ASN /
+  // BGP / threat-feed data. If any downstream surface (e.g. v2 stats panel
+  // at /x/tripwire) needs anonymized data, anonymize at aggregation time,
+  // not at capture.
   console.log(JSON.stringify({
     event: "tripwire.hit",
     ts: new Date().toISOString(),
@@ -40,7 +43,7 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
     bomb,
     ua_raw: ua.slice(0, 200),
     ua_family: uaFamily(ua),
-    ip_hash: ipHash,
+    ip,
   }))
 
   // Rewrite to the internal bomb route. The route handler can set

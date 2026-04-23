@@ -23,7 +23,7 @@ function yesterdayUTC(now = new Date()): string {
 }
 
 function eventKey(e: TripwireEvent): string {
-  return `${e.ts}|${e.event}|${e.pattern ?? ""}|${e.ip_hash ?? ""}`
+  return `${e.ts}|${e.event}|${e.pattern ?? ""}|${e.ip ?? ""}`
 }
 
 function verifyCronAuth(req: NextRequest): boolean {
