@@ -5,7 +5,7 @@ beforeAll(() => {
   process.env.TRIPWIRE_IP_SALT = "test-salt-deterministic"
 })
 
-import { hashIP, uaFamily, guard } from "./observe"
+import { hashIP, uaFamily, guard, resetGuardForTests } from "./observe"
 
 describe("hashIP", () => {
   test("returns a stable hash for a given IP", () => {
@@ -78,5 +78,35 @@ describe("uaFamily", () => {
     // A scanner pretending to be Googlebot still classifies as the scanner,
     // because 'nuclei' appears earlier in the UA_FAMILIES table than 'googlebot'.
     expect(uaFamily("Nuclei/2.8 (pretending to be Googlebot/2.1)")).toBe("nuclei")
+  })
+})
+
+describe("guard", () => {
+  test("first N calls with the same ipHash return true; (N+1)th returns false", () => {
+    resetGuardForTests()
+    const ip = "sha256:abc"
+    for (let i = 0; i < 30; i++) {
+      expect(guard(ip), `call ${i + 1}`).toBe(true)
+    }
+    expect(guard(ip)).toBe(false)
+  })
+
+  test("different IPs have independent counters", () => {
+    resetGuardForTests()
+    for (let i = 0; i < 30; i++) {
+      guard("sha256:a")
+    }
+    expect(guard("sha256:a")).toBe(false)
+    expect(guard("sha256:b")).toBe(true)
+  })
+
+  test("global limit stops further bombs regardless of IP variety", () => {
+    resetGuardForTests()
+    // 1000 total across varied IPs; the 1001st call (any IP) is false.
+    let allowedCount = 0
+    for (let i = 0; i < 1100; i++) {
+      if (guard(`sha256:ip-${i}`)) allowedCount++
+    }
+    expect(allowedCount).toBe(1000)
   })
 })

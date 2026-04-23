@@ -43,8 +43,44 @@ export function uaFamily(ua: string): string {
   return "unknown"
 }
 
-// Stub. Real implementation lands in Task 10 (Task 9 writes the tests).
-// Exists so the shared test file imports resolve today.
-export function guard(_ipHash: string): boolean {
+const PER_IP_LIMIT = 30
+const TOTAL_LIMIT = 1000
+const WINDOW_MS = 60_000
+
+interface Entry {
+  count: number
+  resetAt: number
+}
+
+const perIp = new Map<string, Entry>()
+let globalCount = 0
+let globalResetAt = 0
+
+export function guard(ipHash: string): boolean {
+  const now = Date.now()
+
+  if (now > globalResetAt) {
+    globalCount = 0
+    globalResetAt = now + WINDOW_MS
+  }
+  if (globalCount >= TOTAL_LIMIT) return false
+
+  let entry = perIp.get(ipHash)
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + WINDOW_MS }
+    perIp.set(ipHash, entry)
+  }
+  if (entry.count >= PER_IP_LIMIT) return false
+
+  entry.count++
+  globalCount++
   return true
+}
+
+// Test-only reset. Not used at runtime. Resets all per-IP entries and the
+// global counter so unit tests can start each case from a known state.
+export function resetGuardForTests(): void {
+  perIp.clear()
+  globalCount = 0
+  globalResetAt = 0
 }
