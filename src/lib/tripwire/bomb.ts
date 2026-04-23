@@ -39,8 +39,10 @@ const SKELETONS: Record<BombKind, Skeleton> = {
   },
 }
 
+export const DEFAULT_PAYLOAD = "nice try "
+
 export async function buildBomb(opts: BuildBombOptions): Promise<Uint8Array> {
-  const payloadText = opts.payloadText ?? "nice try "
+  const payloadText = opts.payloadText ?? DEFAULT_PAYLOAD
   if (payloadText.includes("\n") || payloadText.includes("\r")) {
     throw new Error("buildBomb: payloadText must not contain newline characters")
   }
