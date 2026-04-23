@@ -51,6 +51,10 @@ export async function GET(
       "Content-Encoding": "gzip",
       "Content-Type": CONTENT_TYPES[kind],
       "Cache-Control": "no-store",
+      // Hint to intermediate caches / CDNs that this response is already
+      // encoding-negotiated. Discourages gzip -> brotli transcoding, which
+      // would force a 2 GB decompression in the edge's memory.
+      Vary: "Accept-Encoding",
     },
   })
 }
