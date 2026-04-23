@@ -70,7 +70,14 @@ export default function TripwirePage() {
               for config-file probes, plain text for leaked-credential probes.
               The point is to keep the scanner&rsquo;s parser engaged after the
               inflate, not just the network stack. Credit to{" "}
-              <a href="https://ache.one/notes/html_zip_bomb">Ache&rsquo;s HTML Zip Bomb</a>{" "}
+              <a
+                className="underline"
+                href="https://ache.one/notes/html_zip_bomb"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ache&rsquo;s HTML Zip Bomb
+              </a>{" "}
               for refining the HTML variant.
             </p>
           </section>
@@ -131,7 +138,12 @@ export default function TripwirePage() {
               are excluded too. Only the specific, scanner-authored variants
               (<code>/wp-admin/</code>, <code>/administrator/</code>,{" "}
               <code>/phpmyadmin/</code>) are bait. The research dossier at{" "}
-              <a href="https://github.com/funcimp/func.lol/tree/main/research/tripwire">
+              <a
+                className="underline"
+                href="https://github.com/funcimp/func.lol/tree/main/research/tripwire"
+                target="_blank"
+                rel="noreferrer"
+              >
                 research/tripwire/
               </a>{" "}
               has the full list with sources.
@@ -147,7 +159,12 @@ export default function TripwirePage() {
               panel. v3 is an intelligent pattern-discovery pass over the rest
               of the 404 stream to surface new bait candidates. Both are parked
               in{" "}
-              <a href="https://github.com/funcimp/func.lol/blob/main/IDEAS.md">
+              <a
+                className="underline"
+                href="https://github.com/funcimp/func.lol/blob/main/IDEAS.md"
+                target="_blank"
+                rel="noreferrer"
+              >
                 IDEAS.md
               </a>
               .
@@ -158,30 +175,62 @@ export default function TripwirePage() {
             <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">References</h2>
             <ul className="list-disc pl-6 space-y-1.5 font-mono text-[13px]">
               <li>
-                <a href="https://news.ycombinator.com/item?id=44670319">
+                <a
+                  className="underline"
+                  href="https://news.ycombinator.com/item?id=44670319"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   HN: Serving gzip bombs to scanners
                 </a>
               </li>
               <li>
-                <a href="https://ache.one/notes/html_zip_bomb">
+                <a
+                  className="underline"
+                  href="https://ache.one/notes/html_zip_bomb"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Ache, &ldquo;HTML Zip Bomb&rdquo;
                 </a>
               </li>
               <li>
-                <a href="https://github.com/danielmiessler/SecLists">
+                <a
+                  className="underline"
+                  href="https://github.com/danielmiessler/SecLists"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   SecLists (Daniel Miessler)
                 </a>
               </li>
               <li>
-                <a href="https://github.com/projectdiscovery/nuclei-templates">
+                <a
+                  className="underline"
+                  href="https://github.com/projectdiscovery/nuclei-templates"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   nuclei-templates (ProjectDiscovery)
                 </a>
               </li>
               <li>
-                <a href="https://github.com/coreruleset/coreruleset">OWASP CRS</a>
+                <a
+                  className="underline"
+                  href="https://github.com/coreruleset/coreruleset"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  OWASP CRS
+                </a>
               </li>
               <li>
-                <a href="https://github.com/funcimp/func.lol/tree/main/research/tripwire">
+                <a
+                  className="underline"
+                  href="https://github.com/funcimp/func.lol/tree/main/research/tripwire"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   research/tripwire/ (this repo)
                 </a>
               </li>
