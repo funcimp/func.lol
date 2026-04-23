@@ -2,16 +2,10 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { put, list, get } from "@vercel/blob"
 import { gzipSync, gunzipSync } from "node:zlib"
+import { type TripwireEvent, isTripwireEvent } from "@/lib/tripwire/patterns"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-
-// Lightweight shape of the event lines we care about.
-interface TripwireEvent {
-  event: "tripwire.hit" | "tripwire.throttled"
-  ts: string
-  [k: string]: unknown
-}
 
 // Cron fires at 03:00 UTC (see vercel.json crons entry). This function and
 // the Logs API query window below must agree on UTC — do not "fix" one
@@ -23,7 +17,7 @@ function yesterdayUTC(now = new Date()): string {
 }
 
 function eventKey(e: TripwireEvent): string {
-  return `${e.ts}|${e.event}|${e.pattern ?? ""}|${e.ip ?? ""}`
+  return `${e.ts}|${e.event}|${e.pattern}|${e.ip}`
 }
 
 function verifyCronAuth(req: NextRequest): boolean {
@@ -69,29 +63,25 @@ async function fetchLogLinesForDate(date: string): Promise<string[]> {
   return text.split("\n").filter(Boolean)
 }
 
-function parseEventLine(line: string): TripwireEvent | null {
-  // Try whole-line parse first (the happy path for our console.log JSON).
+function tryParseEvent(s: string): TripwireEvent | null {
   try {
-    const obj = JSON.parse(line) as Partial<TripwireEvent>
-    if (obj.event === "tripwire.hit" || obj.event === "tripwire.throttled") {
-      return obj as TripwireEvent
-    }
+    const obj: unknown = JSON.parse(s)
+    return isTripwireEvent(obj) ? obj : null
   } catch {
-    // Fall through to substring extraction.
+    return null
   }
-  // Fallback: carve out the first balanced {...} on the line.
+}
+
+function parseEventLine(line: string): TripwireEvent | null {
+  // Whole-line parse is the happy path for our console.log JSON.
+  const whole = tryParseEvent(line)
+  if (whole) return whole
+  // Fallback: carve out the first balanced {...} on the line, in case
+  // Vercel log shipping adds a prefix/suffix to the JSON payload.
   const first = line.indexOf("{")
   const last = line.lastIndexOf("}")
   if (first < 0 || last <= first) return null
-  try {
-    const obj = JSON.parse(line.slice(first, last + 1)) as Partial<TripwireEvent>
-    if (obj.event === "tripwire.hit" || obj.event === "tripwire.throttled") {
-      return obj as TripwireEvent
-    }
-  } catch {
-    // Skip unparseable line.
-  }
-  return null
+  return tryParseEvent(line.slice(first, last + 1))
 }
 
 function extractTripwireEvents(lines: string[]): TripwireEvent[] {

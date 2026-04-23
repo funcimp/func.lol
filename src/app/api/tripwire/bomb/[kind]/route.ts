@@ -29,7 +29,7 @@ const CONTENT_TYPES: Record<BombKind, string> = {
 }
 
 function isBombKind(v: string): v is BombKind {
-  return v === "html" || v === "json" || v === "yaml" || v === "env"
+  return v in CONTENT_TYPES
 }
 
 export async function GET(

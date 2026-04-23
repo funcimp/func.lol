@@ -1,6 +1,29 @@
 // src/lib/tripwire/patterns.ts
 
-export type BombKind = "html" | "json" | "yaml" | "env"
+export const BOMB_KINDS = ["html", "json", "yaml", "env"] as const
+export type BombKind = (typeof BOMB_KINDS)[number]
+
+export const TRIPWIRE_EVENT_NAMES = ["tripwire.hit", "tripwire.throttled"] as const
+export type TripwireEventName = (typeof TRIPWIRE_EVENT_NAMES)[number]
+
+export interface TripwireEvent {
+  event: TripwireEventName
+  ts: string
+  path: string
+  pattern: string
+  ip: string
+  query?: string
+  category?: Category
+  bomb?: BombKind
+  ua_raw?: string
+  ua_family?: string
+}
+
+export function isTripwireEvent(v: unknown): v is TripwireEvent {
+  if (!v || typeof v !== "object") return false
+  const e = (v as { event?: unknown }).event
+  return e === "tripwire.hit" || e === "tripwire.throttled"
+}
 
 export type Category =
   | "cms"
@@ -35,23 +58,20 @@ export const categoryToBomb: Record<Category, BombKind> = {
   config: "env",
 }
 
-// Strict prefix match. Anything under these paths is never bait.
+// Strict prefix match. Anything under these directories is never bait.
+// Directory-style entries only (end in `/`) so `/_next/anything` is safe but
+// `/robots.txt.backup` is not automatically safe via a `/robots.txt` prefix.
 export const SAFE_PREFIXES: readonly string[] = [
   "/_next/",
   "/api/",
   "/.well-known/",
   "/x/",
   "/static/",
-  "/robots.txt",
-  "/sitemap.xml",
-  "/favicon.ico",
-  "/health",
-  "/healthz",
-  "/status",
-  "/ping",
 ]
 
-// Exact match only. "/admin/something" may still be bait, "/admin" is not.
+// Exact match only. File-style paths and health-check probes live here so
+// they don't accidentally shadow similarly-named paths via prefix-matching.
+// "/admin/something" may still be bait, "/admin" is not.
 export const SAFE_EXACT_PATHS: readonly string[] = [
   "/",
   "/admin",
@@ -59,6 +79,13 @@ export const SAFE_EXACT_PATHS: readonly string[] = [
   "/signup",
   "/register",
   "/dashboard",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/favicon.ico",
+  "/health",
+  "/healthz",
+  "/status",
+  "/ping",
 ]
 
 // Populated in Task 1b from research/tripwire/patterns.md.
@@ -279,6 +306,12 @@ function matchesPrefix(needle: string, token: string): boolean {
   return false
 }
 
+// Pre-lowered tokens reused across every request. Tokens are static data;
+// lowercasing them once at module load avoids ~149 toLowerCase() calls per
+// matched request inside matchBait's hot loop.
+const LOWERED_PATTERNS: ReadonlyArray<{ pattern: Pattern; token: string }> =
+  PATTERNS.map((p) => ({ pattern: p, token: p.token.toLowerCase() }))
+
 export function matchBait(url: URL): Pattern | null {
   if (hasSafePrefix(url.pathname)) return null
   // Safe-exact applies only when there is no query string. Scanner probes
@@ -289,10 +322,9 @@ export function matchBait(url: URL): Pattern | null {
 
   const needle = (url.pathname + url.search).toLowerCase()
 
-  for (const p of PATTERNS) {
-    const token = p.token.toLowerCase()
-    if (p.shape === "prefix" && matchesPrefix(needle, token)) return p
-    if (p.shape === "substring" && needle.includes(token)) return p
+  for (const { pattern, token } of LOWERED_PATTERNS) {
+    if (pattern.shape === "prefix" && matchesPrefix(needle, token)) return pattern
+    if (pattern.shape === "substring" && needle.includes(token)) return pattern
   }
 
   return null

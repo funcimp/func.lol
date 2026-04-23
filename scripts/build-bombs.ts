@@ -2,11 +2,11 @@
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
-import { buildBomb, DEFAULT_PAYLOAD, type BombKind } from "../src/lib/tripwire/bomb"
+import { buildBomb, DEFAULT_PAYLOAD } from "../src/lib/tripwire/bomb"
+import { BOMB_KINDS } from "../src/lib/tripwire/patterns"
 
 const PRODUCTION_TARGET = 2_000_000_000 // ~2 GB decompressed
 const PAYLOAD_TEXT = DEFAULT_PAYLOAD
-const KINDS: BombKind[] = ["html", "json", "yaml", "env"]
 
 const publicDir = path.join(process.cwd(), "public")
 const cachePath = path.join(publicDir, ".bomb-cache.txt")
@@ -18,14 +18,14 @@ function inputHash(): string {
     version: 1,
     target: PRODUCTION_TARGET,
     payload: PAYLOAD_TEXT,
-    kinds: KINDS,
+    kinds: BOMB_KINDS,
     bombSource,
   })
   return createHash("sha256").update(input).digest("hex")
 }
 
 function outputsExist(): boolean {
-  return KINDS.every((k) => existsSync(path.join(publicDir, `.bomb.${k}.gz`)))
+  return BOMB_KINDS.every((k) => existsSync(path.join(publicDir, `.bomb.${k}.gz`)))
 }
 
 async function main() {
@@ -43,7 +43,7 @@ async function main() {
     return
   }
 
-  for (const kind of KINDS) {
+  for (const kind of BOMB_KINDS) {
     const start = Date.now()
     const bytes = await buildBomb({
       kind,
