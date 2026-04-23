@@ -104,7 +104,7 @@ export const PATTERNS: Pattern[] = [
   // Framework: Laravel
   { token: "/_ignition/execute-solution", shape: "prefix", category: "framework" },
   { token: "/telescope/",              shape: "prefix",    category: "framework" },
-  { token: "/storage/logs/laravel.log",shape: "prefix",    category: "framework" },
+  { token: "/storage/logs/laravel.log", shape: "prefix",    category: "framework" },
 
   // Framework: Symfony
   { token: "/app_dev.php",             shape: "prefix",    category: "framework" },
@@ -248,3 +248,33 @@ export const PATTERNS: Pattern[] = [
   { token: "/info.php",                shape: "prefix",    category: "webshell" },
   { token: "/test.php",                shape: "prefix",    category: "webshell" },
 ]
+
+function hasSafePrefix(pathname: string): boolean {
+  for (const prefix of SAFE_PREFIXES) {
+    if (pathname.startsWith(prefix)) return true
+  }
+  return false
+}
+
+function isSafeExact(pathname: string): boolean {
+  return SAFE_EXACT_PATHS.includes(pathname)
+}
+
+export function matchBait(url: URL): Pattern | null {
+  if (hasSafePrefix(url.pathname)) return null
+  // Safe-exact applies only when there is no query string. Scanner probes
+  // like /?q=user/password (Drupageddon, CVE-2014-3704) share pathname "/"
+  // with legitimate root traffic, so we can't short-circuit on pathname
+  // alone when a query is present.
+  if (!url.search && isSafeExact(url.pathname)) return null
+
+  const needle = (url.pathname + url.search).toLowerCase()
+
+  for (const p of PATTERNS) {
+    const token = p.token.toLowerCase()
+    if (p.shape === "prefix" && needle.startsWith(token)) return p
+    if (p.shape === "substring" && needle.includes(token)) return p
+  }
+
+  return null
+}
