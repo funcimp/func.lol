@@ -264,6 +264,21 @@ function isSafeExact(pathname: string): boolean {
   return SAFE_EXACT_PATHS.includes(pathname)
 }
 
+function matchesPrefix(needle: string, token: string): boolean {
+  if (needle.startsWith(token)) return true
+  // Directory-style tokens (trailing slash) also match the slashless form so
+  // scanners that probe /phpmyadmin (no slash) get bombed the same as those
+  // that probe /phpmyadmin/. Only match if the slashless form is followed by
+  // end-of-string or a query (?) — never by more path characters, because
+  // that would collide with similarly-named paths (e.g. /phpmyadminbackup).
+  if (token.endsWith("/")) {
+    const stripped = token.slice(0, -1)
+    if (needle === stripped) return true
+    if (needle.startsWith(stripped + "?")) return true
+  }
+  return false
+}
+
 export function matchBait(url: URL): Pattern | null {
   if (hasSafePrefix(url.pathname)) return null
   // Safe-exact applies only when there is no query string. Scanner probes
@@ -276,7 +291,7 @@ export function matchBait(url: URL): Pattern | null {
 
   for (const p of PATTERNS) {
     const token = p.token.toLowerCase()
-    if (p.shape === "prefix" && needle.startsWith(token)) return p
+    if (p.shape === "prefix" && matchesPrefix(needle, token)) return p
     if (p.shape === "substring" && needle.includes(token)) return p
   }
 

@@ -73,6 +73,34 @@ describe("matchBait", () => {
     })
   }
 
+  const slashlessBaitCases: Array<[string, string]> = [
+    ["/phpmyadmin",                              "admin"],
+    ["/wp-admin",                                "cms"],
+    ["/cgi-bin",                                 "cgi"],
+    ["/actuator",                                "actuator"],
+  ]
+
+  for (const [path, expectedCategory] of slashlessBaitCases) {
+    test(`matches directory-style bait without trailing slash: ${path} as ${expectedCategory}`, () => {
+      const m = matchBait(url(path))
+      expect(m, path).not.toBeNull()
+      expect(m!.category).toBe(expectedCategory)
+    })
+  }
+
+  test("slashless bait with query string still matches", () => {
+    const m = matchBait(url("/phpmyadmin?target=root"))
+    expect(m).not.toBeNull()
+    expect(m!.category).toBe("admin")
+  })
+
+  test("slashless form does NOT match if followed by more path characters", () => {
+    // /phpmyadminbackup should NOT match /phpmyadmin/ pattern — different path.
+    // (No such pattern exists, but verifying the guard protects against
+    // false positives like /wp-adminish matching /wp-admin/.)
+    expect(matchBait(url("/phpmyadminbackup"))).toBeNull()
+  })
+
   test("case-insensitive", () => {
     expect(matchBait(url("/WP-LOGIN.PHP"))?.category).toBe("cms")
     expect(matchBait(url("/PhpMyAdmin/"))?.category).toBe("admin")
