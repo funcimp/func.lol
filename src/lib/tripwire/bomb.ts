@@ -41,6 +41,9 @@ const SKELETONS: Record<BombKind, Skeleton> = {
 
 export async function buildBomb(opts: BuildBombOptions): Promise<Uint8Array> {
   const payloadText = opts.payloadText ?? "nice try "
+  if (payloadText.includes("\n") || payloadText.includes("\r")) {
+    throw new Error("buildBomb: payloadText must not contain newline characters")
+  }
   const skeleton = SKELETONS[opts.kind]
 
   const overhead = Buffer.byteLength(skeleton.head + skeleton.tail, "utf8")

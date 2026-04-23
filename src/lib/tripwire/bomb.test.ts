@@ -43,7 +43,7 @@ describe("buildBomb", () => {
 
   test("env: body is KEY=VALUE plain text", async () => {
     const { body } = await build("env")
-    expect(body).toMatch(/^[A-Z_]+=/m)
+    expect(body).toMatch(/^[A-Z_]+=[^\n]*\n$/)
     expect(body).toContain("nice try")
   })
 
@@ -73,5 +73,14 @@ describe("buildBomb", () => {
     const body = gunzipSync(compressed).toString("utf8")
     expect(body).toContain("hello world")
     expect(body).not.toContain("nice try")
+  })
+
+  test("throws if payloadText contains newline characters", async () => {
+    await expect(
+      buildBomb({ kind: "html", targetDecompressedBytes: 4096, payloadText: "bad\npayload" }),
+    ).rejects.toThrow(/newline/)
+    await expect(
+      buildBomb({ kind: "yaml", targetDecompressedBytes: 4096, payloadText: "bad\rpayload" }),
+    ).rejects.toThrow(/newline/)
   })
 })
