@@ -1,4 +1,4 @@
-// proxy.test.ts
+// src/proxy.test.ts
 import { describe, test, expect, beforeEach, beforeAll } from "bun:test"
 import { gzipSync } from "node:zlib"
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs"
@@ -53,27 +53,27 @@ describe("proxy", () => {
     expect(res).toBeUndefined()
   })
 
-  test("bait URL returns a gzip response with the right Content-Type per kind", async () => {
-    const cases: Array<[string, string]> = [
-      ["/wp-admin/",            "text/html; charset=utf-8"],
-      ["/actuator/env",         "application/json; charset=utf-8"],
-      ["/.env",                 "text/plain; charset=utf-8"],
-      ["/config.yaml",          "application/yaml; charset=utf-8"],
-      ["/config.json",          "application/json; charset=utf-8"],
-      ["/docker-compose.yml",   "application/yaml; charset=utf-8"],
+  test("bait URL rewrites to the internal bomb route per kind", async () => {
+    // Cases map bait path to the expected bomb kind in the rewrite target.
+    // The bomb response itself (Content-Encoding: gzip and Content-Type) is
+    // produced by the route handler, tested separately at the E2E layer.
+    // Proxy responses CANNOT set Content-Encoding — Next.js strips it.
+    const cases: Array<[string, "html" | "json" | "yaml" | "env"]> = [
+      ["/wp-admin/",            "html"],
+      ["/actuator/env",         "json"],
+      ["/.env",                 "env"],
+      ["/config.yaml",          "yaml"],
+      ["/config.json",          "json"],
+      ["/docker-compose.yml",   "yaml"],
     ]
 
-    for (const [url, expectedType] of cases) {
+    for (const [url, expectedKind] of cases) {
       resetGuardForTests()
       const res = (await proxy(req(url))) as Response
       expect(res, url).toBeInstanceOf(Response)
-      expect(res.status).toBe(200)
-      expect(res.headers.get("content-encoding")).toBe("gzip")
-      expect(res.headers.get("content-type")).toBe(expectedType)
-      expect(res.headers.get("cache-control")).toBe("no-store")
-      const body = new Uint8Array(await res.arrayBuffer())
-      expect(body[0]).toBe(0x1f)
-      expect(body[1]).toBe(0x8b)
+      expect(res.headers.get("x-middleware-rewrite"), url).toContain(
+        `/api/tripwire/bomb/${expectedKind}`,
+      )
     }
   })
 

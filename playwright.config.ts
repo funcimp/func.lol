@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -21,5 +22,12 @@ export default defineConfig({
     command: "bun run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    // Tripwire proxy is prod-gated by default (so local dev doesn't self-bomb).
+    // TRIPWIRE_FORCE=1 overrides the gate for E2E tests. TRIPWIRE_IP_SALT is a
+    // deterministic value so hash assertions stay stable across runs.
+    env: {
+      TRIPWIRE_FORCE: "1",
+      TRIPWIRE_IP_SALT: "e2e-test-salt-deterministic",
+    },
   },
 });

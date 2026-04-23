@@ -1,21 +1,14 @@
-// proxy.ts
-import { createReadStream } from "node:fs"
-import path from "node:path"
-import { Readable } from "node:stream"
-import type { ReadableStream as WebReadableStream } from "node:stream/web"
-import type { NextRequest } from "next/server"
+// src/proxy.ts
+import { NextResponse, type NextRequest } from "next/server"
 import { matchBait, categoryToBomb, type BombKind } from "@/lib/tripwire/patterns"
 import { guard, hashIP, uaFamily } from "@/lib/tripwire/observe"
 
-const CONTENT_TYPES: Record<BombKind, string> = {
-  html: "text/html; charset=utf-8",
-  json: "application/json; charset=utf-8",
-  yaml: "application/yaml; charset=utf-8",
-  env: "text/plain; charset=utf-8",
-}
-
 export async function proxy(req: NextRequest): Promise<Response | undefined> {
-  if (process.env.NODE_ENV !== "production") return
+  // Active in production by default. TRIPWIRE_FORCE=1 overrides the gate so
+  // end-to-end tests (Playwright against `next dev`) can exercise the proxy
+  // without running a full production build. Local `next dev` without the
+  // env var still passes through, keeping the no-self-bomb guarantee.
+  if (process.env.NODE_ENV !== "production" && process.env.TRIPWIRE_FORCE !== "1") return
 
   const pattern = matchBait(req.nextUrl)
   if (!pattern) return
@@ -36,9 +29,6 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
   }
 
   const bomb: BombKind = pattern.bomb ?? categoryToBomb[pattern.category]
-  const filePath = path.join(process.cwd(), "public", `.bomb.${bomb}.gz`)
-  const nodeStream = createReadStream(filePath)
-  const body = Readable.toWeb(nodeStream) as unknown as WebReadableStream<Uint8Array>
 
   console.log(JSON.stringify({
     event: "tripwire.hit",
@@ -53,14 +43,12 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
     ip_hash: ipHash,
   }))
 
-  return new Response(body as unknown as ReadableStream, {
-    status: 200,
-    headers: {
-      "Content-Encoding": "gzip",
-      "Content-Type": CONTENT_TYPES[bomb],
-      "Cache-Control": "no-store",
-    },
-  })
+  // Rewrite to the internal bomb route. The route handler can set
+  // Content-Encoding (the proxy cannot — Next.js strips it as a forbidden
+  // middleware header). The rewrite is server-side; the scanner sees the
+  // original bait URL, never /api/tripwire/bomb.
+  const target = new URL(`/api/tripwire/bomb/${bomb}`, req.url)
+  return NextResponse.rewrite(target)
 }
 
 export const config = {
