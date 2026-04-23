@@ -10,6 +10,12 @@ export function hashIP(ip: string): string {
   return `sha256:${digest}`
 }
 
+// First match wins. Ordering matters: narrower patterns (python-requests)
+// must appear before broader ones (python) so the more specific label
+// carries the day. Word boundaries guard only patterns whose tokens are
+// common English fragments (ffuf, curl, wget); scanner names like "nuclei"
+// are distinctive enough that substring match is fine and catches renamed
+// variants (NucleiScanner, NmapBot, etc.) under the same family.
 const UA_FAMILIES: Array<[RegExp, string]> = [
   [/nuclei/i,                   "nuclei"],
   [/zgrab/i,                    "zgrab"],
@@ -37,7 +43,7 @@ export function uaFamily(ua: string): string {
   return "unknown"
 }
 
-// Stub. Real implementation lands in Tasks 9-10.
+// Stub. Real implementation lands in Task 10 (Task 9 writes the tests).
 // Exists so the shared test file imports resolve today.
 export function guard(_ipHash: string): boolean {
   return true

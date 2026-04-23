@@ -73,4 +73,10 @@ describe("uaFamily", () => {
       expect(uaFamily(ua)).toBe(expected)
     })
   }
+
+  test("first-match-wins when a UA contains multiple tokens", () => {
+    // A scanner pretending to be Googlebot still classifies as the scanner,
+    // because 'nuclei' appears earlier in the UA_FAMILIES table than 'googlebot'.
+    expect(uaFamily("Nuclei/2.8 (pretending to be Googlebot/2.1)")).toBe("nuclei")
+  })
 })
