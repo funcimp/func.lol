@@ -1,5 +1,5 @@
 // src/lib/tripwire/bomb.ts
-import { gzipSync } from "node:zlib"
+import { createGzip } from "node:zlib"
 
 export type { BombKind } from "./patterns"
 import type { BombKind } from "./patterns"
@@ -41,6 +41,11 @@ const SKELETONS: Record<BombKind, Skeleton> = {
 
 export const DEFAULT_PAYLOAD = "nice try "
 
+// Cap the in-memory chunk size so large targets don't spike V8/JSC heap.
+// 100_000 repeats of a ~9-byte payload is <1 MB per chunk; adjust if the
+// default payload grows.
+const CHUNK_REPEATS = 100_000
+
 export async function buildBomb(opts: BuildBombOptions): Promise<Uint8Array> {
   const payloadText = opts.payloadText ?? DEFAULT_PAYLOAD
   if (payloadText.includes("\n") || payloadText.includes("\r")) {
@@ -51,10 +56,37 @@ export async function buildBomb(opts: BuildBombOptions): Promise<Uint8Array> {
   const overhead = Buffer.byteLength(skeleton.head + skeleton.tail, "utf8")
   const payloadBudget = Math.max(0, opts.targetDecompressedBytes - overhead)
   const payloadUnitLen = Buffer.byteLength(payloadText, "utf8")
-  const repeats = Math.floor(payloadBudget / payloadUnitLen)
+  const totalRepeats = Math.floor(payloadBudget / payloadUnitLen)
 
-  const payload = skeleton.indentPayload(payloadText.repeat(repeats))
-  const body = skeleton.head + payload + skeleton.tail
+  const gzip = createGzip({ level: 9 })
+  const chunks: Buffer[] = []
+  gzip.on("data", (chunk: Buffer) => chunks.push(chunk))
+  const done = new Promise<void>((resolve, reject) => {
+    gzip.on("end", resolve)
+    gzip.on("error", reject)
+  })
 
-  return gzipSync(Buffer.from(body, "utf8"), { level: 9 })
+  gzip.write(skeleton.head)
+
+  // Precompute one cached chunk, reuse it across the full-chunk iterations.
+  // payloadText is newline-free (enforced above), so indentPayload is
+  // deterministic per-chunk.
+  const fullChunkCount = Math.floor(totalRepeats / CHUNK_REPEATS)
+  const partialRepeats = totalRepeats % CHUNK_REPEATS
+
+  if (fullChunkCount > 0) {
+    const fullChunkText = skeleton.indentPayload(payloadText.repeat(CHUNK_REPEATS))
+    for (let i = 0; i < fullChunkCount; i++) {
+      gzip.write(fullChunkText)
+    }
+  }
+  if (partialRepeats > 0) {
+    gzip.write(skeleton.indentPayload(payloadText.repeat(partialRepeats)))
+  }
+
+  gzip.write(skeleton.tail)
+  gzip.end()
+
+  await done
+  return Buffer.concat(chunks)
 }
