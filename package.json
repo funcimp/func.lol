@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prebuild": "bun run scripts/build-bombs.ts",
+    "build-bombs": "bun run scripts/build-bombs.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
