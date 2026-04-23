@@ -54,16 +54,13 @@ describe("proxy", () => {
   })
 
   test("bait URL returns a gzip response with the right Content-Type per kind", async () => {
-    // NOTE: No current Category maps to the "yaml" BombKind — see
-    // categoryToBomb in src/lib/tripwire/patterns.ts. `/config.yaml` is
-    // categorised as "config" which maps to the "env" bomb. The "yaml"
-    // CONTENT_TYPE entry is retained for forward compatibility if a future
-    // Category is introduced.
     const cases: Array<[string, string]> = [
-      ["/wp-admin/", "text/html; charset=utf-8"],
-      ["/actuator/env", "application/json; charset=utf-8"],
-      ["/.env", "text/plain; charset=utf-8"],
-      ["/config.yaml", "text/plain; charset=utf-8"],
+      ["/wp-admin/",            "text/html; charset=utf-8"],
+      ["/actuator/env",         "application/json; charset=utf-8"],
+      ["/.env",                 "text/plain; charset=utf-8"],
+      ["/config.yaml",          "application/yaml; charset=utf-8"],
+      ["/config.json",          "application/json; charset=utf-8"],
+      ["/docker-compose.yml",   "application/yaml; charset=utf-8"],
     ]
 
     for (const [url, expectedType] of cases) {

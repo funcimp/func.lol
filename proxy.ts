@@ -35,7 +35,7 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
     return
   }
 
-  const bomb = categoryToBomb[pattern.category]
+  const bomb: BombKind = pattern.bomb ?? categoryToBomb[pattern.category]
   const filePath = path.join(process.cwd(), "public", `.bomb.${bomb}.gz`)
   const nodeStream = createReadStream(filePath)
   const body = Readable.toWeb(nodeStream) as unknown as WebReadableStream<Uint8Array>

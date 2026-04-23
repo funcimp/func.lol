@@ -18,6 +18,10 @@ export interface Pattern {
   token: string
   shape: PatternShape
   category: Category
+  // Per-pattern override for the category's default bomb kind. Use when the
+  // expected response MIME differs from the category default (e.g. a YAML
+  // config file in the `config` category should get a YAML bomb, not env).
+  bomb?: BombKind
 }
 
 export const categoryToBomb: Record<Category, BombKind> = {
@@ -151,10 +155,10 @@ export const PATTERNS: Pattern[] = [
   { token: "/.htaccess",               shape: "prefix",    category: "config" },
 
   // Config leaks: generic app config
-  { token: "/config.yaml",             shape: "prefix",    category: "config" },
-  { token: "/config.yml",              shape: "prefix",    category: "config" },
-  { token: "/config.json",             shape: "prefix",    category: "config" },
-  { token: "/docker-compose.yml",      shape: "prefix",    category: "config" },
+  { token: "/config.yaml",             shape: "prefix",    category: "config", bomb: "yaml" },
+  { token: "/config.yml",              shape: "prefix",    category: "config", bomb: "yaml" },
+  { token: "/config.json",             shape: "prefix",    category: "config", bomb: "json" },
+  { token: "/docker-compose.yml",      shape: "prefix",    category: "config", bomb: "yaml" },
   { token: "/Dockerfile",              shape: "prefix",    category: "config" },
 
   // Config leaks: database / archive dumps
