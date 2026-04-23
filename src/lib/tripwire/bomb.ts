@@ -1,7 +1,8 @@
 // src/lib/tripwire/bomb.ts
 import { gzipSync } from "node:zlib"
 
-export type BombKind = "html" | "json" | "yaml" | "env"
+export type { BombKind } from "./patterns"
+import type { BombKind } from "./patterns"
 
 export interface BuildBombOptions {
   kind: BombKind
