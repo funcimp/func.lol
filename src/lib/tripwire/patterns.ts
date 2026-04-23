@@ -58,4 +58,193 @@ export const SAFE_EXACT_PATHS: readonly string[] = [
 ]
 
 // Populated in Task 1b from research/tripwire/patterns.md.
-export const PATTERNS: Pattern[] = []
+export const PATTERNS: Pattern[] = [
+  // CMS: WordPress
+  { token: "/wp-login.php",            shape: "prefix",    category: "cms" },
+  { token: "/wp-admin/",               shape: "prefix",    category: "cms" },
+  { token: "/wp-admin/admin-ajax.php", shape: "prefix",    category: "cms" },
+  { token: "/xmlrpc.php",              shape: "prefix",    category: "cms" },
+  { token: "/wp-config.php",           shape: "prefix",    category: "cms" },
+  { token: "/wp-config.php.bak",       shape: "prefix",    category: "cms" },
+  { token: "/wp-content/debug.log",    shape: "prefix",    category: "cms" },
+  { token: "/wp-content/uploads/",     shape: "prefix",    category: "cms" },
+  { token: "/wp-content/plugins/",     shape: "prefix",    category: "cms" },
+  { token: "/wp-json/wp/v2/users",     shape: "prefix",    category: "cms" },
+  { token: "/wp-cron.php",             shape: "prefix",    category: "cms" },
+  { token: "/readme.html",             shape: "prefix",    category: "cms" },
+  { token: "/license.txt",             shape: "prefix",    category: "cms" },
+
+  // CMS: Drupal
+  { token: "/user/login",              shape: "prefix",    category: "cms" },
+  { token: "/user/register",           shape: "prefix",    category: "cms" },
+  { token: "/?q=user/password",        shape: "prefix",    category: "cms" },
+  { token: "/CHANGELOG.txt",           shape: "prefix",    category: "cms" },
+  { token: "/core/CHANGELOG.txt",      shape: "prefix",    category: "cms" },
+  { token: "/sites/default/files/",    shape: "prefix",    category: "cms" },
+
+  // CMS: Joomla
+  { token: "/administrator/",          shape: "prefix",    category: "cms" },
+  { token: "/administrator/index.php", shape: "prefix",    category: "cms" },
+  { token: "/components/com_users/",   shape: "prefix",    category: "cms" },
+  { token: "/configuration.php-dist",  shape: "prefix",    category: "cms" },
+
+  // CMS: Magento
+  { token: "/magento_version",         shape: "prefix",    category: "cms" },
+  { token: "/downloader/",             shape: "prefix",    category: "cms" },
+
+  // Framework: phpunit (CVE-2017-9841) - substring catches all variants
+  { token: "eval-stdin.php",           shape: "substring", category: "framework" },
+  { token: "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php",         shape: "prefix", category: "framework" },
+  { token: "/vendor/phpunit/phpunit/Util/PHP/eval-stdin.php",             shape: "prefix", category: "framework" },
+  { token: "/lib/phpunit/phpunit/src/Util/PHP/eval-stdin.php",            shape: "prefix", category: "framework" },
+  { token: "/lib/phpunit/src/Util/PHP/eval-stdin.php",                    shape: "prefix", category: "framework" },
+  { token: "/phpunit/src/Util/PHP/eval-stdin.php",                        shape: "prefix", category: "framework" },
+  { token: "/laravel/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php", shape: "prefix", category: "framework" },
+
+  // Framework: Laravel
+  { token: "/_ignition/execute-solution", shape: "prefix", category: "framework" },
+  { token: "/telescope/",              shape: "prefix",    category: "framework" },
+  { token: "/storage/logs/laravel.log",shape: "prefix",    category: "framework" },
+
+  // Framework: Symfony
+  { token: "/app_dev.php",             shape: "prefix",    category: "framework" },
+  { token: "/_profiler/",              shape: "prefix",    category: "framework" },
+  { token: "/config.php",              shape: "prefix",    category: "framework" },
+
+  // Framework: ThinkPHP (RCE chain)
+  { token: "invokefunction",           shape: "substring", category: "framework" },
+  { token: "/index.php?s=/Index/\\think\\app/invokefunction",        shape: "prefix", category: "framework" },
+  { token: "/public/index.php?s=/Index/\\think\\app/invokefunction", shape: "prefix", category: "framework" },
+
+  // Framework: Yii / Zend
+  { token: "/index.php?r=site/login",  shape: "prefix",    category: "framework" },
+  { token: "/ZendServer/",             shape: "prefix",    category: "framework" },
+
+  // Config leaks: .env family
+  { token: "/.env",                    shape: "prefix",    category: "config" },
+  { token: "/.env.local",              shape: "prefix",    category: "config" },
+  { token: "/.env.production",         shape: "prefix",    category: "config" },
+  { token: "/.env.backup",             shape: "prefix",    category: "config" },
+  { token: "/.env.save",               shape: "prefix",    category: "config" },
+  { token: "/.env.dev",                shape: "prefix",    category: "config" },
+
+  // Config leaks: VCS metadata
+  { token: "/.git/config",             shape: "prefix",    category: "config" },
+  { token: "/.git/HEAD",               shape: "prefix",    category: "config" },
+  { token: "/.git/index",              shape: "prefix",    category: "config" },
+  { token: "/.gitignore",              shape: "prefix",    category: "config" },
+  { token: "/.svn/entries",            shape: "prefix",    category: "config" },
+  { token: "/.hg/hgrc",                shape: "prefix",    category: "config" },
+
+  // Config leaks: OS / editor artifacts
+  { token: "/.DS_Store",               shape: "prefix",    category: "config" },
+  { token: "/.vscode/sftp.json",       shape: "prefix",    category: "config" },
+  { token: "/.idea/workspace.xml",     shape: "prefix",    category: "config" },
+
+  // Config leaks: credentials and auth
+  { token: "/.aws/credentials",        shape: "prefix",    category: "config" },
+  { token: "/.aws/config",             shape: "prefix",    category: "config" },
+  { token: "/.ssh/id_rsa",             shape: "prefix",    category: "config" },
+  { token: "/.ssh/authorized_keys",    shape: "prefix",    category: "config" },
+  { token: "/.npmrc",                  shape: "prefix",    category: "config" },
+  { token: "/.htpasswd",               shape: "prefix",    category: "config" },
+  { token: "/.htaccess",               shape: "prefix",    category: "config" },
+
+  // Config leaks: generic app config
+  { token: "/config.yaml",             shape: "prefix",    category: "config" },
+  { token: "/config.yml",              shape: "prefix",    category: "config" },
+  { token: "/config.json",             shape: "prefix",    category: "config" },
+  { token: "/docker-compose.yml",      shape: "prefix",    category: "config" },
+  { token: "/Dockerfile",              shape: "prefix",    category: "config" },
+
+  // Config leaks: database / archive dumps
+  { token: "/backup.sql",              shape: "prefix",    category: "config" },
+  { token: "/db.sql",                  shape: "prefix",    category: "config" },
+  { token: "/dump.sql",                shape: "prefix",    category: "config" },
+  { token: "/backup.zip",              shape: "prefix",    category: "config" },
+  { token: "/backup.tar.gz",           shape: "prefix",    category: "config" },
+  { token: "/site.tar.gz",             shape: "prefix",    category: "config" },
+
+  // Admin panels
+  { token: "/phpmyadmin/",             shape: "prefix",    category: "admin" },
+  { token: "/phpMyAdmin/",             shape: "prefix",    category: "admin" },
+  { token: "/pma/",                    shape: "prefix",    category: "admin" },
+  { token: "/phpmyadmin/index.php",    shape: "prefix",    category: "admin" },
+  { token: "/adminer.php",             shape: "prefix",    category: "admin" },
+  { token: "/adminer/",                shape: "prefix",    category: "admin" },
+  { token: "/manager/html",            shape: "prefix",    category: "admin" },
+  { token: "/host-manager/html",       shape: "prefix",    category: "admin" },
+  { token: "/solr/",                   shape: "prefix",    category: "admin" },
+  { token: "/jenkins/",                shape: "prefix",    category: "admin" },
+  { token: "/jenkins/script",          shape: "prefix",    category: "admin" },
+  { token: "/kibana/",                 shape: "prefix",    category: "admin" },
+  { token: "/_cat/",                   shape: "prefix",    category: "admin" },
+  { token: "/server-status",           shape: "prefix",    category: "admin" },
+  { token: "/server-info",             shape: "prefix",    category: "admin" },
+  { token: "/cacti/",                  shape: "prefix",    category: "admin" },
+  { token: "/zabbix/",                 shape: "prefix",    category: "admin" },
+  { token: "/grafana/",                shape: "prefix",    category: "admin" },
+  { token: "/nagios/",                 shape: "prefix",    category: "admin" },
+  { token: "/webadmin/",               shape: "prefix",    category: "admin" },
+  { token: "/webmin/",                 shape: "prefix",    category: "admin" },
+  { token: "/login.rsp",               shape: "prefix",    category: "admin" },
+  { token: "/cgi-bin/luci",            shape: "prefix",    category: "admin" },
+
+  // Actuator / Spring / deployment bait
+  { token: "/actuator/",               shape: "prefix",    category: "actuator" },
+  { token: "/actuator/env",            shape: "prefix",    category: "actuator" },
+  { token: "/actuator/heapdump",       shape: "prefix",    category: "actuator" },
+  { token: "/actuator/mappings",       shape: "prefix",    category: "actuator" },
+  { token: "/actuator/gateway/routes", shape: "prefix",    category: "actuator" },
+  { token: "/actuator/health",         shape: "prefix",    category: "actuator" },
+  { token: "/actuator/httptrace",      shape: "prefix",    category: "actuator" },
+  { token: "/env",                     shape: "prefix",    category: "actuator" },
+  { token: "/trace",                   shape: "prefix",    category: "actuator" },
+  { token: "/heapdump",                shape: "prefix",    category: "actuator" },
+  { token: "/mappings",                shape: "prefix",    category: "actuator" },
+  { token: "/jmx-console/",            shape: "prefix",    category: "actuator" },
+  { token: "/invoker/readonly",        shape: "prefix",    category: "actuator" },
+  { token: "/web-console/",            shape: "prefix",    category: "actuator" },
+  { token: "/hudson/",                 shape: "prefix",    category: "actuator" },
+  { token: "/struts/",                 shape: "prefix",    category: "actuator" },
+
+  // Legacy CGI, shell, IIS
+  { token: "/cgi-bin/",                shape: "prefix",    category: "cgi" },
+  { token: "/cgi-bin/bash",            shape: "prefix",    category: "cgi" },
+  { token: "/cgi-bin/.%2e/",           shape: "prefix",    category: "cgi" },
+  { token: "/bin/sh",                  shape: "prefix",    category: "cgi" },
+  { token: "/scripts/..%255c../winnt/system32/cmd.exe", shape: "prefix", category: "cgi" },
+  { token: "/ida.dll",                 shape: "prefix",    category: "cgi" },
+  { token: "/iisadmpwd/",              shape: "prefix",    category: "cgi" },
+  { token: "/_vti_bin/",               shape: "prefix",    category: "cgi" },
+  { token: "/_vti_pvt/",               shape: "prefix",    category: "cgi" },
+  { token: "/owa/",                    shape: "prefix",    category: "cgi" },
+  { token: "/aspnet_client/",          shape: "prefix",    category: "cgi" },
+  { token: "/Trace.axd",               shape: "prefix",    category: "cgi" },
+  { token: "/elmah.axd",               shape: "prefix",    category: "cgi" },
+
+  // Cloud metadata / SSRF
+  { token: "169.254.169.254",          shape: "substring", category: "metadata" },
+  { token: "/latest/meta-data/",       shape: "prefix",    category: "metadata" },
+  { token: "/computeMetadata/v1/",     shape: "prefix",    category: "metadata" },
+  { token: "/metadata/instance",       shape: "prefix",    category: "metadata" },
+
+  // Webshells / RCE filenames
+  { token: "/shell.php",               shape: "prefix",    category: "webshell" },
+  { token: "/c99.php",                 shape: "prefix",    category: "webshell" },
+  { token: "/r57.php",                 shape: "prefix",    category: "webshell" },
+  { token: "/wso.php",                 shape: "prefix",    category: "webshell" },
+  { token: "/b374k.php",               shape: "prefix",    category: "webshell" },
+  { token: "/alfa.php",                shape: "prefix",    category: "webshell" },
+  { token: "/webshell.php",            shape: "prefix",    category: "webshell" },
+  { token: "/cmd.php",                 shape: "prefix",    category: "webshell" },
+  { token: "/backdoor.php",            shape: "prefix",    category: "webshell" },
+  { token: "/upload.php",              shape: "prefix",    category: "webshell" },
+  { token: "/filemanager.php",         shape: "prefix",    category: "webshell" },
+  { token: "/up.php",                  shape: "prefix",    category: "webshell" },
+  { token: "/install.php",             shape: "prefix",    category: "webshell" },
+  { token: "/setup.php",               shape: "prefix",    category: "webshell" },
+  { token: "/phpinfo.php",             shape: "prefix",    category: "webshell" },
+  { token: "/info.php",                shape: "prefix",    category: "webshell" },
+  { token: "/test.php",                shape: "prefix",    category: "webshell" },
+]
