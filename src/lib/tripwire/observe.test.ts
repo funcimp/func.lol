@@ -109,4 +109,16 @@ describe("guard", () => {
     }
     expect(allowedCount).toBe(1000)
   })
+
+  test("window rollover: after 60s the counter resets", () => {
+    resetGuardForTests()
+    const ip = "sha256:rollover"
+    const t0 = 1_000_000_000
+    for (let i = 0; i < 30; i++) {
+      expect(guard(ip, t0)).toBe(true)
+    }
+    expect(guard(ip, t0)).toBe(false)
+    // Step past the 60s window:
+    expect(guard(ip, t0 + 60_001)).toBe(true)
+  })
 })

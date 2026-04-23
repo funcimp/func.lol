@@ -43,27 +43,40 @@ export function uaFamily(ua: string): string {
   return "unknown"
 }
 
+// 30 hits per IP per minute is roughly 2x the burst rate of a typical
+// directory scanner. Scanners that do legitimate discovery (gobuster with
+// --threads 10 and a respectful delay) stay well under this ceiling.
 const PER_IP_LIMIT = 30
+
+// 1000 total hits per minute caps worst-case outbound bandwidth around
+// 10 GB/min at ~10 MB per compressed bomb. Well under func.lol's Vercel
+// allotment even at full saturation.
 const TOTAL_LIMIT = 1000
+
 const WINDOW_MS = 60_000
 
-interface Entry {
-  count: number
-  resetAt: number
-}
+type Entry = { count: number; resetAt: number }
 
 const perIp = new Map<string, Entry>()
 let globalCount = 0
 let globalResetAt = 0
 
-export function guard(ipHash: string): boolean {
-  const now = Date.now()
+const SWEEP_THRESHOLD = 10_000
 
+function sweepExpired(now: number): void {
+  for (const [ip, entry] of perIp) {
+    if (now > entry.resetAt) perIp.delete(ip)
+  }
+}
+
+export function guard(ipHash: string, now: number = Date.now()): boolean {
   if (now > globalResetAt) {
     globalCount = 0
     globalResetAt = now + WINDOW_MS
   }
   if (globalCount >= TOTAL_LIMIT) return false
+
+  if (perIp.size > SWEEP_THRESHOLD) sweepExpired(now)
 
   let entry = perIp.get(ipHash)
   if (!entry || now > entry.resetAt) {
