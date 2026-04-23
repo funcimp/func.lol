@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Lab experiments by Functionally Imperative. Public domain. Built in public.
+Experiments by Functionally Imperative. Public domain. Built in public.
 
 > **Public, forever.** No secrets, no private notes, no internal links. Everything here is world-readable.
 
@@ -16,6 +16,8 @@ Lab experiments by Functionally Imperative. Public domain. Built in public.
 
 - Start simple. Add only what survives scrutiny.
 - Ask if you're confused. Don't guess.
+- Experiments are self-contained. No sibling apps, no separate hosts. Experiments ship with func.lol.
+- No func.lol route uses a path that matches a pattern in `src/lib/tripwire/patterns.ts`. The patterns module is the authoritative list. If a future page needs a forbidden path, remove the pattern first.
 
 ## Influences
 

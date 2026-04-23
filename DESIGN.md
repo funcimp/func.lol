@@ -56,7 +56,7 @@ The visual signature. Three roles, strict territories, strict density.
 
 ### Three roles
 
-- **V1 emblem** — lab header decoration. One per lab, SVG, ~96×96.
+- **V1 emblem** — experiment header decoration. One per experiment, SVG, ~96×96.
 - **V2 data viz** — inside article body, where there's real data. Dither carries meaning. No data → no V2.
 - **V3 texture** — page chrome outside content. Mood only.
 
@@ -80,7 +80,7 @@ The visual signature. Three roles, strict territories, strict density.
 - Dither inside forms or buttons
 - Dither in headings
 - Dither in any color other than `--ink`
-- Multiple emblems per lab
+- Multiple emblems per experiment
 - Decorative dither that doesn't mean something
 
 ## Layout & rhythm
@@ -135,7 +135,7 @@ The visual signature. Three roles, strict territories, strict density.
 
 ## Not in the language (yet)
 
-- MDX for lab writeups
+- MDX for experiment writeups
 - Open Graph / social cards
 - Tags, categories, search
 - A second accent color
@@ -143,14 +143,14 @@ The visual signature. Three roles, strict territories, strict density.
 - Photography or non-dithered illustration
 - Animation beyond focus and hover
 - A second typeface family
-- Per-lab custom styling
+- Per-experiment custom styling
 - Multi-column layouts, dashboards, dense tables
 
-## Adding a new lab
+## Adding a new experiment
 
-1. Add an entry to [src/app/labs/page.tsx](src/app/labs/page.tsx).
-2. Create `src/app/labs/<slug>/page.tsx`. Copy the Prime Moments skeleton.
-3. **V1 emblem?** A small dithered SVG that represents the lab. If nothing comes to mind in 60 seconds, skip it.
+1. Add an entry to [src/app/x/page.tsx](src/app/x/page.tsx).
+2. Create `src/app/x/<slug>/page.tsx`. Copy the Prime Moments skeleton.
+3. **V1 emblem?** A small dithered SVG that represents the experiment. If nothing comes to mind in 60 seconds, skip it.
 4. **V2 data viz?** Only if there's real data.
 5. **V3 texture?** Only if there's no V2.
 

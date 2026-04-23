@@ -1,5 +1,5 @@
 // Shared date helpers. Kept intentionally small — any prime-moments-
-// specific date logic stays in app/labs/prime-moments/lib/.
+// specific date logic stays in app/x/prime-moments/lib/.
 
 /**
  * Format an ISO YYYY-MM-DD string as "Mon D, YYYY" in en-US, reading
