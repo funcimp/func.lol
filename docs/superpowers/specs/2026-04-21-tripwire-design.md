@@ -412,7 +412,7 @@ Vercel Pro log retention is seven days. If v2 (live stats) lands more than a wee
 
 **Environment:**
 
-- `CRON_SECRET`: shared secret for authenticating the cron invocation. Vercel sets this automatically when a cron route is configured; route verifies `Authorization: Bearer ${CRON_SECRET}`.
+- `CRON_SECRET`: shared secret for authenticating the cron invocation. You must set this env var yourself (Vercel does NOT auto-inject a random value, despite earlier drafts of this spec claiming otherwise). Generate once with `openssl rand -hex 32`, add as a Production env var, redeploy. Vercel's cron scheduler reads the same env var and sends `Authorization: Bearer ${CRON_SECRET}` on every outgoing cron request; the handler compares and approves.
 - `BLOB_READ_WRITE_TOKEN`: for writing to Vercel Blob.
 - `VERCEL_API_TOKEN`: for querying the Logs API (scoped to the project).
 
@@ -571,7 +571,7 @@ Edited:
 - `package.json`: add `prebuild` and `build-bombs` scripts.
 - `vercel.json`: add `crons` entry for `/api/cron/tripwire-archive` at `0 3 * * *`.
 - `.gitignore`: add `public/.bomb.*.gz` and `public/.bomb-cache.txt`.
-- `.env.local` and Vercel env: add `TRIPWIRE_IP_SALT`, `BLOB_READ_WRITE_TOKEN`, `VERCEL_API_TOKEN`. Vercel injects `CRON_SECRET` automatically.
+- `.env.local` and Vercel env: add `BLOB_READ_WRITE_TOKEN`, `VERCEL_API_TOKEN`, and `CRON_SECRET` (you set this one manually; Vercel does not auto-generate it). `TRIPWIRE_IP_SALT` was removed in a later fix when we decided to store raw scanner IPs for ASN/BGP analysis.
 - `src/app/x/page.tsx`: add the Tripwire entry to the experiments index.
 - `AGENTS.md`: add the route-collision rule.
 
