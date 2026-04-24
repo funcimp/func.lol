@@ -51,6 +51,27 @@ test.describe("tripwire proxy", () => {
     }
   })
 
+  test("POST to a bait path still bombs", async ({ request }) => {
+    // Scanners POST to /xmlrpc.php for WordPress attacks; they probe with
+    // every verb. Our bomb route must accept all methods.
+    const res = await request.post("/xmlrpc.php", {
+      headers: { "accept-encoding": "identity" },
+      maxRedirects: 0,
+    })
+    expect(res.status()).toBe(200)
+    expect(res.headers()["content-encoding"]).toBe("gzip")
+    expect(res.headers()["content-type"]).toBe("text/html; charset=utf-8")
+  })
+
+  test("PUT to a bait path still bombs", async ({ request }) => {
+    const res = await request.put("/actuator/env", {
+      headers: { "accept-encoding": "identity" },
+      maxRedirects: 0,
+    })
+    expect(res.status()).toBe(200)
+    expect(res.headers()["content-type"]).toBe("application/json; charset=utf-8")
+  })
+
   test("robots.txt lists bait paths as Disallow", async ({ request }) => {
     const res = await request.get("/robots.txt")
     expect(res.status()).toBe(200)
