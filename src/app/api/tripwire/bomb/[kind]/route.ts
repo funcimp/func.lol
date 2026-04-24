@@ -32,7 +32,7 @@ function isBombKind(v: string): v is BombKind {
   return v in CONTENT_TYPES
 }
 
-export async function GET(
+async function serveBomb(
   _req: NextRequest,
   { params }: { params: Promise<{ kind: string }> },
 ): Promise<Response> {
@@ -57,4 +57,20 @@ export async function GET(
       Vary: "Accept-Encoding",
     },
   })
+}
+
+// Scanners probe bait paths with every method — GET to fingerprint,
+// POST for exploit payloads (e.g. /xmlrpc.php, webshell uploads), PUT and
+// DELETE on REST endpoints, OPTIONS for method enumeration. Next.js routes
+// 405 on unexported methods by default, which is worse than pointless here:
+// it tells the scanner "nope, try something else" instead of feeding them
+// the bomb. Export the same handler under every method.
+export {
+  serveBomb as GET,
+  serveBomb as POST,
+  serveBomb as PUT,
+  serveBomb as PATCH,
+  serveBomb as DELETE,
+  serveBomb as HEAD,
+  serveBomb as OPTIONS,
 }
