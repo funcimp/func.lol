@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { cookies } from "next/headers";
+import { Analytics } from "@vercel/analytics/next";
 
 import { parseTheme, THEME_COOKIE } from "@/lib/theme";
 
@@ -38,6 +39,7 @@ export default async function RootLayout({
     >
       <body className="min-h-screen bg-paper text-ink antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
