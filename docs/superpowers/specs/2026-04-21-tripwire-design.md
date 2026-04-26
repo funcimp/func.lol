@@ -387,42 +387,56 @@ Smaller shape because the traffic shape is what matters here, not the full reque
 
 **UA family parsing:** tiny helper `uaFamily(ua)` that classifies common scanner UAs: `nuclei`, `nmap`, `masscan`, `zgrab`, `gobuster`, `ffuf`, `requests`, `python`, `curl`, `wget`, `Go-http-client`, plus well-known crawler families (`googlebot`, `bingbot`, etc.) so we can spot UA-spoofing scanners in the aggregated data. Fallback `"unknown"`. No full UA parsing library dep.
 
-## Retention: daily archiver
+## Retention: log drain ingest
 
-Vercel Pro log retention is seven days. If v2 (live stats) lands more than a week after v1 ships, the most interesting early-observation data is already gone by the time we build the stats page. A cheap v1 retention layer keeps raw events around without adding a page-facing feature.
+Vercel Pro log retention is seven days. If v2 (live stats) lands more than a week after v1 ships, the most interesting early-observation data is gone before the stats page exists. A cheap retention layer keeps raw events around without adding a page-facing feature.
 
-**Path:** `src/app/api/cron/tripwire-archive/route.ts`
+**Earlier design (replaced):** A daily cron at `/api/cron/tripwire-archive` polled `https://api.vercel.com/v1/projects/<id>/logs` and merged results into a single per-day Blob file. The endpoint is undocumented (not in Vercel's REST API reference), and the archiver silently returned `incomingCount: 0` for every run despite confirmed scanner traffic. Three failure modes (auth scope, endpoint shape, response body shape) all collapsed into the same zero result, so the diagnostic shape (PR #7) could not distinguish "no traffic" from "broken plumbing." Migrated to push-based delivery.
 
-**Schedule:** daily at 03:00 UTC via a `vercel.json` `crons` entry:
+**Current design:** Vercel Log Drain pushes NDJSON batches to `src/app/api/tripwire/drain/route.ts` whenever new logs arrive (every few seconds during traffic). The handler verifies the HMAC-SHA1 signature, parses each record, buckets by shape, and writes per-batch files to private Blob storage:
 
-```json
-{
-  "crons": [
-    { "path": "/api/cron/tripwire-archive", "schedule": "0 3 * * *" }
-  ]
-}
+```
+tripwire/events/<YYYY-MM-DD>/<unix-ms>-<rand>.jsonl.gz       tripwire.hit + tripwire.throttled
+tripwire/candidates/<YYYY-MM-DD>/<unix-ms>-<rand>.jsonl.gz   non-bait 4xx responses
 ```
 
-**Behavior:**
+Per-batch immutable files mean no read-merge-rewrite. Date prefixes give a cheap query unit. `<rand>` is six hex chars from `randomBytes(3)` to disambiguate concurrent batches that share a millisecond.
 
-1. Read the previous day's logs via the Vercel Logs API (or a configured Log Drain target, if simpler at implementation time against current Vercel docs).
-2. Filter to lines where `event: "tripwire.hit"` or `event: "tripwire.throttled"`. Everything else is dropped on the floor.
-3. Append the filtered events, one per line, to a gzipped JSONL file in Vercel Blob at `tripwire/events/YYYY-MM-DD.jsonl.gz`.
-4. If the file already exists for that date (re-run), merge and deduplicate by `ts` + `pattern` + `ip_hash`. Idempotent.
+**Routing rule per drain record:**
+
+1. If `message` parses as a valid `TripwireEvent` (`event` is `tripwire.hit` or `tripwire.throttled`), bucket as event.
+2. Else if `proxy.statusCode` is in `[400, 500)` and `proxy.path` is not in our bait list, bucket as candidate.
+3. Else drop.
+
+The `matchBait` check on candidates is defensive. Bait paths always return 200 from the bomb route, so a 4xx on a bait path should be unreachable, but the check keeps the bucket clean if the proxy ever misses one.
+
+**Schema reference:** [Vercel Log Drains reference](https://vercel.com/docs/drains/reference/logs). Key fields used: `source`, `timestamp` (ms epoch number), `message` (stdout payload), `proxy.path`, `proxy.statusCode`, `proxy.userAgent` (array of strings), `proxy.clientIp`.
+
+**Signature verification:** Vercel sends `x-vercel-signature` (hex SHA1 HMAC of the raw body). We verify with `crypto.createHmac("sha1", secret).update(raw).digest()` and `timingSafeEqual`. Mismatch returns 403; Vercel retries with backoff. See [Vercel Drains security](https://vercel.com/docs/drains/security).
 
 **Environment:**
 
-- `CRON_SECRET`: shared secret for authenticating the cron invocation. You must set this env var yourself (Vercel does NOT auto-inject a random value, despite earlier drafts of this spec claiming otherwise). Generate once with `openssl rand -hex 32`, add as a Production env var, redeploy. Vercel's cron scheduler reads the same env var and sends `Authorization: Bearer ${CRON_SECRET}` on every outgoing cron request; the handler compares and approves.
-- `BLOB_READ_WRITE_TOKEN`: for writing to Vercel Blob.
-- `VERCEL_API_TOKEN`: for querying the Logs API (scoped to the project).
+- `BLOB_READ_WRITE_TOKEN`: for writing to private Vercel Blob.
+- `TRIPWIRE_DRAIN_SECRET`: shared HMAC secret. Generate with `openssl rand -hex 32`, paste into the drain config in the Vercel dashboard, and add the same value to project env vars. No `VERCEL_API_TOKEN` or `CRON_SECRET` needed.
 
-**What this buys:** at v2 launch, the aggregator has full history in Blob rather than the last seven days of Vercel logs. The aggregator pipeline (v2) switches from "query Vercel Logs API" to "read Blob JSONL files," which is also cheaper and simpler.
+**One-time configuration:**
+
+1. `vercel env add TRIPWIRE_DRAIN_SECRET production` (paste the secret).
+2. Vercel Dashboard → Project → Logs → Drains → Create:
+   - URL: `https://func.lol/api/tripwire/drain`
+   - Format: NDJSON
+   - Sources: lambda, edge (the proxy and route handlers)
+   - Signing secret: same value as `TRIPWIRE_DRAIN_SECRET`
+   - Sampling: filter to exclude `path = /api/tripwire/drain` to avoid self-drain loops.
+3. `vercel env pull .env.local`, redeploy.
+
+**What this buys:** the drain has a documented schema (no field-name guessing), no polling window where data can be lost, and no full-access `VERCEL_API_TOKEN` required (Vercel has no fine-grained "logs read" scope). The push model also captures `candidate.4xx` records (non-bait 404 / 401 / 403 / 429) which feed v3's intelligent pattern discovery.
 
 **What this does not do:**
 
 - Does not surface anything on the `/x/tripwire` page at v1. Zero reader-facing consequence.
-- Does not aggregate. Each archive file is the raw event stream for that day, gzipped. Aggregation is v2.
-- Does not store anything other than `tripwire.hit` and `tripwire.throttled`. Normal 404s, 200s, and every other request stay in Vercel's log stream and expire at seven days per Pro retention. If v3's "intelligent pattern discovery" wants them, v3 will either add a second filter or sample them separately.
+- Does not aggregate. Each batch file is raw events, gzipped. Aggregation is v2.
+- Does not deduplicate. If Vercel retries on a 5xx, the same events may land in two batch files. Dedup belongs at v2 aggregation, not at ingest.
 
 ## Build-time bomb generation
 
@@ -561,7 +575,8 @@ New:
 - `src/lib/tripwire/observe.test.ts`
 - `src/app/robots.ts`
 - `src/app/robots.test.ts`
-- `src/app/api/cron/tripwire-archive/route.ts`
+- `src/app/api/tripwire/drain/route.ts`
+- `src/app/api/tripwire/drain/route.test.ts`
 - `src/app/x/tripwire/page.tsx`
 - `scripts/build-bombs.ts`
 - `proxy.test.ts`
@@ -569,9 +584,8 @@ New:
 Edited:
 
 - `package.json`: add `prebuild` and `build-bombs` scripts.
-- `vercel.json`: add `crons` entry for `/api/cron/tripwire-archive` at `0 3 * * *`.
 - `.gitignore`: add `public/.bomb.*.gz` and `public/.bomb-cache.txt`.
-- `.env.local` and Vercel env: add `BLOB_READ_WRITE_TOKEN`, `VERCEL_API_TOKEN`, and `CRON_SECRET` (you set this one manually; Vercel does not auto-generate it). `TRIPWIRE_IP_SALT` was removed in a later fix when we decided to store raw scanner IPs for ASN/BGP analysis.
+- `.env.local` and Vercel env: add `BLOB_READ_WRITE_TOKEN` and `TRIPWIRE_DRAIN_SECRET`. The drain itself is configured in the Vercel dashboard. Earlier drafts also set `TRIPWIRE_IP_SALT` (removed when we decided to store raw scanner IPs for ASN/BGP analysis), `VERCEL_API_TOKEN`, and `CRON_SECRET` (both removed when the cron archiver was replaced with the drain).
 - `src/app/x/page.tsx`: add the Tripwire entry to the experiments index.
 - `AGENTS.md`: add the route-collision rule.
 
@@ -579,7 +593,7 @@ Edited:
 
 Tracked in [`IDEAS.md`](../../../IDEAS.md) under the `Tripwire` section:
 
-- **v2.** Live stats panel on `/x/tripwire`. Read the daily archived JSONL files from Blob (already produced by v1's archiver), aggregate, render stats. No new storage plumbing needed; v1 built it.
+- **v2.** Live stats panel on `/x/tripwire`. Read per-batch JSONL files from `tripwire/events/` and `tripwire/candidates/` in Blob (produced by the drain ingest endpoint), aggregate, render stats. No new storage plumbing; the drain built it.
 - **v3.** Intelligent pattern discovery. Analyze the non-tripwire 404 stream for scanner-like clusters and surface new bait candidates.
 - Contextual bomb variants beyond the four (YAML billion-laughs alias bomb, ZIP/tarball bombs, per-pattern bombs).
 - `Accept`-header-driven bomb selection.
