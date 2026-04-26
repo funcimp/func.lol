@@ -1,12 +1,27 @@
 // src/proxy.test.ts
-import { describe, test, expect, beforeEach, beforeAll } from "bun:test"
+import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test"
 import { gzipSync } from "node:zlib"
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs"
 import path from "node:path"
 import { NextRequest } from "next/server"
 
-import { proxy } from "./proxy"
-import { resetGuardForTests } from "@/lib/tripwire/observe"
+// Capture blob put() calls instead of hitting Blob storage.
+interface PutCall {
+  pathname: string
+  body: string
+  options: Record<string, unknown>
+}
+const putCalls: PutCall[] = []
+
+mock.module("@vercel/blob", () => ({
+  put: async (pathname: string, body: string, options: Record<string, unknown>) => {
+    putCalls.push({ pathname, body, options })
+    return { url: `https://blob.example/${pathname}`, pathname }
+  },
+}))
+
+const { proxy } = await import("./proxy")
+const { resetGuardForTests } = await import("@/lib/tripwire/observe")
 
 function req(pathname: string, init?: { ua?: string; ip?: string }): NextRequest {
   const url = new URL(pathname, "https://func.lol")
@@ -42,18 +57,16 @@ describe("proxy", () => {
   beforeEach(() => {
     resetGuardForTests()
     process.env.NODE_ENV = "production"
+    putCalls.length = 0
   })
 
   test("non-bait URL returns undefined (pass-through)", async () => {
     const res = await proxy(req("/x/prime-moments"))
     expect(res).toBeUndefined()
+    expect(putCalls).toHaveLength(0)
   })
 
   test("bait URL rewrites to the internal bomb route per kind", async () => {
-    // Cases map bait path to the expected bomb kind in the rewrite target.
-    // The bomb response itself (Content-Encoding: gzip and Content-Type) is
-    // produced by the route handler, tested separately at the E2E layer.
-    // Proxy responses CANNOT set Content-Encoding — Next.js strips it.
     const cases: Array<[string, "html" | "json" | "yaml" | "env"]> = [
       ["/wp-admin/",            "html"],
       ["/actuator/env",         "json"],
@@ -77,6 +90,7 @@ describe("proxy", () => {
     process.env.NODE_ENV = "development"
     const res = await proxy(req("/wp-admin/"))
     expect(res).toBeUndefined()
+    expect(putCalls).toHaveLength(0)
   })
 
   test("circuit breaker trips after 30 hits from the same IP", async () => {
@@ -87,5 +101,82 @@ describe("proxy", () => {
     }
     const throttled = await proxy(req("/wp-admin/", { ip: "1.2.3.4" }))
     expect(throttled).toBeUndefined()
+  })
+
+  describe("blob archive", () => {
+    const FILENAME_RE = /^tripwire\/events\/\d{4}-\d{2}-\d{2}\/\d+-[0-9a-f]{6}\.json$/
+
+    test("tripwire.hit fires-and-forgets one blob put with the event payload", async () => {
+      const res = (await proxy(req("/wp-login.php", { ua: "Nuclei/2.9", ip: "9.9.9.9" }))) as Response
+      expect(res).toBeInstanceOf(Response)
+      expect(putCalls).toHaveLength(1)
+
+      const { pathname, body, options } = putCalls[0]
+      expect(pathname).toMatch(FILENAME_RE)
+      expect(options).toMatchObject({
+        access: "private",
+        contentType: "application/json",
+        addRandomSuffix: false,
+      })
+
+      const event = JSON.parse(body) as Record<string, unknown>
+      expect(event.event).toBe("tripwire.hit")
+      expect(event.path).toBe("/wp-login.php")
+      expect(event.pattern).toBe("/wp-login.php")
+      expect(event.category).toBe("cms")
+      expect(event.bomb).toBe("html")
+      expect(event.ip).toBe("9.9.9.9")
+      expect(event.ua_family).toBe("nuclei")
+      expect(typeof event.ts).toBe("string")
+    })
+
+    test("tripwire.throttled fires-and-forgets one blob put with the smaller payload", async () => {
+      resetGuardForTests()
+      // Burn the per-IP allowance so the 31st request throttles.
+      for (let i = 0; i < 30; i++) {
+        await proxy(req("/wp-admin/", { ip: "5.5.5.5" }))
+      }
+      putCalls.length = 0
+
+      const res = await proxy(req("/wp-admin/", { ip: "5.5.5.5" }))
+      expect(res).toBeUndefined()
+      expect(putCalls).toHaveLength(1)
+
+      const event = JSON.parse(putCalls[0].body) as Record<string, unknown>
+      expect(event.event).toBe("tripwire.throttled")
+      expect(event.path).toBe("/wp-admin/")
+      expect(event.pattern).toBe("/wp-admin/")
+      expect(event.ip).toBe("5.5.5.5")
+      // Throttled payload is intentionally minimal — no UA, category, or bomb.
+      expect(event.ua_family).toBeUndefined()
+      expect(event.category).toBeUndefined()
+      expect(event.bomb).toBeUndefined()
+    })
+
+    test("blob put failure is caught, doesn't break the bomb response", async () => {
+      // Re-mock to throw on this test only.
+      mock.module("@vercel/blob", () => ({
+        put: async () => {
+          throw new Error("simulated blob outage")
+        },
+      }))
+      // Re-import proxy so the new mock takes effect.
+      const { proxy: proxyWithFailingBlob } = await import("./proxy")
+
+      const res = (await proxyWithFailingBlob(
+        req("/wp-login.php", { ip: "8.8.8.8" }),
+      )) as Response
+      // Bomb response still ships even though the archive write failed.
+      expect(res).toBeInstanceOf(Response)
+      expect(res.headers.get("x-middleware-rewrite")).toContain("/api/tripwire/bomb/html")
+
+      // Restore the capturing mock for subsequent tests.
+      mock.module("@vercel/blob", () => ({
+        put: async (pathname: string, body: string, options: Record<string, unknown>) => {
+          putCalls.push({ pathname, body, options })
+          return { url: `https://blob.example/${pathname}`, pathname }
+        },
+      }))
+    })
   })
 })
