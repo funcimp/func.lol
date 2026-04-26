@@ -11,8 +11,7 @@
     "lint": "eslint",
     "test": "bun test",
     "e2e": "bunx playwright test",
-    "e2e:ui": "bunx playwright test --ui",
-    "tripwire:archive": "bun run scripts/trigger-archive.ts"
+    "e2e:ui": "bunx playwright test --ui"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
