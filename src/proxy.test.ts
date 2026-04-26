@@ -3,7 +3,18 @@ import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test"
 import { gzipSync } from "node:zlib"
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs"
 import path from "node:path"
-import { NextRequest } from "next/server"
+import * as nextServer from "next/server"
+
+const { NextRequest } = nextServer
+
+// after() from next/server requires a real Next.js request context that
+// bun:test doesn't provide; calling it would throw. The put() promise is
+// constructed eagerly so its mock captures the call before after() runs;
+// no-op'ing after() lets us assert on putCalls without losing fidelity.
+mock.module("next/server", () => ({
+  ...nextServer,
+  after: () => {},
+}))
 
 // Capture blob put() calls instead of hitting Blob storage.
 interface PutCall {
