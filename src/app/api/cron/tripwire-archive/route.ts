@@ -65,26 +65,45 @@ function verifyCronAuth(req: NextRequest): boolean {
  * On failure or missing env config the archiver no-ops gracefully rather
  * than failing the cron.
  */
-async function fetchLogLines(from: number, to: number, key: string): Promise<string[]> {
+interface FetchResult {
+  lines: string[]
+  note: string
+}
+
+async function fetchLogLines(from: number, to: number, key: string): Promise<FetchResult> {
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
-  if (!token || !projectId) return []
+  if (!token) {
+    return { lines: [], note: "missing VERCEL_API_TOKEN env var" }
+  }
+  if (!projectId) {
+    return { lines: [], note: "missing VERCEL_PROJECT_ID env var" }
+  }
 
   const url = new URL(`https://api.vercel.com/v1/projects/${projectId}/logs`)
   url.searchParams.set("since", String(from))
   url.searchParams.set("until", String(to))
   url.searchParams.set("limit", "5000")
 
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  let res: Response
+  try {
+    res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[tripwire-archive] Logs API fetch threw: ${msg}`)
+    return { lines: [], note: `Logs API fetch threw: ${msg}` }
+  }
   if (!res.ok) {
+    const body = await res.text().catch(() => "")
     console.error(
       `[tripwire-archive] Vercel Logs API failed (status=${res.status}). ` +
-      `Archive will be empty for ${key}. Verify VERCEL_API_TOKEN and endpoint shape.`,
+      `Archive will be empty for ${key}. Body preview: ${body.slice(0, 200)}`,
     )
-    return []
+    return { lines: [], note: `Logs API ${res.status}: ${body.slice(0, 120)}` }
   }
   const text = await res.text()
-  return text.split("\n").filter(Boolean)
+  const lines = text.split("\n").filter(Boolean)
+  return { lines, note: `fetched ${lines.length} lines from Logs API` }
 }
 
 function tryParseTripwireEvent(s: string): TripwireEvent | null {
@@ -159,18 +178,33 @@ function numberField(obj: Record<string, unknown>, keys: string[]): number | nul
 interface Buckets {
   events: TripwireEvent[]
   candidates: CandidateEvent[]
+  unparsedSample: string[]
+  jsonParseable: number
+  jsonNonParseable: number
 }
 
 function bucketLogLines(lines: string[]): Buckets {
   const events: TripwireEvent[] = []
   const candidates: CandidateEvent[] = []
+  const unparsedSample: string[] = []
+  let jsonParseable = 0
+  let jsonNonParseable = 0
   for (const line of lines) {
     const tw = parseTripwireEventLine(line)
     if (tw) { events.push(tw); continue }
     const cand = parseRequestLogLine(line)
-    if (cand) candidates.push(cand)
+    if (cand) { candidates.push(cand); continue }
+    // Diagnostic: we received a line we couldn't bucket. Track a small sample
+    // so the response can show what Vercel's actual log shape looks like.
+    try {
+      JSON.parse(line.slice(line.indexOf("{"), line.lastIndexOf("}") + 1))
+      jsonParseable++
+    } catch {
+      jsonNonParseable++
+    }
+    if (unparsedSample.length < 3) unparsedSample.push(line.slice(0, 400))
   }
-  return { events, candidates }
+  return { events, candidates, unparsedSample, jsonParseable, jsonNonParseable }
 }
 
 async function readExistingArchive<T>(
@@ -252,30 +286,44 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const { from, to, key } = windowForCron()
-  const lines = await fetchLogLines(from, to, key)
-  const { events: incomingEvents, candidates: incomingCandidates } = bucketLogLines(lines)
+  const fetchResult = await fetchLogLines(from, to, key)
+  const buckets = bucketLogLines(fetchResult.lines)
 
   const eventsPath = `tripwire/events/${key}.jsonl.gz`
   const candidatesPath = `tripwire/candidates/${key}.jsonl.gz`
 
   const [eventsResult, candidatesResult] = await Promise.all([
-    incomingEvents.length === 0
+    buckets.events.length === 0
       ? Promise.resolve({ existingCount: 0, incomingCount: 0, mergedCount: 0 })
       : (async () => {
           const existing = await readExistingArchive(eventsPath, parseArchivedTripwireEvent)
-          return writeArchive(eventsPath, existing, incomingEvents, tripwireKey)
+          return writeArchive(eventsPath, existing, buckets.events, tripwireKey)
         })(),
-    incomingCandidates.length === 0
+    buckets.candidates.length === 0
       ? Promise.resolve({ existingCount: 0, incomingCount: 0, mergedCount: 0 })
       : (async () => {
           const existing = await readExistingArchive(candidatesPath, parseArchivedCandidate)
-          return writeArchive(candidatesPath, existing, incomingCandidates, candidateKey)
+          return writeArchive(candidatesPath, existing, buckets.candidates, candidateKey)
         })(),
   ])
 
   return NextResponse.json({
     ok: true,
     key,
+    window: { from, to },
+    fetch: {
+      note: fetchResult.note,
+      lineCount: fetchResult.lines.length,
+    },
+    parse: {
+      tripwireEvents: buckets.events.length,
+      candidate4xx: buckets.candidates.length,
+      unparsed: {
+        jsonParseable: buckets.jsonParseable,
+        jsonNonParseable: buckets.jsonNonParseable,
+        sample: buckets.unparsedSample,
+      },
+    },
     events: eventsResult,
     candidates: candidatesResult,
   })
