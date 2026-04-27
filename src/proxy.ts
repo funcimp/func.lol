@@ -1,5 +1,5 @@
 // src/proxy.ts
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse, after, type NextRequest } from "next/server"
 import { put } from "@vercel/blob"
 import { randomBytes } from "node:crypto"
 import {
@@ -10,18 +10,26 @@ import {
 } from "@/lib/tripwire/patterns"
 import { guard, uaFamily } from "@/lib/tripwire/observe"
 
-// Fire-and-forget durable archive of a tripwire event. One file per event
-// under tripwire/events/<YYYY-MM-DD>/<unix-ms>-<rand>.json. Failures don't
-// block the bomb response — console.log above stays as the 7-day Vercel-log
-// debugging shim if Blob is briefly unreachable.
+// Durable archive of a tripwire event. One file per event under
+// tripwire/events/<YYYY-MM-DD>/<unix-ms>-<rand>.json.
+//
+// after() keeps the function instance alive until the put resolves. Without
+// it, cold-start singleton requests get suspended mid-flight: the in-flight
+// HTTPS write to Blob is silently terminated by the runtime before it can
+// succeed or fail. Verified empirically (mirror + log diff): cold-start
+// singletons drop, warm-instance / burst events land. console.log stays as
+// a 7-day Vercel-log debugging shim if Blob is briefly unreachable.
 function archiveEvent(event: TripwireEvent): void {
   const date = new Date().toISOString().slice(0, 10)
   const filename = `${Date.now()}-${randomBytes(3).toString("hex")}.json`
-  put(`tripwire/events/${date}/${filename}`, JSON.stringify(event), {
-    access: "private",
-    contentType: "application/json",
-    addRandomSuffix: false,
-  }).catch((err) => console.error("[tripwire] blob write failed:", err))
+  const pathname = `tripwire/events/${date}/${filename}`
+  after(() =>
+    put(pathname, JSON.stringify(event), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+    }).catch((err) => console.error("[tripwire] blob write failed:", err)),
+  )
 }
 
 export async function proxy(req: NextRequest): Promise<Response | undefined> {
