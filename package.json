@@ -12,7 +12,8 @@
     "test": "bun test",
     "e2e": "bunx playwright test",
     "e2e:ui": "bunx playwright test --ui",
-    "mirror-blob": "bun run scripts/mirror-blob.ts"
+    "mirror-blob": "bun run scripts/mirror-blob.ts",
+    "sync-tripwire": "bun run scripts/sync-tripwire.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

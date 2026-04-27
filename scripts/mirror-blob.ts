@@ -10,13 +10,26 @@
 //   bun run mirror-blob foo/bar/     # mirrors a different prefix
 //
 // Reads BLOB_READ_WRITE_TOKEN from .env.local (bun auto-loads).
+//
+// The mirrorBlob() function is also exported so other scripts can reuse
+// the mirror logic without shelling out.
 
 import { list, get } from "@vercel/blob"
 import { mkdir, writeFile, stat } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-const PREFIX = process.argv[2] ?? "tripwire/"
-const ROOT = join(process.cwd(), "scratch", "blob")
+export interface MirrorOptions {
+  prefix: string
+  root: string
+  silent?: boolean
+}
+
+export interface MirrorResult {
+  total: number
+  downloaded: number
+  skipped: number
+  failed: number
+}
 
 async function localSize(path: string): Promise<number | null> {
   try {
@@ -36,8 +49,7 @@ async function downloadOne(url: string, localPath: string): Promise<void> {
   await writeFile(localPath, buf)
 }
 
-async function main(): Promise<void> {
-  console.log(`[mirror] prefix=${PREFIX} → ${ROOT}`)
+export async function mirrorBlob({ prefix, root, silent }: MirrorOptions): Promise<MirrorResult> {
   let cursor: string | undefined
   let total = 0
   let downloaded = 0
@@ -45,10 +57,10 @@ async function main(): Promise<void> {
   let failed = 0
 
   do {
-    const page = await list({ prefix: PREFIX, cursor })
+    const page = await list({ prefix, cursor })
     for (const blob of page.blobs) {
       total++
-      const localPath = join(ROOT, blob.pathname)
+      const localPath = join(root, blob.pathname)
       if ((await localSize(localPath)) === blob.size) {
         skipped++
         continue
@@ -56,7 +68,7 @@ async function main(): Promise<void> {
       try {
         await downloadOne(blob.url, localPath)
         downloaded++
-        process.stdout.write(`  OK    ${blob.pathname}\n`)
+        if (!silent) process.stdout.write(`  OK    ${blob.pathname}\n`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`  FAIL  ${blob.pathname}: ${msg}`)
@@ -66,16 +78,19 @@ async function main(): Promise<void> {
     cursor = page.cursor
   } while (cursor)
 
-  console.log()
-  console.log(`Total found:  ${total}`)
-  console.log(`Downloaded:   ${downloaded}`)
-  console.log(`Skipped:      ${skipped}  (already present, matching size)`)
-  console.log(`Failed:       ${failed}`)
-
-  if (failed > 0) process.exit(1)
+  return { total, downloaded, skipped, failed }
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+// CLI entry — runs only when this file is executed directly, not when imported.
+if (import.meta.main) {
+  const PREFIX = process.argv[2] ?? "tripwire/"
+  const ROOT = join(process.cwd(), "scratch", "blob")
+  console.log(`[mirror] prefix=${PREFIX} → ${ROOT}`)
+  const r = await mirrorBlob({ prefix: PREFIX, root: ROOT })
+  console.log()
+  console.log(`Total found:  ${r.total}`)
+  console.log(`Downloaded:   ${r.downloaded}`)
+  console.log(`Skipped:      ${r.skipped}  (already present, matching size)`)
+  console.log(`Failed:       ${r.failed}`)
+  if (r.failed > 0) process.exit(1)
+}
