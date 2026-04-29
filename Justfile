@@ -9,6 +9,9 @@ default:
 tripwire-sync *args:
     bun run scripts/tripwire/sync.ts {{args}}
 
+tripwire-analyze-404s *args:
+    bun run scripts/tripwire/analyze-404s.ts {{args}}
+
 tripwire-build-bombs:
     bun run scripts/tripwire/build-bombs.ts
 
