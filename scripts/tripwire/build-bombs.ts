@@ -1,9 +1,9 @@
-// scripts/build-bombs.ts
+// scripts/tripwire/build-bombs.ts
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
-import { buildBomb, DEFAULT_PAYLOAD } from "../src/lib/tripwire/bomb"
-import { BOMB_KINDS } from "../src/lib/tripwire/patterns"
+import { buildBomb, DEFAULT_PAYLOAD } from "../../src/lib/tripwire/bomb"
+import { BOMB_KINDS } from "../../src/lib/tripwire/patterns"
 
 const PRODUCTION_TARGET = 2_000_000_000 // ~2 GB decompressed
 const PAYLOAD_TEXT = DEFAULT_PAYLOAD

@@ -8,6 +8,10 @@ export type TripwireEventName = (typeof TRIPWIRE_EVENT_NAMES)[number]
 
 export interface TripwireEvent {
   event: TripwireEventName
+  // cuid2, generated in src/proxy.ts. Optional because legacy events (and
+  // logs from before this field was added) lack it; sync tool falls back
+  // to a synthesized id from log.id + ts for those.
+  req_id?: string
   ts: string
   path: string
   pattern: string

@@ -5,16 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prebuild": "bun run scripts/build-bombs.ts",
-    "build-bombs": "bun run scripts/build-bombs.ts",
+    "prebuild": "bun run scripts/tripwire/build-bombs.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
     "e2e": "bunx playwright test",
-    "e2e:ui": "bunx playwright test --ui",
-    "mirror-blob": "bun run scripts/mirror-blob.ts"
+    "e2e:ui": "bunx playwright test --ui"
   },
   "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
     "next": "16.2.3",
