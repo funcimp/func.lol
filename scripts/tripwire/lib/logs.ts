@@ -1,11 +1,19 @@
 // scripts/tripwire/lib/logs.ts
 //
-// Shared helpers for tripwire ops scripts that pull logs via the Vercel CLI.
+// Shared helpers for tripwire ops scripts that pull logs via the Vercel CLI
+// or read a manual dashboard JSON export.
 //
 // The CLI's `vercel logs --json --no-follow` doesn't always exit cleanly even
 // when there's no more data to send, so callers that block on it need a hard
 // timeout. We set one here and treat partial stdout as the data set.
+//
+// The CLI also has a hard-to-pin retrieval limit that varies by query — for
+// the same `--query` over `--since 14d`, only the most recent ~3 days of
+// data come back regardless of timeout/limit. Older events are reachable
+// only through the dashboard export. readExportFile() normalizes export
+// entries into the same LogEntry shape so consumers don't care about source.
 
+import { readFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 
 export interface LogEntry {
@@ -84,6 +92,40 @@ export function fetchLogs(opts: FetchLogsOptions): LogEntry[] {
   const out: LogEntry[] = []
   for (const line of lines) {
     try { out.push(JSON.parse(line) as LogEntry) } catch { /* skip */ }
+  }
+  return out
+}
+
+// Vercel dashboard export JSON entry shape. Field names differ from the CLI
+// (requestId vs id, timestampInMs vs timestamp, type vs source) so we
+// normalize into LogEntry.
+interface ExportEntry {
+  requestId?: string
+  timestampInMs?: number
+  level?: string
+  message?: string
+  type?: string
+  requestPath?: string
+  requestMethod?: string
+  responseStatusCode?: number
+}
+
+export function readExportFile(path: string): LogEntry[] {
+  const raw = readFileSync(path, "utf8")
+  const arr = JSON.parse(raw) as ExportEntry[]
+  const out: LogEntry[] = []
+  for (const e of arr) {
+    if (!e.requestId || typeof e.timestampInMs !== "number") continue
+    out.push({
+      id: e.requestId,
+      timestamp: e.timestampInMs,
+      level: e.level,
+      message: e.message,
+      source: e.type,
+      requestPath: e.requestPath,
+      requestMethod: e.requestMethod,
+      responseStatusCode: e.responseStatusCode,
+    })
   }
   return out
 }
