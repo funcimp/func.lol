@@ -27,7 +27,7 @@
 import { list, get, put } from "@vercel/blob"
 import { mkdir, writeFile, stat, readdir, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import { fetchLogs, parseSince, capSince, type LogEntry } from "./lib/logs"
+import { fetchLogs, parseSince, capSince, readExportFile, type LogEntry } from "./lib/logs"
 
 const ROOT = join(process.cwd(), "scratch", "blob")
 const EVENTS_DIR = join(ROOT, "events")
@@ -62,6 +62,7 @@ interface Flags {
   query: string
   source: string
   limit: number
+  fromExport: string | null
 }
 
 async function readWatermark(): Promise<Watermark | null> {
@@ -123,7 +124,10 @@ async function parseFlags(argv: string[]): Promise<Flags> {
   const limitIdx = args.indexOf("--limit")
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1] ?? "10000", 10) : 10000
 
-  return { upload, since, sinceRaw, sinceFromWatermark, query, source, limit }
+  const fromExportIdx = args.indexOf("--from-export")
+  const fromExport = fromExportIdx >= 0 ? (args[fromExportIdx + 1] ?? null) : null
+
+  return { upload, since, sinceRaw, sinceFromWatermark, query, source, limit, fromExport }
 }
 
 function extractTripwireEvents(logs: LogEntry[]): Array<{ event: TripwireEvent; logId: string; logTs: number }> {
@@ -217,19 +221,30 @@ async function uploadOne(event: TripwireEvent, fallbackId: string): Promise<stri
 async function main(): Promise<void> {
   const flags = await parseFlags(process.argv)
 
-  console.log(`[sync-tripwire] since=${flags.sinceRaw} → ${flags.since.toISOString()}${flags.sinceFromWatermark ? " (from watermark)" : ""}`)
-  console.log(`[sync-tripwire] upload=${flags.upload}, query="${flags.query}", source=${flags.source}, limit=${flags.limit}`)
+  if (flags.fromExport) {
+    console.log(`[sync-tripwire] source=export ${flags.fromExport}`)
+  } else {
+    console.log(`[sync-tripwire] since=${flags.sinceRaw} → ${flags.since.toISOString()}${flags.sinceFromWatermark ? " (from watermark)" : ""}`)
+    console.log(`[sync-tripwire] query="${flags.query}", source=${flags.source}, limit=${flags.limit}`)
+  }
+  console.log(`[sync-tripwire] upload=${flags.upload}`)
   console.log()
 
-  console.log("[sync-tripwire] fetching logs...")
-  const rawLogs = fetchLogs({
-    since: flags.since,
-    limit: flags.limit,
-    query: flags.query,
-    source: flags.source,
-  })
+  let rawLogs: LogEntry[]
+  if (flags.fromExport) {
+    console.log(`[sync-tripwire] reading export...`)
+    rawLogs = readExportFile(flags.fromExport)
+  } else {
+    console.log("[sync-tripwire] fetching logs from CLI...")
+    rawLogs = fetchLogs({
+      since: flags.since,
+      limit: flags.limit,
+      query: flags.query,
+      source: flags.source,
+    })
+  }
   const events = extractTripwireEvents(rawLogs)
-  console.log(`[sync-tripwire] fetched ${rawLogs.length} log lines, ${events.length} unique tripwire events`)
+  console.log(`[sync-tripwire] read ${rawLogs.length} log lines, ${events.length} unique tripwire events`)
   console.log()
 
   console.log("[sync-tripwire] mirroring events/ blob prefix...")
