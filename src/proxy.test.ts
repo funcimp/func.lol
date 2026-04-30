@@ -115,7 +115,7 @@ describe("proxy", () => {
   })
 
   describe("blob archive", () => {
-    const FILENAME_RE = /^tripwire\/events\/\d{4}-\d{2}-\d{2}\/\d+-[0-9a-f]{6}\.json$/
+    const FILENAME_RE = /^events\/\d{4}-\d{2}-\d{2}\/\d+-[a-z0-9]+\.json$/
 
     test("tripwire.hit fires-and-forgets one blob put with the event payload", async () => {
       const res = (await proxy(req("/wp-login.php", { ua: "Nuclei/2.9", ip: "9.9.9.9" }))) as Response
@@ -139,6 +139,8 @@ describe("proxy", () => {
       expect(event.ip).toBe("9.9.9.9")
       expect(event.ua_family).toBe("nuclei")
       expect(typeof event.ts).toBe("string")
+      expect(typeof event.req_id).toBe("string")
+      expect((event.req_id as string).length).toBeGreaterThanOrEqual(8)
     })
 
     test("tripwire.throttled fires-and-forgets one blob put with the smaller payload", async () => {
@@ -158,6 +160,7 @@ describe("proxy", () => {
       expect(event.path).toBe("/wp-admin/")
       expect(event.pattern).toBe("/wp-admin/")
       expect(event.ip).toBe("5.5.5.5")
+      expect(typeof event.req_id).toBe("string")
       // Throttled payload is intentionally minimal — no UA, category, or bomb.
       expect(event.ua_family).toBeUndefined()
       expect(event.category).toBeUndefined()

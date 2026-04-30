@@ -1,7 +1,7 @@
 // src/proxy.ts
 import { NextResponse, after, type NextRequest } from "next/server"
 import { put } from "@vercel/blob"
-import { randomBytes } from "node:crypto"
+import { createId } from "@paralleldrive/cuid2"
 import {
   matchBait,
   categoryToBomb,
@@ -11,23 +11,25 @@ import {
 import { guard, uaFamily } from "@/lib/tripwire/observe"
 
 // Durable archive of a tripwire event. One file per event under
-// tripwire/events/<YYYY-MM-DD>/<unix-ms>-<rand>.json.
+// events/<YYYY-MM-DD>/<ts-ms>-<req_id>.json — same shape used by the sync
+// backfill tool, so live and backfilled writes are indistinguishable.
 //
 // after() keeps the function instance alive until the put resolves. Without
 // it, cold-start singleton requests get suspended mid-flight: the in-flight
 // HTTPS write to Blob is silently terminated by the runtime before it can
-// succeed or fail. Verified empirically (mirror + log diff): cold-start
-// singletons drop, warm-instance / burst events land. console.log stays as
-// a 7-day Vercel-log debugging shim if Blob is briefly unreachable.
+// succeed or fail. Failures are caught so a Blob outage doesn't surface
+// anywhere visible beyond the Vercel runtime log.
 function archiveEvent(event: TripwireEvent): void {
-  const date = new Date().toISOString().slice(0, 10)
-  const filename = `${Date.now()}-${randomBytes(3).toString("hex")}.json`
-  const pathname = `tripwire/events/${date}/${filename}`
+  const date = event.ts.slice(0, 10)
+  const ms = new Date(event.ts).getTime()
+  const id = event.req_id ?? createId()
+  const pathname = `events/${date}/${ms}-${id}.json`
   after(() =>
     put(pathname, JSON.stringify(event), {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
+      allowOverwrite: true,
     }).catch((err) => console.error("[tripwire] blob write failed:", err)),
   )
 }
@@ -48,6 +50,7 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
   if (!guard(ip)) {
     const throttled: TripwireEvent = {
       event: "tripwire.throttled",
+      req_id: createId(),
       ts: new Date().toISOString(),
       path: req.nextUrl.pathname,
       pattern: pattern.token,
@@ -66,6 +69,7 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
   // not at capture.
   const hit: TripwireEvent = {
     event: "tripwire.hit",
+    req_id: createId(),
     ts: new Date().toISOString(),
     path: req.nextUrl.pathname,
     query: req.nextUrl.search,
