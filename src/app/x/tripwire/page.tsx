@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
+import { getAggregates } from "@/lib/tripwire/aggregates";
 
 export const metadata: Metadata = {
   title: "Tripwire — func.lol",
@@ -10,7 +11,17 @@ export const metadata: Metadata = {
     "A consent-based trap for automated scanners. robots.txt publishes the rules. Ignoring them trips the wire.",
 };
 
-export default function TripwirePage() {
+// ISR: the stats blob is refreshed by the hourly cron at
+// /api/cron/tripwire-stats. 30-minute revalidate gives stale-while-
+// revalidate semantics — high-traffic pages re-render against the
+// freshest blob in the background; low-traffic pages still see fresh
+// data thanks to the cron.
+export const revalidate = 1800;
+
+export default async function TripwirePage() {
+  const aggregates = await getAggregates();
+  const { totalEvents, distinctIps, distinctAsns, earliestTs } = aggregates.lifetime;
+  const since = new Date(earliestTs).toISOString().slice(0, 10);
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
       <div className="mx-auto max-w-[720px]">
@@ -30,6 +41,11 @@ export default function TripwirePage() {
           </h1>
           <p className="font-mono text-[13px] opacity-55 mt-3">
             robots.txt publishes the rules. ignoring them trips the wire.
+          </p>
+          <p className="font-mono text-[11px] opacity-55 mt-3">
+            <span className="tabular-nums">{totalEvents}</span> events ·{" "}
+            <span className="tabular-nums">{distinctIps}</span> ips ·{" "}
+            <span className="tabular-nums">{distinctAsns}</span> networks · since {since}
           </p>
         </header>
 
