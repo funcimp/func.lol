@@ -167,6 +167,43 @@ describe("proxy", () => {
       expect(event.bomb).toBeUndefined()
     })
 
+    test("ignored IP receives the bomb but is not logged or archived", async () => {
+      const previous = process.env.IGNORED_IPS
+      process.env.IGNORED_IPS = "9.9.9.9, 7.7.7.7"
+      try {
+        resetGuardForTests()
+        putCalls.length = 0
+        const res = (await proxy(req("/wp-login.php", { ip: "9.9.9.9" }))) as Response
+        // Bomb still ships
+        expect(res).toBeInstanceOf(Response)
+        expect(res.headers.get("x-middleware-rewrite")).toContain("/api/tripwire/bomb/html")
+        // No archive write
+        expect(putCalls).toHaveLength(0)
+      } finally {
+        if (previous === undefined) delete process.env.IGNORED_IPS
+        else process.env.IGNORED_IPS = previous
+      }
+    })
+
+    test("ignored IP also bypasses the rate limiter", async () => {
+      const previous = process.env.IGNORED_IPS
+      process.env.IGNORED_IPS = "1.1.1.1"
+      try {
+        resetGuardForTests()
+        putCalls.length = 0
+        // 50 hits — would normally trip the 30/min limit. With ignored IP,
+        // every request still gets the bomb and nothing is archived.
+        for (let i = 0; i < 50; i++) {
+          const res = (await proxy(req("/wp-login.php", { ip: "1.1.1.1" }))) as Response
+          expect(res?.status, `iteration ${i}`).toBe(200)
+        }
+        expect(putCalls).toHaveLength(0)
+      } finally {
+        if (previous === undefined) delete process.env.IGNORED_IPS
+        else process.env.IGNORED_IPS = previous
+      }
+    })
+
     test("blob put failure is caught, doesn't break the bomb response", async () => {
       // Re-mock to throw on this test only.
       mock.module("@vercel/blob", () => ({

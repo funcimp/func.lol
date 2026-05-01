@@ -104,8 +104,15 @@ async function mirrorEvents(): Promise<{ downloaded: number; skipped: number }> 
   return { downloaded, skipped }
 }
 
+function ignoredIps(): Set<string> {
+  const raw = process.env.IGNORED_IPS ?? ""
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))
+}
+
 async function readAllEvents(): Promise<TripwireEvent[]> {
+  const ignored = ignoredIps()
   const out: TripwireEvent[] = []
+  let skipped = 0
   let dateDirs: string[]
   try { dateDirs = await readdir(EVENTS_DIR) } catch { return out }
   for (const dir of dateDirs) {
@@ -116,9 +123,14 @@ async function readAllEvents(): Promise<TripwireEvent[]> {
       if (!f.endsWith(".json")) continue
       try {
         const text = await readFile(join(dirPath, f), "utf8")
-        out.push(JSON.parse(text) as TripwireEvent)
+        const ev = JSON.parse(text) as TripwireEvent
+        if (ev.ip && ignored.has(ev.ip)) { skipped++; continue }
+        out.push(ev)
       } catch { /* skip malformed */ }
     }
+  }
+  if (ignored.size > 0) {
+    console.log(`[build-stats] skipped ${skipped} events from IGNORED_IPS (${ignored.size} ip${ignored.size === 1 ? "" : "s"})`)
   }
   return out
 }

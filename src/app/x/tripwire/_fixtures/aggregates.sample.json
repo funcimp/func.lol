@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-05-01T03:07:33.985Z",
+  "generatedAt": "2026-05-01T03:25:58.854Z",
   "lifetime": {
-    "totalEvents": 109,
+    "totalEvents": 108,
     "earliestTs": "2026-04-24T01:02:13.347Z",
     "latestTs": "2026-05-01T02:12:31.280Z",
     "daysSinceFirst": 8,
-    "distinctIps": 34,
+    "distinctIps": 33,
     "distinctPaths": 57,
     "distinctAsns": 19
   },
   "byCategory": [
     {
       "category": "config",
-      "count": 52
+      "count": 51
     },
     {
       "category": "cms",
@@ -38,7 +38,7 @@
   "byUaFamily": [
     {
       "ua": "unknown",
-      "count": 89
+      "count": 88
     },
     {
       "ua": "curl",
@@ -84,7 +84,7 @@
     },
     {
       "date": "2026-05-01",
-      "count": 12
+      "count": 11
     }
   ],
   "topPaths": [
@@ -95,7 +95,7 @@
     },
     {
       "path": "/.env",
-      "count": 13,
+      "count": 12,
       "category": "config"
     },
     {
@@ -383,7 +383,7 @@
     {
       "asn": "AS14593",
       "name": "Space Exploration Technologies Corporation",
-      "count": 15
+      "count": 14
     },
     {
       "asn": "AS31898",
