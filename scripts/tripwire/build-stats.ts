@@ -1,9 +1,8 @@
 // scripts/tripwire/build-stats.ts
 //
-// Aggregator for the tripwire stats page. Reads bronze events from the
-// events/ blob prefix (mirrored locally), enriches IPs with ASN data via
-// the bundled GeoLite2-ASN.mmdb, and emits a flat JSON aggregate that the
-// stats page renders.
+// Silver → gold. SQL aggregations over tripwire_events; JSON output for
+// the stats page. Run scripts/tripwire/ingest-events.ts first to bring
+// the DB up to date with the events/ blob prefix.
 //
 // Output (default): scratch/blob/stats/tripwire-aggregates.json
 // Optional: pass --upload to also write to the live blob at the same path.
@@ -12,37 +11,17 @@
 //   bun run scripts/tripwire/build-stats.ts                   # local only
 //   bun run scripts/tripwire/build-stats.ts --upload          # local + blob
 //   bun run scripts/tripwire/build-stats.ts --top-paths 50    # cap topPaths length
-//
-// The aggregator is intentionally simple: read everything, aggregate in
-// memory, write one JSON file. At hobby-site scale (hundreds of events,
-// growing slowly) this is well under build/cron time budgets. Switch to
-// streaming or Postgres if/when volume justifies.
 
-import { list, get, put } from "@vercel/blob"
-import { Reader, ReaderModel, type Asn } from "@maxmind/geoip2-node"
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises"
+import { put } from "@vercel/blob"
+import { sql } from "drizzle-orm"
+import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { getDb } from "@/db"
 
 const ROOT = join(process.cwd(), "scratch", "blob")
-const EVENTS_DIR = join(ROOT, "events")
 const STATS_LOCAL_PATH = join(ROOT, "stats", "tripwire-aggregates.json")
 const STATS_BLOB_KEY = "stats/tripwire-aggregates.json"
-const ASN_DB_PATH = join(process.cwd(), "data", "GeoLite2-ASN.mmdb")
 const DEFAULT_TOP_PATHS = 100
-
-interface TripwireEvent {
-  event: "tripwire.hit" | "tripwire.throttled"
-  req_id?: string
-  ts: string
-  path: string
-  pattern: string
-  ip: string
-  query?: string
-  category?: string
-  bomb?: string
-  ua_raw?: string
-  ua_family?: string
-}
 
 interface Aggregates {
   generatedAt: string
@@ -70,153 +49,124 @@ interface Flags {
 function parseFlags(argv: string[]): Flags {
   const args = argv.slice(2)
   const upload = args.includes("--upload")
-  const topPathsIdx = args.indexOf("--top-paths")
-  const topPaths = topPathsIdx >= 0
-    ? parseInt(args[topPathsIdx + 1] ?? "0", 10) || DEFAULT_TOP_PATHS
+  const idx = args.indexOf("--top-paths")
+  const topPaths = idx >= 0
+    ? parseInt(args[idx + 1] ?? "0", 10) || DEFAULT_TOP_PATHS
     : DEFAULT_TOP_PATHS
   return { upload, topPaths }
 }
 
-async function localSize(path: string): Promise<number | null> {
-  try { return (await stat(path)).size } catch { return null }
-}
+type LifetimeRow = {
+  total_events: number
+  earliest_ts: string
+  latest_ts: string
+  distinct_ips: number
+  distinct_paths: number
+  distinct_asns: number
+} & Record<string, unknown>
 
-// Mirror the events/ blob prefix to scratch/blob/events/. Skips files that
-// already exist locally with matching size.
-async function mirrorEvents(): Promise<{ downloaded: number; skipped: number }> {
-  let cursor: string | undefined
-  let downloaded = 0
-  let skipped = 0
-  do {
-    const page = await list({ prefix: "events/", cursor })
-    for (const blob of page.blobs) {
-      const localPath = join(ROOT, blob.pathname)
-      if ((await localSize(localPath)) === blob.size) { skipped++; continue }
-      const file = await get(blob.url, { access: "private" })
-      if (!file || file.statusCode !== 200) continue
-      const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
-      await mkdir(dirname(localPath), { recursive: true })
-      await writeFile(localPath, buf)
-      downloaded++
-    }
-    cursor = page.cursor
-  } while (cursor)
-  return { downloaded, skipped }
-}
+type CategoryRow = { category: string; count: number } & Record<string, unknown>
+type UaRow = { ua: string; count: number } & Record<string, unknown>
+type DayRow = { date: string; count: number } & Record<string, unknown>
+type PathRow = { path: string; count: number; category: string | null } & Record<string, unknown>
+type AsnRow = { asn: string; name: string; count: number } & Record<string, unknown>
 
-async function readAllEvents(): Promise<TripwireEvent[]> {
-  const out: TripwireEvent[] = []
-  let dateDirs: string[]
-  try { dateDirs = await readdir(EVENTS_DIR) } catch { return out }
-  for (const dir of dateDirs) {
-    const dirPath = join(EVENTS_DIR, dir)
-    let files: string[]
-    try { files = await readdir(dirPath) } catch { continue }
-    for (const f of files) {
-      if (!f.endsWith(".json")) continue
-      try {
-        const text = await readFile(join(dirPath, f), "utf8")
-        out.push(JSON.parse(text) as TripwireEvent)
-      } catch { /* skip malformed */ }
-    }
-  }
-  return out
-}
+async function aggregate(topPathsLimit: number): Promise<Aggregates> {
+  const db = getDb()
 
-async function aggregate(events: TripwireEvent[], reader: ReaderModel, topPathsLimit: number): Promise<Aggregates> {
-  if (events.length === 0) {
-    throw new Error("no events found — mirror produced an empty events/ tree")
+  const lifetimeResult = await db.execute<LifetimeRow>(sql`
+    SELECT
+      COUNT(*)::int                 AS total_events,
+      MIN(ts)::text                 AS earliest_ts,
+      MAX(ts)::text                 AS latest_ts,
+      COUNT(DISTINCT ip)::int       AS distinct_ips,
+      COUNT(DISTINCT path)::int     AS distinct_paths,
+      COUNT(DISTINCT asn)::int      AS distinct_asns
+    FROM tripwire_events
+  `)
+  const lifetime = lifetimeResult.rows[0]
+  if (!lifetime || lifetime.total_events === 0) {
+    throw new Error("no events in tripwire_events — run ingest-events.ts first")
   }
 
-  const byCategory = new Map<string, number>()
-  const byUaFamily = new Map<string, number>()
-  const byDay = new Map<string, number>()
-  const byPath = new Map<string, { count: number; category?: string }>()
-  const byAsn = new Map<string, { name: string; count: number }>()
-  const ips = new Set<string>()
-  const asnsSeen = new Set<string>()
-  let earliestTs = events[0].ts
-  let latestTs = events[0].ts
+  const byCategory = await db.execute<CategoryRow>(sql`
+    SELECT category, COUNT(*)::int AS count
+    FROM tripwire_events
+    WHERE category IS NOT NULL
+    GROUP BY category
+    ORDER BY count DESC, category ASC
+  `)
 
-  for (const e of events) {
-    if (e.ts < earliestTs) earliestTs = e.ts
-    if (e.ts > latestTs) latestTs = e.ts
-    if (e.category) byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + 1)
-    const ua = e.ua_family ?? "unknown"
-    byUaFamily.set(ua, (byUaFamily.get(ua) ?? 0) + 1)
-    const day = e.ts.slice(0, 10)
-    byDay.set(day, (byDay.get(day) ?? 0) + 1)
-    const pathEntry = byPath.get(e.path) ?? { count: 0, category: e.category }
-    pathEntry.count++
-    byPath.set(e.path, pathEntry)
-    if (e.ip) {
-      ips.add(e.ip)
-      let lookup: Asn | null = null
-      try { lookup = reader.asn(e.ip) } catch { /* unknown / private */ }
-      if (lookup?.autonomousSystemNumber) {
-        const asn = `AS${lookup.autonomousSystemNumber}`
-        const name = lookup.autonomousSystemOrganization ?? "Unknown"
-        const entry = byAsn.get(asn) ?? { name, count: 0 }
-        entry.count++
-        byAsn.set(asn, entry)
-        asnsSeen.add(asn)
-      }
-    }
-  }
+  const byUaFamily = await db.execute<UaRow>(sql`
+    SELECT COALESCE(ua_family, 'unknown') AS ua, COUNT(*)::int AS count
+    FROM tripwire_events
+    GROUP BY ua
+    ORDER BY count DESC, ua ASC
+  `)
 
-  const earliestDate = new Date(earliestTs)
-  const daysSinceFirst = Math.max(1, Math.ceil((Date.now() - earliestDate.getTime()) / 86400000))
+  const byDay = await db.execute<DayRow>(sql`
+    SELECT TO_CHAR(ts AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+           COUNT(*)::int AS count
+    FROM tripwire_events
+    GROUP BY date
+    ORDER BY date ASC
+  `)
 
-  const sortDesc = <T extends { count: number }>(arr: T[]): T[] =>
-    arr.sort((a, b) => b.count - a.count)
+  const topPaths = await db.execute<PathRow>(sql`
+    SELECT path,
+           COUNT(*)::int AS count,
+           MAX(category) AS category
+    FROM tripwire_events
+    GROUP BY path
+    ORDER BY count DESC, path ASC
+    LIMIT ${topPathsLimit}
+  `)
+
+  const byAsn = await db.execute<AsnRow>(sql`
+    SELECT asn,
+           COALESCE(MAX(asn_name), 'Unknown') AS name,
+           COUNT(*)::int AS count
+    FROM tripwire_events
+    WHERE asn IS NOT NULL
+    GROUP BY asn
+    ORDER BY count DESC, asn ASC
+  `)
+
+  const earliestDate = new Date(lifetime.earliest_ts)
+  const daysSinceFirst = Math.max(
+    1,
+    Math.ceil((Date.now() - earliestDate.getTime()) / 86400000),
+  )
 
   return {
     generatedAt: new Date().toISOString(),
     lifetime: {
-      totalEvents: events.length,
-      earliestTs,
-      latestTs,
+      totalEvents: lifetime.total_events,
+      earliestTs: new Date(lifetime.earliest_ts).toISOString(),
+      latestTs: new Date(lifetime.latest_ts).toISOString(),
       daysSinceFirst,
-      distinctIps: ips.size,
-      distinctPaths: byPath.size,
-      distinctAsns: asnsSeen.size,
+      distinctIps: lifetime.distinct_ips,
+      distinctPaths: lifetime.distinct_paths,
+      distinctAsns: lifetime.distinct_asns,
     },
-    byCategory: sortDesc(
-      [...byCategory].map(([category, count]) => ({ category, count })),
-    ),
-    byUaFamily: sortDesc(
-      [...byUaFamily].map(([ua, count]) => ({ ua, count })),
-    ),
-    byDay: [...byDay]
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
-    topPaths: sortDesc(
-      [...byPath].map(([path, v]) => ({ path, count: v.count, category: v.category })),
-    ).slice(0, topPathsLimit),
-    byAsn: sortDesc(
-      [...byAsn].map(([asn, v]) => ({ asn, name: v.name, count: v.count })),
-    ),
+    byCategory: byCategory.rows.map((r) => ({ category: r.category, count: r.count })),
+    byUaFamily: byUaFamily.rows.map((r) => ({ ua: r.ua, count: r.count })),
+    byDay: byDay.rows.map((r) => ({ date: r.date, count: r.count })),
+    topPaths: topPaths.rows.map((r) => ({
+      path: r.path,
+      count: r.count,
+      category: r.category ?? undefined,
+    })),
+    byAsn: byAsn.rows.map((r) => ({ asn: r.asn, name: r.name, count: r.count })),
   }
 }
 
 async function main(): Promise<void> {
   const flags = parseFlags(process.argv)
   console.log(`[build-stats] upload=${flags.upload}, topPaths=${flags.topPaths}`)
-  console.log()
 
-  console.log("[build-stats] mirroring events/ blob prefix...")
-  const mr = await mirrorEvents()
-  console.log(`[build-stats] mirror: ${mr.downloaded} downloaded, ${mr.skipped} skipped`)
-
-  console.log("[build-stats] reading events...")
-  const events = await readAllEvents()
-  console.log(`[build-stats] read ${events.length} events`)
-
-  console.log(`[build-stats] opening ASN db at ${ASN_DB_PATH}...`)
-  const reader = await Reader.open(ASN_DB_PATH)
-
-  console.log("[build-stats] aggregating + enriching...")
-  const aggregates = await aggregate(events, reader, flags.topPaths)
+  console.log("[build-stats] aggregating from Neon...")
+  const aggregates = await aggregate(flags.topPaths)
 
   console.log()
   console.log(`Total events:      ${aggregates.lifetime.totalEvents}`)

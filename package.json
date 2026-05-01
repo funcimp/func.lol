@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@maxmind/geoip2-node": "^6.3.4",
+    "@neondatabase/serverless": "^1.1.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
+    "drizzle-orm": "^0.45.2",
     "next": "16.2.4",
     "react": "19.2.5",
     "react-dom": "19.2.5"
@@ -27,6 +29,8 @@
     "@types/node": "^22.19.17",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "dotenv-cli": "^11.0.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4.2.4",
