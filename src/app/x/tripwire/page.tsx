@@ -1,27 +1,27 @@
 // src/app/x/tripwire/page.tsx
-import type { Metadata } from "next";
-import Link from "next/link";
+import type { Metadata } from "next"
+import Link from "next/link"
 
-import ThemeToggle from "@/components/ThemeToggle";
-import { getAggregates } from "@/lib/tripwire/aggregates";
+import ThemeToggle from "@/components/ThemeToggle"
+import { getAggregates } from "@/lib/tripwire/aggregates"
+import { BombDemo } from "./_components/BombDemo"
+import { Hero, StatsPanel } from "./_components/StatsPanel"
 
 export const metadata: Metadata = {
   title: "Tripwire — func.lol",
   description:
     "A consent-based trap for automated scanners. robots.txt publishes the rules. Ignoring them trips the wire.",
-};
+}
 
 // ISR: the stats blob is refreshed by the hourly cron at
 // /api/cron/tripwire-stats. 30-minute revalidate gives stale-while-
 // revalidate semantics — high-traffic pages re-render against the
 // freshest blob in the background; low-traffic pages still see fresh
 // data thanks to the cron.
-export const revalidate = 1800;
+export const revalidate = 1800
 
 export default async function TripwirePage() {
-  const aggregates = await getAggregates();
-  const { totalEvents, distinctIps, distinctAsns, earliestTs } = aggregates.lifetime;
-  const since = new Date(earliestTs).toISOString().slice(0, 10);
+  const aggregates = await getAggregates()
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
       <div className="mx-auto max-w-[720px]">
@@ -42,12 +42,9 @@ export default async function TripwirePage() {
           <p className="font-mono text-[13px] opacity-55 mt-3">
             robots.txt publishes the rules. ignoring them trips the wire.
           </p>
-          <p className="font-mono text-[11px] opacity-55 mt-3">
-            <span className="tabular-nums">{totalEvents}</span> events ·{" "}
-            <span className="tabular-nums">{distinctIps}</span> ips ·{" "}
-            <span className="tabular-nums">{distinctAsns}</span> networks · since {since}
-          </p>
         </header>
+
+        <Hero lifetime={aggregates.lifetime} />
 
         <article className="prose-hyphens text-[16px] leading-[1.65]">
           <section className="mb-9">
@@ -58,14 +55,15 @@ export default async function TripwirePage() {
               <code>/phpunit/src/Util/PHP/eval-stdin.php</code>,{" "}
               <code>/actuator/env</code>, and hundreds more. The scanners fire
               at every IPv4 address they can route to, they ignore{" "}
-              <code>robots.txt</code>, and they do not care about 404s.
+              <code>robots.txt</code>, and they do not care about 404s. The
+              numbers above are this site&rsquo;s slice of that traffic.
             </p>
           </section>
 
           <section className="mb-9">
             <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">The trap</h2>
             <p>
-              The experiment is a consent-based trap. Publish the bait paths in{" "}
+              Tripwire is a consent-based trap. The bait paths are published in{" "}
               <code>robots.txt</code> under <code>Disallow</code>. Compliant
               crawlers respect the rule and stay away. Anyone who shows up
               anyway has identified themselves as a scanner by breaking a rule
@@ -94,58 +92,37 @@ export default async function TripwirePage() {
               >
                 Ache&rsquo;s HTML Zip Bomb
               </a>{" "}
-              for refining the HTML variant.
+              for refining the HTML variant. The production bombs inflate to
+              ~2 GB. The buttons below serve a 2 MB version so a real reader
+              can sample the trick without their tab dying.
             </p>
           </section>
+        </article>
 
+        <section className="mb-12">
+          <BombDemo />
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-6">What we caught</h2>
+          <StatsPanel aggregates={aggregates} />
+        </section>
+
+        <article className="prose-hyphens text-[16px] leading-[1.65]">
           <section className="mb-9">
             <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">The matcher</h2>
             <p>
               One TypeScript module owns the bait list. The proxy imports it for
               matching. The <code>robots.txt</code> route imports it for{" "}
-              <code>Disallow</code> emission. No drift. There is no
-              UA allowlist: without reverse-DNS verification, trusting UA is a
-              free bypass for spoofers rather than a shield for real crawlers,
-              and real crawlers already respect <code>robots.txt</code>. An
+              <code>Disallow</code> emission. No drift. There is no UA
+              allowlist: without reverse-DNS verification, trusting UA is a free
+              bypass for spoofers rather than a shield for real crawlers, and
+              real crawlers already respect <code>robots.txt</code>. An
               in-memory rate limit bounds how much bandwidth a single attacker
               can extract from this site, falling through to a normal 404 once
               the breaker trips.
             </p>
             <p className="mt-4">
-              The bait list has a structural asymmetry worth naming. Some
-              tokens (e.g., <code>eval-stdin.php</code>) are substring matches
-              that cannot appear in <code>robots.txt</code>, which only speaks
-              in path prefixes. Their canonical prefix forms do appear. A
-              scanner that hits a substring-only match has still hit a token
-              that is definitionally a scanner signature, so the consent
-              framing still stands.
-            </p>
-          </section>
-
-          <section className="mb-9">
-            <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">
-              Why not a UA allowlist
-            </h2>
-            <p>
-              Early drafts carved out bait-path requests from known-good
-              crawler UAs (<code>Googlebot</code>, <code>bingbot</code>, etc.)
-              on the theory that a hypothetically misbehaving real crawler
-              deserved protection. The argument fails under inspection. Real
-              Googlebot follows <code>robots.txt</code> and does not hit bait
-              paths, so the allowlist protects against a scenario that does not
-              occur. Meanwhile, scanners routinely spoof crawler UAs precisely
-              because many servers treat them as trusted. A UA allowlist
-              without IP verification is therefore a free bypass for spoofers,
-              not a shield for real crawlers. The right implementation pairs UA
-              matching with reverse-DNS verification, which is real work and
-              belongs in a version where we have evidence the protection is
-              needed.
-            </p>
-          </section>
-
-          <section className="mb-9">
-            <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">Exclusions</h2>
-            <p>
               A safe-path allowlist protects legitimate routes. Anything under{" "}
               <code>/_next/</code>, <code>/api/</code>, <code>/x/</code>,{" "}
               <code>/.well-known/</code>, <code>/static/</code>, and common
@@ -153,7 +130,7 @@ export default async function TripwirePage() {
               <code>/admin</code>, <code>/login</code>, <code>/dashboard</code>{" "}
               are excluded too. Only the specific, scanner-authored variants
               (<code>/wp-admin/</code>, <code>/administrator/</code>,{" "}
-              <code>/phpmyadmin/</code>) are bait. The research dossier at{" "}
+              <code>/phpmyadmin/</code>) are bait. The full list lives in{" "}
               <a
                 className="underline"
                 href="https://github.com/funcimp/func.lol/tree/main/research/tripwire"
@@ -161,27 +138,6 @@ export default async function TripwirePage() {
                 rel="noreferrer"
               >
                 research/tripwire/
-              </a>{" "}
-              has the full list with sources.
-            </p>
-          </section>
-
-          <section className="mb-9">
-            <h2 className="text-[28px] font-bold tracking-[-0.03em] mb-3">What is next</h2>
-            <p>
-              v1 does not surface any stats on this page. Events land in
-              structured logs and are archived daily to private storage for
-              later analysis. v2 will read those archives and add a stats
-              panel. v3 is an intelligent pattern-discovery pass over the rest
-              of the 404 stream to surface new bait candidates. Both are parked
-              in{" "}
-              <a
-                className="underline"
-                href="https://github.com/funcimp/func.lol/blob/main/IDEAS.md"
-                target="_blank"
-                rel="noreferrer"
-              >
-                IDEAS.md
               </a>
               .
             </p>
@@ -268,5 +224,5 @@ export default async function TripwirePage() {
         />
       </div>
     </main>
-  );
+  )
 }
