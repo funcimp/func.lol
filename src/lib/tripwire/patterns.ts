@@ -162,15 +162,23 @@ export const PATTERNS: Pattern[] = [
   { token: "/index.php?r=site/login",  shape: "prefix",    category: "framework" },
   { token: "/ZendServer/",             shape: "prefix",    category: "framework" },
 
-  // Config leaks: .env family. Substring catches every variant we've
-  // observed in the wild — /.env, /.env.local, /.env.production,
-  // /.env.bak, /.env.swp, /.env~, plus subdirectory probes scanners
-  // sweep through (/frontend/.env, /backend/.env, /server/.env,
-  // /admin/.env, /public/.env, /web/.env, /apps/.env, /app/.env,
-  // /src/.env, /release/.env, /current/.env, /private/.env, /config/.env,
-  // /core/.env, /core/app/.env, /core/Database/.env). Also catches
-  // /.envrc (direnv config). The earlier per-extension prefix list was
-  // brittle against variants we'd never seen.
+  // Config leaks: .env family.
+  //
+  // /.env appears as both a prefix and a substring intentionally:
+  //   - prefix is what src/app/robots.ts publishes as `Disallow: /.env`
+  //     (robots.ts only emits prefix-shape tokens to keep the file
+  //     scoped to canonical paths).
+  //   - substring is what catches the long tail of variants observed in
+  //     the wild — /.env.local, /.env.production, /.env.bak, /.env.swp,
+  //     /.env~, plus subdirectory probes scanners sweep through
+  //     (/frontend/.env, /backend/.env, /server/.env, /admin/.env,
+  //     /public/.env, /web/.env, /apps/.env, /app/.env, /src/.env,
+  //     /release/.env, /current/.env, /private/.env, /config/.env,
+  //     /core/.env, /core/app/.env, /core/Database/.env). Also catches
+  //     /.envrc (direnv config).
+  // Duplicate match is harmless: matchBait returns the first hit, and
+  // robots.txt dedupes by token before sorting.
+  { token: "/.env",                    shape: "prefix",    category: "config" },
   { token: "/.env",                    shape: "substring", category: "config" },
 
   // Config leaks: VCS metadata
