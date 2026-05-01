@@ -19,9 +19,17 @@ describe("robots.ts", () => {
     }
   })
 
-  test("disallow does not contain substring tokens directly", () => {
-    const substringTokens = PATTERNS.filter((p) => p.shape === "substring").map((p) => p.token)
-    for (const token of substringTokens) {
+  test("disallow does not contain substring-only tokens", () => {
+    // Tokens that exist as both a prefix and a substring (e.g. /.env) are
+    // expected to appear in disallow because of the prefix entry; only
+    // substring-ONLY tokens should be excluded from robots.txt.
+    const prefixTokens = new Set(
+      PATTERNS.filter((p) => p.shape === "prefix").map((p) => p.token),
+    )
+    const substringOnlyTokens = PATTERNS
+      .filter((p) => p.shape === "substring" && !prefixTokens.has(p.token))
+      .map((p) => p.token)
+    for (const token of substringOnlyTokens) {
       expect(disallow).not.toContain(token)
     }
   })

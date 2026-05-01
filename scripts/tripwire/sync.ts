@@ -25,14 +25,13 @@
 // and an active `vercel login` session.
 
 import { list, get, put } from "@vercel/blob"
-import { spawnSync } from "node:child_process"
 import { mkdir, writeFile, stat, readdir, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { fetchLogs, parseSince, capSince, readExportFile, type LogEntry } from "./lib/logs"
 
 const ROOT = join(process.cwd(), "scratch", "blob")
 const EVENTS_DIR = join(ROOT, "events")
 const WATERMARK_KEY = "sync-state.json"
-const MAX_DAYS = 14
 const DEFAULT_SINCE = "7d"
 
 interface TripwireEvent {
@@ -49,14 +48,6 @@ interface TripwireEvent {
   query?: string
 }
 
-interface LogEntry {
-  id: string
-  timestamp: number
-  level?: string
-  message?: string
-  source?: string
-}
-
 interface Watermark {
   lastTs: string
   lastRunAt: string
@@ -71,26 +62,7 @@ interface Flags {
   query: string
   source: string
   limit: number
-}
-
-function parseSince(input: string): Date {
-  const m = input.match(/^(\d+)([dhm])$/)
-  if (m) {
-    const n = parseInt(m[1], 10)
-    const unit = m[2]
-    const ms = unit === "d" ? n * 86400000 : unit === "h" ? n * 3600000 : n * 60000
-    return new Date(Date.now() - ms)
-  }
-  const d = new Date(input)
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`invalid --since value: ${input} (use "7d", "24h", or ISO date)`)
-  }
-  return d
-}
-
-function capSince(d: Date): Date {
-  const earliest = new Date(Date.now() - MAX_DAYS * 86400000)
-  return d < earliest ? earliest : d
+  fromExport: string | null
 }
 
 async function readWatermark(): Promise<Watermark | null> {
@@ -152,49 +124,10 @@ async function parseFlags(argv: string[]): Promise<Flags> {
   const limitIdx = args.indexOf("--limit")
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1] ?? "10000", 10) : 10000
 
-  return { upload, since, sinceRaw, sinceFromWatermark, query, source, limit }
-}
+  const fromExportIdx = args.indexOf("--from-export")
+  const fromExport = fromExportIdx >= 0 ? (args[fromExportIdx + 1] ?? null) : null
 
-// vercel logs --json --no-follow streams data but doesn't always close cleanly
-// once the data is dumped. We set a hard timeout so spawnSync sends SIGTERM
-// after the CLI has had enough time to flush stdout. Anything in stdout at
-// that point is parsed as JSONL.
-const CLI_TIMEOUT_MS = 120_000
-
-function fetchLogs(flags: Flags): LogEntry[] {
-  const cliArgs = [
-    "logs",
-    "--json",
-    "--no-follow",
-    "--no-branch",
-    "--environment", "production",
-    "--source", flags.source,
-    "--since", flags.since.toISOString(),
-    "--limit", String(flags.limit),
-    "--query", flags.query,
-  ]
-  const result = spawnSync("vercel", cliArgs, {
-    encoding: "utf8",
-    maxBuffer: 256 * 1024 * 1024,
-    timeout: CLI_TIMEOUT_MS,
-  })
-  // SIGTERM via timeout is the expected exit path here; treat partial stdout as data.
-  if (result.error && (result.error as NodeJS.ErrnoException).code !== "ETIMEDOUT") {
-    throw result.error
-  }
-  if (result.status !== 0 && result.status !== null) {
-    // null means killed by signal (timeout). Anything else is a real error
-    // unless we have stdout.
-    if (!result.stdout) {
-      throw new Error(`vercel logs failed (status=${result.status}): ${result.stderr}`)
-    }
-  }
-  const lines = (result.stdout ?? "").split("\n").filter(Boolean)
-  const out: LogEntry[] = []
-  for (const line of lines) {
-    try { out.push(JSON.parse(line) as LogEntry) } catch { /* skip */ }
-  }
-  return out
+  return { upload, since, sinceRaw, sinceFromWatermark, query, source, limit, fromExport }
 }
 
 function extractTripwireEvents(logs: LogEntry[]): Array<{ event: TripwireEvent; logId: string; logTs: number }> {
@@ -288,14 +221,30 @@ async function uploadOne(event: TripwireEvent, fallbackId: string): Promise<stri
 async function main(): Promise<void> {
   const flags = await parseFlags(process.argv)
 
-  console.log(`[sync-tripwire] since=${flags.sinceRaw} → ${flags.since.toISOString()}${flags.sinceFromWatermark ? " (from watermark)" : ""}`)
-  console.log(`[sync-tripwire] upload=${flags.upload}, query="${flags.query}", source=${flags.source}, limit=${flags.limit}`)
+  if (flags.fromExport) {
+    console.log(`[sync-tripwire] source=export ${flags.fromExport}`)
+  } else {
+    console.log(`[sync-tripwire] since=${flags.sinceRaw} → ${flags.since.toISOString()}${flags.sinceFromWatermark ? " (from watermark)" : ""}`)
+    console.log(`[sync-tripwire] query="${flags.query}", source=${flags.source}, limit=${flags.limit}`)
+  }
+  console.log(`[sync-tripwire] upload=${flags.upload}`)
   console.log()
 
-  console.log("[sync-tripwire] fetching logs...")
-  const rawLogs = fetchLogs(flags)
+  let rawLogs: LogEntry[]
+  if (flags.fromExport) {
+    console.log(`[sync-tripwire] reading export...`)
+    rawLogs = readExportFile(flags.fromExport)
+  } else {
+    console.log("[sync-tripwire] fetching logs from CLI...")
+    rawLogs = fetchLogs({
+      since: flags.since,
+      limit: flags.limit,
+      query: flags.query,
+      source: flags.source,
+    })
+  }
   const events = extractTripwireEvents(rawLogs)
-  console.log(`[sync-tripwire] fetched ${rawLogs.length} log lines, ${events.length} unique tripwire events`)
+  console.log(`[sync-tripwire] read ${rawLogs.length} log lines, ${events.length} unique tripwire events`)
   console.log()
 
   console.log("[sync-tripwire] mirroring events/ blob prefix...")

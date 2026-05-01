@@ -90,6 +90,9 @@ export const SAFE_EXACT_PATHS: readonly string[] = [
   "/healthz",
   "/status",
   "/ping",
+  // iOS browsers auto-request these even when not present.
+  "/apple-touch-icon.png",
+  "/apple-touch-icon-precomposed.png",
 ]
 
 // Populated in Task 1b from research/tripwire/patterns.md.
@@ -126,6 +129,10 @@ export const PATTERNS: Pattern[] = [
   // CMS: Magento
   { token: "/magento_version",         shape: "prefix",    category: "cms" },
   { token: "/downloader/",             shape: "prefix",    category: "cms" },
+  { token: "/rest/V1/",                shape: "prefix",    category: "cms" },
+  { token: "/rest/default/V1/",        shape: "prefix",    category: "cms" },
+  { token: "/catalogsearch/",          shape: "prefix",    category: "cms" },
+  { token: "/media/system/js/core.js", shape: "prefix",    category: "cms" },
 
   // Framework: phpunit (CVE-2017-9841) - substring catches all variants
   { token: "eval-stdin.php",           shape: "substring", category: "framework" },
@@ -155,13 +162,24 @@ export const PATTERNS: Pattern[] = [
   { token: "/index.php?r=site/login",  shape: "prefix",    category: "framework" },
   { token: "/ZendServer/",             shape: "prefix",    category: "framework" },
 
-  // Config leaks: .env family
+  // Config leaks: .env family.
+  //
+  // /.env appears as both a prefix and a substring intentionally:
+  //   - prefix is what src/app/robots.ts publishes as `Disallow: /.env`
+  //     (robots.ts only emits prefix-shape tokens to keep the file
+  //     scoped to canonical paths).
+  //   - substring is what catches the long tail of variants observed in
+  //     the wild — /.env.local, /.env.production, /.env.bak, /.env.swp,
+  //     /.env~, plus subdirectory probes scanners sweep through
+  //     (/frontend/.env, /backend/.env, /server/.env, /admin/.env,
+  //     /public/.env, /web/.env, /apps/.env, /app/.env, /src/.env,
+  //     /release/.env, /current/.env, /private/.env, /config/.env,
+  //     /core/.env, /core/app/.env, /core/Database/.env). Also catches
+  //     /.envrc (direnv config).
+  // Duplicate match is harmless: matchBait returns the first hit, and
+  // robots.txt dedupes by token before sorting.
   { token: "/.env",                    shape: "prefix",    category: "config" },
-  { token: "/.env.local",              shape: "prefix",    category: "config" },
-  { token: "/.env.production",         shape: "prefix",    category: "config" },
-  { token: "/.env.backup",             shape: "prefix",    category: "config" },
-  { token: "/.env.save",               shape: "prefix",    category: "config" },
-  { token: "/.env.dev",                shape: "prefix",    category: "config" },
+  { token: "/.env",                    shape: "substring", category: "config" },
 
   // Config leaks: VCS metadata
   { token: "/.git/config",             shape: "prefix",    category: "config" },
@@ -184,6 +202,9 @@ export const PATTERNS: Pattern[] = [
   { token: "/.npmrc",                  shape: "prefix",    category: "config" },
   { token: "/.htpasswd",               shape: "prefix",    category: "config" },
   { token: "/.htaccess",               shape: "prefix",    category: "config" },
+  { token: "/.netrc",                  shape: "prefix",    category: "config" },
+  { token: "/.pgpass",                 shape: "prefix",    category: "config" },
+  { token: "/sftp-config.json",        shape: "prefix",    category: "config" },
 
   // Config leaks: generic app config
   { token: "/config.yaml",             shape: "prefix",    category: "config", bomb: "yaml" },
@@ -192,13 +213,36 @@ export const PATTERNS: Pattern[] = [
   { token: "/docker-compose.yml",      shape: "prefix",    category: "config", bomb: "yaml" },
   { token: "/Dockerfile",              shape: "prefix",    category: "config" },
 
-  // Config leaks: database / archive dumps
-  { token: "/backup.sql",              shape: "prefix",    category: "config" },
+  // Config leaks: database / archive dumps.
+  //
+  // "/backup" substring catches the entire backup family — /backup, /backup.sql,
+  // /backup.zip, /backup.tar.gz, /backup1.zip, /backup2.tar, /backups.zip,
+  // /backup_full, /backup_web_config.txt, /foo/backup, etc. — without
+  // false-matching /phpmyadminbackup (no "/" precedes the "backup" there).
+  // "/archive" substring catches /archive, /archive.tar, /archive.tar.gz,
+  // /archive.zip, /archives/, etc. The 3-letter abbreviations (back, bkp, bak,
+  // old) are too short to use as substrings, so they're explicit prefixes.
+  { token: "/backup",                  shape: "substring", category: "config" },
+  { token: "/archive",                 shape: "substring", category: "config" },
+  { token: "full_backup",              shape: "substring", category: "config" },
   { token: "/db.sql",                  shape: "prefix",    category: "config" },
   { token: "/dump.sql",                shape: "prefix",    category: "config" },
-  { token: "/backup.zip",              shape: "prefix",    category: "config" },
-  { token: "/backup.tar.gz",           shape: "prefix",    category: "config" },
   { token: "/site.tar.gz",             shape: "prefix",    category: "config" },
+  { token: "/web/dump-",               shape: "prefix",    category: "config" },
+  { token: "/www.zip",                 shape: "prefix",    category: "config" },
+  { token: "/www.tar",                 shape: "prefix",    category: "config" },
+  { token: "/old.tar",                 shape: "prefix",    category: "config" },
+  { token: "/old.tar.gz",              shape: "prefix",    category: "config" },
+  { token: "/old.zip",                 shape: "prefix",    category: "config" },
+  { token: "/back.tar",                shape: "prefix",    category: "config" },
+  { token: "/back.tar.gz",             shape: "prefix",    category: "config" },
+  { token: "/back.zip",                shape: "prefix",    category: "config" },
+  { token: "/bkp.tar",                 shape: "prefix",    category: "config" },
+  { token: "/bkp.tar.gz",              shape: "prefix",    category: "config" },
+  { token: "/bkp.zip",                 shape: "prefix",    category: "config" },
+  { token: "/bak.tar",                 shape: "prefix",    category: "config" },
+  { token: "/bak.tar.gz",              shape: "prefix",    category: "config" },
+  { token: "/bak.zip",                 shape: "prefix",    category: "config" },
 
   // Admin panels
   { token: "/phpmyadmin/",             shape: "prefix",    category: "admin" },
@@ -247,6 +291,7 @@ export const PATTERNS: Pattern[] = [
   { token: "/cgi-bin/",                shape: "prefix",    category: "cgi" },
   { token: "/cgi-bin/bash",            shape: "prefix",    category: "cgi" },
   { token: "/cgi-bin/.%2e/",           shape: "prefix",    category: "cgi" },
+  { token: "/getcmd",                  shape: "prefix",    category: "cgi" },
   { token: "/bin/sh",                  shape: "prefix",    category: "cgi" },
   { token: "/scripts/..%255c../winnt/system32/cmd.exe", shape: "prefix", category: "cgi" },
   { token: "/ida.dll",                 shape: "prefix",    category: "cgi" },
@@ -280,8 +325,16 @@ export const PATTERNS: Pattern[] = [
   { token: "/install.php",             shape: "prefix",    category: "webshell" },
   { token: "/setup.php",               shape: "prefix",    category: "webshell" },
   { token: "/phpinfo.php",             shape: "prefix",    category: "webshell" },
+  { token: "/phpinfo",                 shape: "prefix",    category: "webshell" },
   { token: "/info.php",                shape: "prefix",    category: "webshell" },
   { token: "/test.php",                shape: "prefix",    category: "webshell" },
+  { token: "/file-manager/initialize", shape: "prefix",    category: "webshell" },
+  // File-upload exploit endpoints — scanners try many path prefixes
+  // (/jquery-file-upload/server/php, /file-upload/server/php,
+  // /assets/plugins/jquery-file-upload/server/php, etc.). Substrings
+  // catch the long tail.
+  { token: "jquery-file-upload",       shape: "substring", category: "webshell" },
+  { token: "/server/php",              shape: "substring", category: "webshell" },
 ]
 
 function hasSafePrefix(pathname: string): boolean {
