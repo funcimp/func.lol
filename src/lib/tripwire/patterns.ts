@@ -283,6 +283,7 @@ export const PATTERNS: Pattern[] = [
   { token: "/cgi-bin/",                shape: "prefix",    category: "cgi" },
   { token: "/cgi-bin/bash",            shape: "prefix",    category: "cgi" },
   { token: "/cgi-bin/.%2e/",           shape: "prefix",    category: "cgi" },
+  { token: "/getcmd",                  shape: "prefix",    category: "cgi" },
   { token: "/bin/sh",                  shape: "prefix",    category: "cgi" },
   { token: "/scripts/..%255c../winnt/system32/cmd.exe", shape: "prefix", category: "cgi" },
   { token: "/ida.dll",                 shape: "prefix",    category: "cgi" },
