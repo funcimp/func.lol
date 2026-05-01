@@ -15,6 +15,12 @@ tripwire-analyze-404s *args:
 tripwire-build-bombs:
     bun run scripts/tripwire/build-bombs.ts
 
+tripwire-download-geoip *args:
+    bun run scripts/tripwire/download-geoip.ts {{args}}
+
+tripwire-build-stats *args:
+    bun run scripts/tripwire/build-stats.ts {{args}}
+
 # === General dev ===
 
 dev:

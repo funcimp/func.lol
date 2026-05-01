@@ -1,0 +1,474 @@
+{
+  "generatedAt": "2026-05-01T03:07:33.985Z",
+  "lifetime": {
+    "totalEvents": 109,
+    "earliestTs": "2026-04-24T01:02:13.347Z",
+    "latestTs": "2026-05-01T02:12:31.280Z",
+    "daysSinceFirst": 8,
+    "distinctIps": 34,
+    "distinctPaths": 57,
+    "distinctAsns": 19
+  },
+  "byCategory": [
+    {
+      "category": "config",
+      "count": 52
+    },
+    {
+      "category": "cms",
+      "count": 42
+    },
+    {
+      "category": "framework",
+      "count": 5
+    },
+    {
+      "category": "webshell",
+      "count": 4
+    },
+    {
+      "category": "admin",
+      "count": 3
+    },
+    {
+      "category": "actuator",
+      "count": 3
+    }
+  ],
+  "byUaFamily": [
+    {
+      "ua": "unknown",
+      "count": 89
+    },
+    {
+      "ua": "curl",
+      "count": 12
+    },
+    {
+      "ua": "requests",
+      "count": 6
+    },
+    {
+      "ua": "go-http-client",
+      "count": 2
+    }
+  ],
+  "byDay": [
+    {
+      "date": "2026-04-24",
+      "count": 8
+    },
+    {
+      "date": "2026-04-25",
+      "count": 25
+    },
+    {
+      "date": "2026-04-26",
+      "count": 16
+    },
+    {
+      "date": "2026-04-27",
+      "count": 28
+    },
+    {
+      "date": "2026-04-28",
+      "count": 6
+    },
+    {
+      "date": "2026-04-29",
+      "count": 3
+    },
+    {
+      "date": "2026-04-30",
+      "count": 11
+    },
+    {
+      "date": "2026-05-01",
+      "count": 12
+    }
+  ],
+  "topPaths": [
+    {
+      "path": "/wp-login.php",
+      "count": 13,
+      "category": "cms"
+    },
+    {
+      "path": "/.env",
+      "count": 13,
+      "category": "config"
+    },
+    {
+      "path": "/xmlrpc.php",
+      "count": 9,
+      "category": "cms"
+    },
+    {
+      "path": "/.git/config",
+      "count": 4,
+      "category": "config"
+    },
+    {
+      "path": "/license.txt",
+      "count": 3,
+      "category": "cms"
+    },
+    {
+      "path": "/wp-admin/",
+      "count": 3,
+      "category": "cms"
+    },
+    {
+      "path": "/wp-content/uploads/2024/",
+      "count": 2,
+      "category": "cms"
+    },
+    {
+      "path": "/wp-admin/txets.php",
+      "count": 2,
+      "category": "cms"
+    },
+    {
+      "path": "/.env.backup",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/.env.production",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/.env.bak",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/.env.local",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/.env.dev",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/.env.save",
+      "count": 2,
+      "category": "config"
+    },
+    {
+      "path": "/administrator/",
+      "count": 2,
+      "category": "cms"
+    },
+    {
+      "path": "/user/login",
+      "count": 2,
+      "category": "cms"
+    },
+    {
+      "path": "/wp-content/plugins/hellopress/wp_filemanager.php",
+      "count": 2,
+      "category": "cms"
+    },
+    {
+      "path": "/_ignition/execute-solution",
+      "count": 2,
+      "category": "framework"
+    },
+    {
+      "path": "/actuator/env",
+      "count": 2,
+      "category": "actuator"
+    },
+    {
+      "path": "/wp-content/plugins/twenty/login.php",
+      "count": 1,
+      "category": "cms"
+    },
+    {
+      "path": "/wp-content/plugins/ccx/",
+      "count": 1,
+      "category": "cms"
+    },
+    {
+      "path": "/.env.old",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.preprod",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/wp-admin/css/",
+      "count": 1,
+      "category": "cms"
+    },
+    {
+      "path": "/.env.uat",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.stage",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.test",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.live",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.staging",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.ci",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.sample",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.swp",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.development",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env~",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.prod",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.example",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.dist",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.docker",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.env.remote",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/.aws/credentials",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/server-info.php",
+      "count": 1,
+      "category": "admin"
+    },
+    {
+      "path": "/info.php",
+      "count": 1,
+      "category": "webshell"
+    },
+    {
+      "path": "/_profiler/phpinfo",
+      "count": 1,
+      "category": "framework"
+    },
+    {
+      "path": "/phpinfo.php",
+      "count": 1,
+      "category": "webshell"
+    },
+    {
+      "path": "/test.php",
+      "count": 1,
+      "category": "webshell"
+    },
+    {
+      "path": "/app_dev.php/_profiler/open",
+      "count": 1,
+      "category": "framework"
+    },
+    {
+      "path": "/.env-ku",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/env.php",
+      "count": 1,
+      "category": "actuator"
+    },
+    {
+      "path": "/config.phpinfo",
+      "count": 1,
+      "category": "framework"
+    },
+    {
+      "path": "/wp-content/plugins/admin.php",
+      "count": 1,
+      "category": "cms"
+    },
+    {
+      "path": "/.aws/config",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/phpmyadmin/",
+      "count": 1,
+      "category": "admin"
+    },
+    {
+      "path": "/config.yaml",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/phpmyadmin",
+      "count": 1,
+      "category": "admin"
+    },
+    {
+      "path": "/shell.php",
+      "count": 1,
+      "category": "webshell"
+    },
+    {
+      "path": "/docker-compose.yml",
+      "count": 1,
+      "category": "config"
+    },
+    {
+      "path": "/config.json",
+      "count": 1,
+      "category": "config"
+    }
+  ],
+  "byAsn": [
+    {
+      "asn": "AS16509",
+      "name": "Amazon.com, Inc.",
+      "count": 25
+    },
+    {
+      "asn": "AS14593",
+      "name": "Space Exploration Technologies Corporation",
+      "count": 15
+    },
+    {
+      "asn": "AS31898",
+      "name": "Oracle Corporation",
+      "count": 13
+    },
+    {
+      "asn": "AS51396",
+      "name": "Pfcloud UG (haftungsbeschrankt)",
+      "count": 12
+    },
+    {
+      "asn": "AS36352",
+      "name": "HostPapa",
+      "count": 8
+    },
+    {
+      "asn": "AS8075",
+      "name": "Microsoft Corporation",
+      "count": 6
+    },
+    {
+      "asn": "AS14061",
+      "name": "DigitalOcean, LLC",
+      "count": 4
+    },
+    {
+      "asn": "AS206092",
+      "name": "F.n.s. Holdings Limited",
+      "count": 3
+    },
+    {
+      "asn": "AS137000",
+      "name": "VIJAYALAKSHMI NET SERVICES PVT LTD",
+      "count": 2
+    },
+    {
+      "asn": "AS23470",
+      "name": "ReliableSite.Net LLC",
+      "count": 1
+    },
+    {
+      "asn": "AS133982",
+      "name": "Excitel Broadband Private Limited",
+      "count": 1
+    },
+    {
+      "asn": "AS396982",
+      "name": "Google LLC",
+      "count": 1
+    },
+    {
+      "asn": "AS51167",
+      "name": "Contabo GmbH",
+      "count": 1
+    },
+    {
+      "asn": "AS5384",
+      "name": "Emirates Telecommunications Group Company (etisalat Group) Pjsc",
+      "count": 1
+    },
+    {
+      "asn": "AS6400",
+      "name": "Compania Dominicana de Telefonos S. A.",
+      "count": 1
+    },
+    {
+      "asn": "AS29889",
+      "name": "Fast Serv Networks, LLC",
+      "count": 1
+    },
+    {
+      "asn": "AS136557",
+      "name": "Host Universal Pty Ltd",
+      "count": 1
+    },
+    {
+      "asn": "AS149645",
+      "name": "Spectrum Cable network and broadband, Inc.",
+      "count": 1
+    },
+    {
+      "asn": "AS38193",
+      "name": "Transworld Associates Pvt. Ltd.",
+      "count": 1
+    }
+  ]
+}
