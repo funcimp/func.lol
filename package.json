@@ -16,19 +16,19 @@
     "@paralleldrive/cuid2": "^3.3.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
-    "next": "16.2.3",
+    "next": "16.2.4",
     "react": "19.2.5",
     "react-dom": "19.2.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/postcss": "^4.2.3",
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^22.19.17",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
-    "eslint-config-next": "16.2.3",
-    "tailwindcss": "^4.2.3",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3"
   },
   "ignoreScripts": [
