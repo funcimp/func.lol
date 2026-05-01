@@ -10,19 +10,6 @@ import {
 } from "@/lib/tripwire/patterns"
 import { guard, uaFamily } from "@/lib/tripwire/observe"
 
-// Comma-separated list of IPs to exclude from logging/archive. Used to
-// keep the maintainer's own probing-while-developing out of the data.
-// Bait still serves them the bomb — they're just not recorded.
-function isIgnoredIp(ip: string): boolean {
-  if (!ip) return false
-  const raw = process.env.IGNORED_IPS
-  if (!raw) return false
-  for (const entry of raw.split(",")) {
-    if (entry.trim() === ip) return true
-  }
-  return false
-}
-
 // Durable archive of a tripwire event. One file per event under
 // events/<YYYY-MM-DD>/<ts-ms>-<req_id>.json — same shape used by the sync
 // backfill tool, so live and backfilled writes are indistinguishable.
@@ -59,12 +46,8 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
 
   const ua = req.headers.get("user-agent") ?? ""
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? ""
-  const ignored = isIgnoredIp(ip)
 
-  // Ignored IPs (typically the maintainer's own) bypass both the rate
-  // limiter and the log/archive paths. They still receive the bomb so
-  // local probing-as-testing works.
-  if (!ignored && !guard(ip)) {
+  if (!guard(ip)) {
     const throttled: TripwireEvent = {
       event: "tripwire.throttled",
       req_id: createId(),
@@ -97,10 +80,8 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
     ua_family: uaFamily(ua),
     ip,
   }
-  if (!ignored) {
-    console.log(JSON.stringify(hit))
-    archiveEvent(hit)
-  }
+  console.log(JSON.stringify(hit))
+  archiveEvent(hit)
 
   // Rewrite to the internal bomb route. The route handler can set
   // Content-Encoding (the proxy cannot — Next.js strips it as a forbidden
