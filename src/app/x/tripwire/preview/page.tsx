@@ -94,39 +94,54 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
   )
 }
 
-// === Daily activity — solid bars, height proportional to count ===
+// === Daily activity — solid bars, height proportional to count, count
+// printed above each bar so the visual encoding is never ambiguous ===
 function DailyActivity() {
-  const cellW = 16
-  const cellH = 56
-  const gap = 2
+  const cellW = 32
+  const cellH = 96
+  const gap = 6
+  const labelTop = 14    // space above bar for count label
+  const labelBottom = 18 // space below bar for date label
   const width = data.byDay.length * (cellW + gap) - gap
+  const totalH = labelTop + cellH + labelBottom
   return (
     <div className="text-ink">
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
         daily activity
       </h3>
       <div className="overflow-x-auto">
-        <svg width={width} height={cellH + 24} viewBox={`0 0 ${width} ${cellH + 24}`}>
+        <svg width={width} height={totalH} viewBox={`0 0 ${width} ${totalH}`}>
           {data.byDay.map((d, i) => {
             const ratio = d.count / maxByDay
             const h = Math.max(1, ratio * cellH)
+            const cx = i * (cellW + gap) + cellW / 2
+            const barTop = labelTop + (cellH - h)
             return (
               <g key={d.date}>
+                <text
+                  x={cx}
+                  y={barTop - 4}
+                  textAnchor="middle"
+                  className="fill-ink font-mono tabular-nums"
+                  style={{ fontSize: 10, opacity: 0.75 }}
+                >
+                  {d.count}
+                </text>
                 <rect
                   x={i * (cellW + gap)}
-                  y={cellH - h}
+                  y={barTop}
                   width={cellW}
                   height={h}
                   fill="currentColor"
                 />
                 <text
-                  x={i * (cellW + gap) + cellW / 2}
-                  y={cellH + 14}
+                  x={cx}
+                  y={labelTop + cellH + 13}
                   textAnchor="middle"
                   className="fill-ink font-mono"
-                  style={{ fontSize: 9, opacity: 0.55 }}
+                  style={{ fontSize: 10, opacity: 0.55 }}
                 >
-                  {d.date.slice(8, 10)}
+                  {d.date.slice(5)}
                 </text>
               </g>
             )
@@ -134,7 +149,7 @@ function DailyActivity() {
         </svg>
       </div>
       <div className="font-mono text-[10px] opacity-55 mt-2">
-        max {maxByDay} hits/day · {data.byDay[0]?.date.slice(0, 7)}–{data.byDay[data.byDay.length - 1]?.date.slice(0, 7)}
+        {data.byDay.reduce((n, d) => n + d.count, 0)} hits over {data.byDay.length} days
       </div>
     </div>
   )
