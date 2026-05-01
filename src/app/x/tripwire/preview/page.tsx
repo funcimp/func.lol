@@ -1,8 +1,9 @@
 // src/app/x/tripwire/preview/page.tsx
 //
-// Phase 0 prototype: render the tripwire stats fixture in candidate viz
-// shapes for design review. Not deployed in v1 — exists to compare options
-// before committing to the final stats panel on /x/tripwire.
+// Phase 0 prototype, narrowed: viz variants chosen during comparison
+// review now read as a single coherent stats panel. Solid-fill bars in
+// the prime-moments palette throughout; no dither (the user preferred
+// the cleaner read).
 
 import type { Metadata } from "next"
 import Link from "next/link"
@@ -34,7 +35,6 @@ interface Aggregates {
 }
 
 const data = aggregates as Aggregates
-const maxByCategory = Math.max(...data.byCategory.map((c) => c.count))
 const maxByUa = Math.max(...data.byUaFamily.map((c) => c.count))
 const maxByDay = Math.max(...data.byDay.map((c) => c.count))
 const maxByPath = Math.max(...data.topPaths.map((c) => c.count))
@@ -54,45 +54,6 @@ data.byCategory.slice(0, 4).forEach((c, i) => {
 })
 function categoryColor(category: string | undefined): string {
   return (category && CATEGORY_COLORS[category]) || "var(--color-ink)"
-}
-
-// Bayer 4x4 dither pattern as an SVG pattern. Levels 0-5 used as fill
-// density. `currentColor` lets us recolor the fill from the CSS context.
-function DitherDefs() {
-  return (
-    <svg width="0" height="0" className="absolute" aria-hidden="true">
-      <defs>
-        {[0, 1, 2, 3, 4, 5].map((level) => (
-          <pattern
-            key={level}
-            id={`dither-${level}`}
-            x="0"
-            y="0"
-            width="4"
-            height="4"
-            patternUnits="userSpaceOnUse"
-          >
-            {[
-              [0, 8, 2, 10],
-              [12, 4, 14, 6],
-              [3, 11, 1, 9],
-              [15, 7, 13, 5],
-            ].flatMap((row, y) =>
-              row.map((threshold, x) => {
-                const intensity = level / 5
-                const filled = threshold / 16 < intensity
-                return filled ? <rect key={`${x},${y}`} x={x} y={y} width="1" height="1" fill="currentColor" /> : null
-              }),
-            )}
-          </pattern>
-        ))}
-      </defs>
-    </svg>
-  )
-}
-
-function ditherLevel(ratio: number): number {
-  return Math.max(1, Math.round(ratio * 5))
 }
 
 // === Section: hero counts ===
@@ -133,10 +94,8 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
   )
 }
 
-// === Section: daily activity / variants ===
-
-// Variant A: day strip — single row of dithered cells.
-function DayStrip() {
+// === Daily activity — solid bars, height proportional to count ===
+function DailyActivity() {
   const cellW = 16
   const cellH = 56
   const gap = 2
@@ -144,53 +103,7 @@ function DayStrip() {
   return (
     <div className="text-ink">
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        daily activity / variant A — day strip (mono dither)
-      </h3>
-      <div className="overflow-x-auto">
-        <svg width={width} height={cellH + 24} viewBox={`0 0 ${width} ${cellH + 24}`}>
-          {data.byDay.map((d, i) => {
-            const ratio = d.count / maxByDay
-            const level = ditherLevel(ratio)
-            return (
-              <g key={d.date}>
-                <rect
-                  x={i * (cellW + gap)}
-                  y={0}
-                  width={cellW}
-                  height={cellH}
-                  fill={`url(#dither-${level})`}
-                />
-                <text
-                  x={i * (cellW + gap) + cellW / 2}
-                  y={cellH + 14}
-                  textAnchor="middle"
-                  className="fill-ink font-mono"
-                  style={{ fontSize: 9, opacity: 0.55 }}
-                >
-                  {d.date.slice(8, 10)}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
-      </div>
-      <div className="font-mono text-[10px] opacity-55 mt-2">
-        max {maxByDay} hits/day · {data.byDay[0]?.date.slice(0, 7)}–{data.byDay[data.byDay.length - 1]?.date.slice(0, 7)}
-      </div>
-    </div>
-  )
-}
-
-// Variant B: solid bars per day, height = count, no dither.
-function DayBars() {
-  const cellW = 16
-  const cellH = 56
-  const gap = 2
-  const width = data.byDay.length * (cellW + gap) - gap
-  return (
-    <div className="text-ink">
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        daily activity / variant B — solid bars
+        daily activity
       </h3>
       <div className="overflow-x-auto">
         <svg width={width} height={cellH + 24} viewBox={`0 0 ${width} ${cellH + 24}`}>
@@ -220,90 +133,23 @@ function DayBars() {
           })}
         </svg>
       </div>
+      <div className="font-mono text-[10px] opacity-55 mt-2">
+        max {maxByDay} hits/day · {data.byDay[0]?.date.slice(0, 7)}–{data.byDay[data.byDay.length - 1]?.date.slice(0, 7)}
+      </div>
     </div>
   )
 }
 
-// Variant C: sparkline — continuous line through daily counts.
-function DaySparkline() {
-  const w = 720
-  const h = 80
-  const pad = 2
-  const xs = (i: number) => pad + (i / (data.byDay.length - 1)) * (w - pad * 2)
-  const ys = (count: number) => h - pad - (count / maxByDay) * (h - pad * 2)
-  const points = data.byDay.map((d, i) => `${xs(i).toFixed(1)},${ys(d.count).toFixed(1)}`).join(" ")
-  return (
-    <div className="text-ink">
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        daily activity / variant C — sparkline
-      </h3>
-      <svg width={w} height={h + 22} viewBox={`0 0 ${w} ${h + 22}`} preserveAspectRatio="none">
-        <polyline points={points} fill="none" stroke="currentColor" strokeWidth={1.5} />
-        {data.byDay.map((d, i) => (
-          <circle key={d.date} cx={xs(i)} cy={ys(d.count)} r={2} fill="currentColor" />
-        ))}
-        <text x={xs(0)} y={h + 14} className="fill-ink font-mono" style={{ fontSize: 9, opacity: 0.55 }}>
-          {data.byDay[0]?.date.slice(5)}
-        </text>
-        <text
-          x={xs(data.byDay.length - 1)}
-          y={h + 14}
-          textAnchor="end"
-          className="fill-ink font-mono"
-          style={{ fontSize: 9, opacity: 0.55 }}
-        >
-          {data.byDay[data.byDay.length - 1]?.date.slice(5)}
-        </text>
-      </svg>
-    </div>
-  )
-}
-
-// === Section: categories / variants ===
-
-// Variant A: horizontal dithered bars, one row per category, in moment colors.
-function CategoryBars() {
-  return (
-    <div>
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        categories / variant A — colored dithered bars
-      </h3>
-      <ul className="space-y-2">
-        {data.byCategory.map((c) => {
-          const ratio = c.count / maxByCategory
-          const level = ditherLevel(ratio)
-          const color = categoryColor(c.category)
-          return (
-            <li key={c.category} className="flex items-baseline gap-3">
-              <span className="font-mono text-[12px] uppercase tracking-[0.14em] opacity-75 w-[80px] shrink-0">
-                {c.category}
-              </span>
-              <span className="tabular-nums font-mono text-[12px] opacity-55 w-[40px] shrink-0">
-                {c.count}
-              </span>
-              <span className="flex-1 h-4" style={{ color }}>
-                <svg width="100%" height="16" viewBox="0 0 100 16" preserveAspectRatio="none">
-                  <rect x={0} y={0} width={ratio * 100} height={16} fill={`url(#dither-${level})`} />
-                </svg>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
-// Variant B: stacked single bar showing proportions across all categories.
-function CategoryStacked() {
+// === Categories — stacked proportion bar with legend ===
+function Categories() {
   const total = data.byCategory.reduce((n, c) => n + c.count, 0)
-  // Pre-compute cumulative offsets so the JSX is render-pure.
-  const segments = data.byCategory.reduce<Array<{ category: string; x: number; w: number }>>(
+  // Pre-compute cumulative offsets so the JSX stays render-pure.
+  const segments = data.byCategory.reduce<Array<{ category: string; x: number; w: number; count: number }>>(
     (acc, c) => {
       const prev = acc[acc.length - 1]
       const x = prev ? prev.x + prev.w : 0
       const w = (c.count / total) * 100
-      acc.push({ category: c.category, x, w })
+      acc.push({ category: c.category, x, w, count: c.count })
       return acc
     },
     [],
@@ -311,7 +157,7 @@ function CategoryStacked() {
   return (
     <div>
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        categories / variant B — stacked proportion bar
+        what they were looking for
       </h3>
       <svg width="100%" height="32" viewBox="0 0 100 32" preserveAspectRatio="none" className="mb-3">
         {segments.map((s) => (
@@ -341,9 +187,8 @@ function CategoryStacked() {
   )
 }
 
-// === Section: UA families ===
+// === UA families — solid colored bars (4 families ↔ 4 moment colors) ===
 function UaFamilies() {
-  // Cycle through moment colors per UA family (4 UAs ↔ 4 moment colors).
   return (
     <div>
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
@@ -352,7 +197,7 @@ function UaFamilies() {
       <ul className="space-y-2">
         {data.byUaFamily.map((u, i) => {
           const ratio = u.count / maxByUa
-          const level = ditherLevel(ratio)
+          const color = momentColor(i)
           return (
             <li key={u.ua} className="flex items-baseline gap-3">
               <span className="font-mono text-[12px] uppercase tracking-[0.14em] opacity-75 w-[120px] shrink-0">
@@ -361,9 +206,9 @@ function UaFamilies() {
               <span className="tabular-nums font-mono text-[12px] opacity-55 w-[40px] shrink-0">
                 {u.count}
               </span>
-              <span className="flex-1 h-4" style={{ color: momentColor(i) }}>
+              <span className="flex-1 h-4">
                 <svg width="100%" height="16" viewBox="0 0 100 16" preserveAspectRatio="none">
-                  <rect x={0} y={0} width={ratio * 100} height={16} fill={`url(#dither-${level})`} />
+                  <rect x={0} y={0} width={ratio * 100} height={16} fill={color} />
                 </svg>
               </span>
             </li>
@@ -374,20 +219,18 @@ function UaFamilies() {
   )
 }
 
-// === Section: top paths / variants ===
-
-// Variant A: ranked list, each row colored by its category.
-function TopPathsList({ limit = 15 }: { limit?: number }) {
+// === Top paths — ranked list, solid colored bar per category ===
+function TopPaths({ limit = 15 }: { limit?: number }) {
   const shown = data.topPaths.slice(0, limit)
   return (
     <div>
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        most-probed paths / variant A — ranked list with category color
+        most-probed paths
       </h3>
       <ul className="space-y-1">
         {shown.map((p) => {
           const ratio = p.count / maxByPath
-          const level = ditherLevel(ratio)
+          const color = categoryColor(p.category)
           return (
             <li key={p.path} className="flex items-baseline gap-3">
               <span className="tabular-nums font-mono text-[12px] opacity-55 w-[30px] shrink-0 text-right">
@@ -398,13 +241,13 @@ function TopPathsList({ limit = 15 }: { limit?: number }) {
               </span>
               <span
                 className="font-mono text-[10px] uppercase tracking-[0.14em] w-[60px] shrink-0 text-right"
-                style={{ color: categoryColor(p.category) }}
+                style={{ color }}
               >
                 {p.category ?? "-"}
               </span>
-              <span className="w-[80px] shrink-0" style={{ color: categoryColor(p.category) }}>
+              <span className="w-[80px] shrink-0">
                 <svg width="80" height="10" viewBox="0 0 80 10" preserveAspectRatio="none">
-                  <rect x={0} y={0} width={ratio * 80} height={10} fill={`url(#dither-${level})`} />
+                  <rect x={0} y={0} width={ratio * 80} height={10} fill={color} />
                 </svg>
               </span>
             </li>
@@ -420,41 +263,7 @@ function TopPathsList({ limit = 15 }: { limit?: number }) {
   )
 }
 
-// Variant B: wall of words — font size proportional to count.
-function TopPathsWall({ limit = 30 }: { limit?: number }) {
-  const shown = data.topPaths.slice(0, limit)
-  // Map count to font-size 11..28 for visual weight
-  const sizeFor = (count: number) => {
-    const ratio = count / maxByPath
-    return 11 + ratio * 17
-  }
-  return (
-    <div>
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
-        most-probed paths / variant B — wall of words
-      </h3>
-      <p className="font-mono leading-[1.7]">
-        {shown.map((p, i) => (
-          <span
-            key={p.path}
-            className="mr-3 align-middle"
-            style={{
-              fontSize: `${sizeFor(p.count)}px`,
-              color: categoryColor(p.category),
-              opacity: 0.5 + (p.count / maxByPath) * 0.5,
-            }}
-            title={`${p.count}× ${p.category ?? ""}`}
-          >
-            {p.path}
-            {i < shown.length - 1 ? " ·" : ""}
-          </span>
-        ))}
-      </p>
-    </div>
-  )
-}
-
-// === Section: ASNs ===
+// === ASNs — top N, top 4 colored, rest mono ===
 function AsnBars({ limit = 10 }: { limit?: number }) {
   const shown = data.byAsn.slice(0, limit)
   return (
@@ -465,8 +274,6 @@ function AsnBars({ limit = 10 }: { limit?: number }) {
       <ul className="space-y-2">
         {shown.map((a, i) => {
           const ratio = a.count / maxByAsn
-          const level = ditherLevel(ratio)
-          // Top 4 ASNs get moment colors; rest fall back to ink
           const color = i < 4 ? momentColor(i) : "var(--color-ink)"
           return (
             <li key={a.asn} className="flex items-baseline gap-3">
@@ -479,9 +286,9 @@ function AsnBars({ limit = 10 }: { limit?: number }) {
               <span className="tabular-nums font-mono text-[12px] opacity-55 w-[40px] shrink-0 text-right">
                 {a.count}
               </span>
-              <span className="w-[80px] shrink-0" style={{ color }}>
+              <span className="w-[80px] shrink-0">
                 <svg width="80" height="10" viewBox="0 0 80 10" preserveAspectRatio="none">
-                  <rect x={0} y={0} width={ratio * 80} height={10} fill={`url(#dither-${level})`} />
+                  <rect x={0} y={0} width={ratio * 80} height={10} fill={color} />
                 </svg>
               </span>
             </li>
@@ -498,22 +305,9 @@ function AsnBars({ limit = 10 }: { limit?: number }) {
 }
 
 // === Page ===
-
-function Divider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 mt-16 mb-8">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-40">
-        {label}
-      </span>
-      <span className="flex-1 border-t border-ink/15" />
-    </div>
-  )
-}
-
 export default function TripwirePreviewPage() {
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
-      <DitherDefs />
       <div className="mx-auto max-w-[720px]">
         <div className="flex items-center justify-between mb-7">
           <Link
@@ -530,30 +324,17 @@ export default function TripwirePreviewPage() {
             tripwire / stats preview
           </h1>
           <p className="font-mono text-[13px] opacity-55 mt-3">
-            phase 0 prototype · candidate visualizations against real data
+            phase 0 prototype · narrowed to chosen variants
           </p>
         </header>
 
         <Hero />
 
-        <Divider label="daily activity" />
-        <section className="mb-8"><DayStrip /></section>
-        <section className="mb-8"><DayBars /></section>
-        <section className="mb-8"><DaySparkline /></section>
-
-        <Divider label="categories" />
-        <section className="mb-8"><CategoryBars /></section>
-        <section className="mb-8"><CategoryStacked /></section>
-
-        <Divider label="ua families" />
-        <section className="mb-8"><UaFamilies /></section>
-
-        <Divider label="top paths" />
-        <section className="mb-8"><TopPathsList limit={15} /></section>
-        <section className="mb-8"><TopPathsWall limit={30} /></section>
-
-        <Divider label="origin networks" />
-        <section className="mb-8"><AsnBars limit={10} /></section>
+        <section className="mb-12"><DailyActivity /></section>
+        <section className="mb-12"><Categories /></section>
+        <section className="mb-12"><UaFamilies /></section>
+        <section className="mb-12"><TopPaths limit={15} /></section>
+        <section className="mb-12"><AsnBars limit={10} /></section>
 
         <footer className="font-mono text-[11px] opacity-40 mt-16 mb-12">
           fixture generated {data.generatedAt.slice(0, 19).replace("T", " ")} UTC
