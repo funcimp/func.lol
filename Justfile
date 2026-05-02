@@ -15,8 +15,11 @@ tripwire-analyze-404s *args:
 tripwire-build-bombs:
     bun run scripts/tripwire/build-bombs.ts
 
-tripwire-download-geoip *args:
-    bun run scripts/tripwire/download-geoip.ts {{args}}
+# Pull a fresh GeoLite2-ASN.mmdb from MaxMind and put it in blob at
+# geoip/GeoLite2-ASN.mmdb. The cron's ASN enrichment reads from blob,
+# so refreshing the db here is independent of any deploy.
+tripwire-sync-geoip-to-blob:
+    bun run scripts/tripwire/sync-geoip-to-blob.ts
 
 tripwire-ingest-events *args:
     bun run scripts/tripwire/ingest-events.ts {{args}}
@@ -24,10 +27,9 @@ tripwire-ingest-events *args:
 tripwire-build-stats *args:
     bun run scripts/tripwire/build-stats.ts {{args}}
 
-# Refresh the GeoIP db (if stale), ingest any new bronze events into Neon,
-# and rebuild the aggregate JSON. Pass --upload to also publish to blob.
+# Ingest any new bronze events into Neon and rebuild the aggregate JSON.
+# Pass --upload to also publish to blob.
 tripwire-update-stats *args:
-    just tripwire-download-geoip
     just tripwire-ingest-events
     just tripwire-build-stats {{args}}
 
