@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prebuild": "bun run scripts/tripwire/build-bombs.ts",
+    "prebuild": "bun run scripts/tripwire/download-geoip.ts && bun run scripts/tripwire/build-bombs.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",

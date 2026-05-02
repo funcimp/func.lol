@@ -104,7 +104,12 @@ async function main(): Promise<void> {
   const accountId = process.env.MAXMIND_ACCOUNT_ID
   const licenseKey = process.env.MAXMIND_LICENSE_KEY
   if (!accountId || !licenseKey) {
-    throw new Error("MAXMIND_ACCOUNT_ID and MAXMIND_LICENSE_KEY must be set in env (.env.local for local, project env for Vercel)")
+    // CI builds have no MaxMind creds and don't need the .mmdb to run unit
+    // tests or the dev server. Warn and exit cleanly so prebuild keeps
+    // running. Only Vercel production builds (where the env vars are set)
+    // actually populate the file for the cron route's outputFileTracingIncludes.
+    console.warn("[geoip] MAXMIND_ACCOUNT_ID / MAXMIND_LICENSE_KEY not set; skipping download.")
+    return
   }
 
   console.log(`[geoip] downloading GeoLite2-ASN from MaxMind...`)
