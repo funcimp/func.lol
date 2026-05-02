@@ -144,9 +144,9 @@ export default async function TripwirePage() {
             </h2>
             <p>
               What if I made a carefully crafted{" "}
-              <Link href="/robots.txt" className="underline">
+              <a href="/robots.txt" className="underline">
                 robots.txt
-              </Link>{" "}
+              </a>{" "}
               that lists every one of these paths under{" "}
               <code>Disallow</code>? It does two things at once. It
               tells real crawlers like Googlebot, Bingbot, and
