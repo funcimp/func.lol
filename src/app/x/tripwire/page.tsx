@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 // revalidate semantics. High-traffic pages re-render against the
 // freshest blob in the background; low-traffic pages still see fresh
 // data thanks to the cron.
-export const runtime = "nodejs"
 export const revalidate = 300
 
 // IPs are RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24,
