@@ -92,5 +92,11 @@ export async function proxy(req: NextRequest): Promise<Response | undefined> {
 }
 
 export const config = {
-  matcher: ["/((?!_next/|api/|static/).*)"],
+  // Exclude statically-prerendered routes (/robots.txt, /sitemap.xml) from
+  // middleware. They're built once at deploy time; running middleware on
+  // them caused intermittent 404s on edge cache misses (Next.js 16 routed
+  // some misses through the function path, which has no handler for those
+  // paths and returned 404). Their bait-status is also already covered by
+  // SAFE_EXACT_PATHS, so keeping the proxy out is purely a routing fix.
+  matcher: ["/((?!_next/|api/|static/|robots\\.txt|sitemap\\.xml).*)"],
 }
