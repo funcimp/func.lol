@@ -1,70 +1,31 @@
 // src/lib/tripwire/ingest.ts
 //
-// Bronze → silver. Lists every event under the events/ blob prefix, skips
-// ids already in tripwire_events (PK lookup against the candidate id list),
-// fetches the new ones, enriches each IP with ASN data from
-// GeoLite2-ASN.mmdb, and bulk-inserts. ON CONFLICT (id) DO NOTHING is the
-// belt to the SELECT's suspenders. The id list could change between the
-// dedup query and the insert if another job ran in parallel.
+// One job: copy events from the events/ blob prefix into the
+// tripwire_events table. Dedup by id (the slug from the blob filename).
+// No ASN enrichment, no aggregate building. ASN lookups happen later
+// at query time in build-stats.
 //
-// Filename shape from src/proxy.ts: events/<YYYY-MM-DD>/<ms>-<id>.json. The
-// id is everything after the first hyphen and before .json, which covers
-// both the new cuid2 form and the older compound ids written by the sync
-// tool.
-//
-// The ASN db lives in blob (geoip/GeoLite2-ASN.mmdb), not in the deploy
-// artifact. Refresh it any time with `bun run scripts/tripwire/sync-geoip-
-// to-blob.ts`; no redeploy needed. The reader is cached at module level
-// so warm Fluid Compute instances reuse it across cron invocations and
-// only the first cold instance pays the ~10MB blob fetch.
+// Filename shape from src/proxy.ts: events/<YYYY-MM-DD>/<ms>-<id>.json.
+// The id is everything after the first hyphen and before .json.
 //
 // Pure library: no console.log, no process.exit. Callers (the CLI script
 // and the cron route) decide how to log and surface results.
 
 import { list, get } from "@vercel/blob"
-import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
-import { streamToBuffer, streamToText } from "@/lib/blob-stream"
+import { streamToText } from "@/lib/blob-stream"
 import { isTripwireEvent, type TripwireEvent } from "@/lib/tripwire/patterns"
 
-const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
 const DEFAULT_BATCH = 200
 const ID_LOOKUP_CHUNK = 1000
 
-let cachedAsnReader: ReaderModel | null = null
-
 // Structured-log shape. Callers (cron route + CLI scripts) get a single
-// JSON line per emit, ready to drop straight into Vercel's runtime log
-// indexer. Match the pattern src/proxy.ts already uses for
+// JSON line per emit. Match the pattern src/proxy.ts already uses for
 // tripwire.hit / tripwire.throttled events.
 export interface IngestLogEvent {
   step: string
   [field: string]: unknown
-}
-
-async function getAsnReader(log: (e: IngestLogEvent) => void): Promise<ReaderModel> {
-  if (cachedAsnReader) {
-    log({ step: "asn_reader.cached_hit" })
-    return cachedAsnReader
-  }
-  log({ step: "asn_reader.fetch_start" })
-  const t0 = Date.now()
-  const file = await get(ASN_BLOB_KEY, { access: "private" })
-  if (!file || file.statusCode !== 200) {
-    throw new Error(
-      `Failed to fetch ${ASN_BLOB_KEY} from blob (status: ${file?.statusCode ?? "no response"}). ` +
-        `Run scripts/tripwire/sync-geoip-to-blob.ts to populate it.`,
-    )
-  }
-  const t1 = Date.now()
-  log({ step: "asn_reader.fetch_done", get_ms: t1 - t0 })
-  const buf = await streamToBuffer(file.stream)
-  const t2 = Date.now()
-  log({ step: "asn_reader.drain_done", drain_ms: t2 - t1, bytes: buf.length })
-  cachedAsnReader = Reader.openBuffer(buf)
-  log({ step: "asn_reader.open_done", open_ms: Date.now() - t2 })
-  return cachedAsnReader
 }
 
 export interface IngestOptions {
@@ -91,11 +52,6 @@ interface BlobRef {
   id: string
 }
 
-interface AsnLookup {
-  asn: string | null
-  asnName: string | null
-}
-
 // events/2026-04-30/1777563007310-kj5ynyxqlmw81z9dlc8zpqxf.json
 //                                 ^^^^^^^^^^^^^^^^^^^^^^^^
 function idFromPathname(pathname: string): string | null {
@@ -103,21 +59,9 @@ function idFromPathname(pathname: string): string | null {
   return match ? match[2] : null
 }
 
-function lookupAsn(reader: ReaderModel, ip: string): AsnLookup {
-  let result: Asn | null = null
-  try {
-    result = reader.asn(ip)
-  } catch {
-    // Private / unrouted / not-in-db. Fall through.
-  }
-  if (!result?.autonomousSystemNumber) return { asn: null, asnName: null }
-  return {
-    asn: `AS${result.autonomousSystemNumber}`,
-    asnName: result.autonomousSystemOrganization ?? null,
-  }
-}
-
-async function listAllBlobs(log: (e: IngestLogEvent) => void): Promise<{ refs: BlobRef[]; unrecognized: number }> {
+async function listAllBlobs(
+  log: (e: IngestLogEvent) => void,
+): Promise<{ refs: BlobRef[]; unrecognized: number }> {
   const refs: BlobRef[] = []
   let unrecognized = 0
   let cursor: string | undefined
@@ -137,7 +81,10 @@ async function listAllBlobs(log: (e: IngestLogEvent) => void): Promise<{ refs: B
   return { refs, unrecognized }
 }
 
-async function fetchEvent(url: string, log: (e: IngestLogEvent) => void): Promise<TripwireEvent | null> {
+async function fetchEvent(
+  url: string,
+  log: (e: IngestLogEvent) => void,
+): Promise<TripwireEvent | null> {
   const file = await get(url, { access: "private" })
   if (!file || file.statusCode !== 200) {
     log({ step: "fetch_event.bad_status", url, statusCode: file?.statusCode ?? null })
@@ -158,11 +105,7 @@ async function fetchEvent(url: string, log: (e: IngestLogEvent) => void): Promis
   return parsed
 }
 
-function rowFromEvent(
-  ref: BlobRef,
-  event: TripwireEvent,
-  asnLookup: AsnLookup,
-): schema.NewTripwireEventRow {
+function rowFromEvent(ref: BlobRef, event: TripwireEvent): schema.NewTripwireEventRow {
   return {
     id: ref.id,
     reqId: event.req_id ?? null,
@@ -176,8 +119,8 @@ function rowFromEvent(
     bomb: event.bomb ?? null,
     uaRaw: event.ua_raw ?? null,
     uaFamily: event.ua_family ?? null,
-    asn: asnLookup.asn,
-    asnName: asnLookup.asnName,
+    asn: null,
+    asnName: null,
     blobPathname: ref.pathname,
   }
 }
@@ -209,8 +152,6 @@ export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestR
   const log = opts.onProgress ?? (() => {})
   const deadlineMs = opts.deadlineMs ?? Number.POSITIVE_INFINITY
   const overDeadline = () => Date.now() >= deadlineMs
-
-  const reader = await getAsnReader(log)
 
   const tList = Date.now()
   const { refs, unrecognized } = await listAllBlobs(log)
@@ -245,7 +186,7 @@ export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestR
         skipped++
         continue
       }
-      rows.push(rowFromEvent(ref, event, lookupAsn(reader, event.ip)))
+      rows.push(rowFromEvent(ref, event))
     }
     inserted += await insertBatch(rows)
     log({

@@ -1,22 +1,68 @@
 // src/lib/tripwire/stats.ts
 //
-// Silver → gold. SQL aggregations over tripwire_events plus the JSON
-// shape the stats page consumes. Pure library (no console.log,
-// no process.exit) so the cron route and the CLI script can both call it.
+// One job: read the current state of the DB, look up ASN data for the
+// distinct IPs we have, build the analytics JSON, write it to blob.
+// That's it. The page reads that blob and renders it.
+//
+// ASN enrichment happens here at query time, not at ingest, so refreshing
+// the ASN db (via tripwire-asn-update cron) is independent of ingest and
+// the next build-stats run picks up the new mapping automatically. The
+// reader is cached at module level so warm Fluid Compute instances reuse
+// it across cron invocations and only the first cold instance pays the
+// ~10MB blob fetch.
 
-import { put } from "@vercel/blob"
+import { get, put } from "@vercel/blob"
+import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
+import { streamToBuffer } from "@/lib/blob-stream"
 import {
   STATS_BLOB_KEY,
   DEFAULT_TOP_PATHS,
   type Aggregates,
 } from "@/lib/tripwire/aggregate-shape"
 
+const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
+
 // Re-export so existing callers can keep importing from "@/lib/tripwire/stats".
 // The page-side loader imports STATS_BLOB_KEY straight from aggregate-shape so
 // it never pulls drizzle into the page bundle.
 export { STATS_BLOB_KEY, DEFAULT_TOP_PATHS, type Aggregates }
+
+let cachedAsnReader: ReaderModel | null = null
+
+async function getAsnReader(): Promise<ReaderModel> {
+  if (cachedAsnReader) return cachedAsnReader
+  const file = await get(ASN_BLOB_KEY, { access: "private" })
+  if (!file || file.statusCode !== 200) {
+    throw new Error(
+      `Failed to fetch ${ASN_BLOB_KEY} from blob (status: ${file?.statusCode ?? "no response"}). ` +
+        `Run the tripwire-asn-update cron / sync-geoip-to-blob.ts to populate it.`,
+    )
+  }
+  const buf = await streamToBuffer(file.stream)
+  cachedAsnReader = Reader.openBuffer(buf)
+  return cachedAsnReader
+}
+
+interface AsnLookup {
+  asn: string
+  name: string
+}
+
+function lookupAsn(reader: ReaderModel, ip: string): AsnLookup | null {
+  let result: Asn | null = null
+  try {
+    result = reader.asn(ip)
+  } catch {
+    // Private / unrouted / not-in-db.
+  }
+  if (!result?.autonomousSystemNumber) return null
+  return {
+    asn: `AS${result.autonomousSystemNumber}`,
+    name: result.autonomousSystemOrganization ?? "Unknown",
+  }
+}
 
 type LifetimeRow = {
   total_events: number
@@ -24,26 +70,26 @@ type LifetimeRow = {
   latest_ts: string
   distinct_ips: number
   distinct_paths: number
-  distinct_asns: number
 } & Record<string, unknown>
 
 type CategoryRow = { category: string; count: number } & Record<string, unknown>
 type UaRow = { ua: string; count: number } & Record<string, unknown>
 type DayRow = { date: string; count: number } & Record<string, unknown>
 type PathRow = { path: string; count: number; category: string | null } & Record<string, unknown>
-type AsnRow = { asn: string; name: string; count: number } & Record<string, unknown>
+type IpCountRow = { ip: string; count: number } & Record<string, unknown>
 
-export async function buildAggregates(topPathsLimit: number = DEFAULT_TOP_PATHS): Promise<Aggregates> {
+export async function buildAggregates(
+  topPathsLimit: number = DEFAULT_TOP_PATHS,
+): Promise<Aggregates> {
   const db = getDb()
 
   const lifetimeResult = await db.execute<LifetimeRow>(sql`
     SELECT
-      COUNT(*)::int                 AS total_events,
-      MIN(ts)::text                 AS earliest_ts,
-      MAX(ts)::text                 AS latest_ts,
-      COUNT(DISTINCT ip)::int       AS distinct_ips,
-      COUNT(DISTINCT path)::int     AS distinct_paths,
-      COUNT(DISTINCT asn)::int      AS distinct_asns
+      COUNT(*)::int             AS total_events,
+      MIN(ts)::text             AS earliest_ts,
+      MAX(ts)::text             AS latest_ts,
+      COUNT(DISTINCT ip)::int   AS distinct_ips,
+      COUNT(DISTINCT path)::int AS distinct_paths
     FROM tripwire_events
   `)
   const lifetime = lifetimeResult.rows[0]
@@ -84,15 +130,29 @@ export async function buildAggregates(topPathsLimit: number = DEFAULT_TOP_PATHS)
     LIMIT ${topPathsLimit}
   `)
 
-  const byAsn = await db.execute<AsnRow>(sql`
-    SELECT asn,
-           COALESCE(MAX(asn_name), 'Unknown') AS name,
-           COUNT(*)::int AS count
+  // ASN enrichment at query time: fold each event's IP through the mmdb
+  // and roll up. Lifetime.distinctAsns is computed from the rolled-up map
+  // rather than from a SQL DISTINCT — the column-stored value is no
+  // longer the source of truth for ASN since we stopped writing it during
+  // ingest.
+  const ipCountsResult = await db.execute<IpCountRow>(sql`
+    SELECT ip, COUNT(*)::int AS count
     FROM tripwire_events
-    WHERE asn IS NOT NULL
-    GROUP BY asn
-    ORDER BY count DESC, asn ASC
+    WHERE ip IS NOT NULL AND ip <> ''
+    GROUP BY ip
   `)
+  const reader = await getAsnReader()
+  const asnTotals = new Map<string, { name: string; count: number }>()
+  for (const row of ipCountsResult.rows) {
+    const lookup = lookupAsn(reader, row.ip)
+    if (!lookup) continue
+    const entry = asnTotals.get(lookup.asn) ?? { name: lookup.name, count: 0 }
+    entry.count += row.count
+    asnTotals.set(lookup.asn, entry)
+  }
+  const byAsn = [...asnTotals.entries()]
+    .map(([asn, v]) => ({ asn, name: v.name, count: v.count }))
+    .sort((a, b) => (b.count - a.count) || a.asn.localeCompare(b.asn))
 
   const earliestDate = new Date(lifetime.earliest_ts)
   const daysSinceFirst = Math.max(
@@ -109,7 +169,7 @@ export async function buildAggregates(topPathsLimit: number = DEFAULT_TOP_PATHS)
       daysSinceFirst,
       distinctIps: lifetime.distinct_ips,
       distinctPaths: lifetime.distinct_paths,
-      distinctAsns: lifetime.distinct_asns,
+      distinctAsns: byAsn.length,
     },
     byCategory: byCategory.rows.map((r) => ({ category: r.category, count: r.count })),
     byUaFamily: byUaFamily.rows.map((r) => ({ ua: r.ua, count: r.count })),
@@ -119,7 +179,7 @@ export async function buildAggregates(topPathsLimit: number = DEFAULT_TOP_PATHS)
       count: r.count,
       category: r.category ?? undefined,
     })),
-    byAsn: byAsn.rows.map((r) => ({ asn: r.asn, name: r.name, count: r.count })),
+    byAsn,
   }
 }
 

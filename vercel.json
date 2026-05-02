@@ -3,8 +3,16 @@
   "bunVersion": "1.x",
   "crons": [
     {
-      "path": "/api/cron/tripwire-stats",
-      "schedule": "7 * * * *"
+      "path": "/api/cron/tripwire-ingest",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/tripwire-build-stats",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/tripwire-asn-update",
+      "schedule": "0 3 * * 0"
     }
   ]
 }
