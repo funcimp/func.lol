@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
   const result = await ingestNewEvents({
     batchSize: batch,
-    onProgress: (msg) => console.log(`[ingest] ${msg}`),
+    onProgress: (e) => console.log(JSON.stringify({ event: "ingest", ...e })),
   })
 
   console.log()

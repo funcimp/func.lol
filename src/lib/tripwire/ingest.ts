@@ -33,8 +33,22 @@ const ID_LOOKUP_CHUNK = 1000
 
 let cachedAsnReader: ReaderModel | null = null
 
-async function getAsnReader(): Promise<ReaderModel> {
-  if (cachedAsnReader) return cachedAsnReader
+// Structured-log shape. Callers (cron route + CLI scripts) get a single
+// JSON line per emit, ready to drop straight into Vercel's runtime log
+// indexer. Match the pattern src/proxy.ts already uses for
+// tripwire.hit / tripwire.throttled events.
+export interface IngestLogEvent {
+  step: string
+  [field: string]: unknown
+}
+
+async function getAsnReader(log: (e: IngestLogEvent) => void): Promise<ReaderModel> {
+  if (cachedAsnReader) {
+    log({ step: "asn_reader.cached_hit" })
+    return cachedAsnReader
+  }
+  log({ step: "asn_reader.fetch_start" })
+  const t0 = Date.now()
   const file = await get(ASN_BLOB_KEY, { access: "private" })
   if (!file || file.statusCode !== 200) {
     throw new Error(
@@ -42,14 +56,24 @@ async function getAsnReader(): Promise<ReaderModel> {
         `Run scripts/tripwire/sync-geoip-to-blob.ts to populate it.`,
     )
   }
+  const t1 = Date.now()
+  log({ step: "asn_reader.fetch_done", get_ms: t1 - t0 })
   const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
+  const t2 = Date.now()
+  log({ step: "asn_reader.drain_done", drain_ms: t2 - t1, bytes: buf.length })
   cachedAsnReader = Reader.openBuffer(buf)
+  log({ step: "asn_reader.open_done", open_ms: Date.now() - t2 })
   return cachedAsnReader
 }
 
 export interface IngestOptions {
   batchSize?: number
-  onProgress?: (msg: string) => void
+  onProgress?: (event: IngestLogEvent) => void
+  // Stop ingesting (and return what's done so far) when wall-clock crosses
+  // this absolute deadline timestamp (ms since epoch). Lets the cron route
+  // bail before the platform kills it at maxDuration, so each run makes
+  // partial progress instead of timing out with zero inserts.
+  deadlineMs?: number
 }
 
 export interface IngestResult {
@@ -92,7 +116,7 @@ function lookupAsn(reader: ReaderModel, ip: string): AsnLookup {
   }
 }
 
-async function listAllBlobs(log: (msg: string) => void): Promise<{ refs: BlobRef[]; unrecognized: number }> {
+async function listAllBlobs(log: (e: IngestLogEvent) => void): Promise<{ refs: BlobRef[]; unrecognized: number }> {
   const refs: BlobRef[] = []
   let unrecognized = 0
   let cursor: string | undefined
@@ -102,7 +126,7 @@ async function listAllBlobs(log: (msg: string) => void): Promise<{ refs: BlobRef
       const id = idFromPathname(blob.pathname)
       if (!id) {
         unrecognized++
-        log(`skipping unrecognized blob: ${blob.pathname}`)
+        log({ step: "list.unrecognized_blob", pathname: blob.pathname })
         continue
       }
       refs.push({ pathname: blob.pathname, url: blob.url, id })
@@ -112,10 +136,10 @@ async function listAllBlobs(log: (msg: string) => void): Promise<{ refs: BlobRef
   return { refs, unrecognized }
 }
 
-async function fetchEvent(url: string, log: (msg: string) => void): Promise<TripwireEvent | null> {
+async function fetchEvent(url: string, log: (e: IngestLogEvent) => void): Promise<TripwireEvent | null> {
   const file = await get(url, { access: "private" })
   if (!file || file.statusCode !== 200) {
-    log(`fetch ${url} → ${file?.statusCode ?? "no response"}`)
+    log({ step: "fetch_event.bad_status", url, statusCode: file?.statusCode ?? null })
     return null
   }
   const text = await new Response(file.stream).text()
@@ -123,11 +147,11 @@ async function fetchEvent(url: string, log: (msg: string) => void): Promise<Trip
   try {
     parsed = JSON.parse(text)
   } catch {
-    log(`malformed json at ${url}`)
+    log({ step: "fetch_event.malformed_json", url })
     return null
   }
   if (!isTripwireEvent(parsed)) {
-    log(`not a tripwire event: ${url}`)
+    log({ step: "fetch_event.not_tripwire", url })
     return null
   }
   return parsed
@@ -182,19 +206,39 @@ async function insertBatch(rows: schema.NewTripwireEventRow[]): Promise<number> 
 export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestResult> {
   const batchSize = opts.batchSize ?? DEFAULT_BATCH
   const log = opts.onProgress ?? (() => {})
+  const deadlineMs = opts.deadlineMs ?? Number.POSITIVE_INFINITY
+  const overDeadline = () => Date.now() >= deadlineMs
 
-  const reader = await getAsnReader()
+  const reader = await getAsnReader(log)
+
+  const tList = Date.now()
   const { refs, unrecognized } = await listAllBlobs(log)
+  log({ step: "list.done", count: refs.length, list_ms: Date.now() - tList })
+
+  const tDedup = Date.now()
   const allIds = refs.map((r) => r.id)
   const known = await existingIds(allIds)
   const todo = refs.filter((r) => !known.has(r.id))
+  log({ step: "dedup.done", known: known.size, todo: todo.length, dedup_ms: Date.now() - tDedup })
 
   let inserted = 0
   let skipped = 0
+  let bailedAtBatch: number | null = null
   for (let i = 0; i < todo.length; i += batchSize) {
+    const batchN = Math.floor(i / batchSize) + 1
+    if (overDeadline()) {
+      bailedAtBatch = batchN
+      log({ step: "deadline.bail_pre_batch", batch: batchN })
+      break
+    }
     const slice = todo.slice(i, i + batchSize)
+    const tBatch = Date.now()
     const rows: schema.NewTripwireEventRow[] = []
     for (const ref of slice) {
+      if (overDeadline()) {
+        log({ step: "deadline.bail_mid_batch", batch: batchN, partial_rows: rows.length })
+        break
+      }
       const event = await fetchEvent(ref.url, log)
       if (!event) {
         skipped++
@@ -203,8 +247,19 @@ export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestR
       rows.push(rowFromEvent(ref, event, lookupAsn(reader, event.ip)))
     }
     inserted += await insertBatch(rows)
-    log(`batch ${Math.floor(i / batchSize) + 1}: +${rows.length} (running total ${inserted})`)
+    log({
+      step: "batch.done",
+      batch: batchN,
+      rows: rows.length,
+      inserted_total: inserted,
+      batch_ms: Date.now() - tBatch,
+    })
+    if (overDeadline()) {
+      bailedAtBatch = batchN
+      break
+    }
   }
+  if (bailedAtBatch !== null) log({ step: "deadline.partial_run", last_batch: bailedAtBatch })
 
   return {
     listed: refs.length,
