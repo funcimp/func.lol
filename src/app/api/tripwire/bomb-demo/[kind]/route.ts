@@ -3,7 +3,7 @@
 // Browser-safe (~2 MB decompressed) version of the production bombs.
 // Served to the BombDemo client component on /x/tripwire so a visitor
 // can click a button and watch their browser inflate one. Same encoding
-// trick as the production route — the file is precompressed gzip and
+// trick as the production route. The file is precompressed gzip and
 // the response advertises Content-Encoding: gzip so the browser inflates
 // it for free.
 

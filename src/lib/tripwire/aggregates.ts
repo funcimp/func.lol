@@ -3,7 +3,7 @@
 // Page-side data loader for the tripwire stats aggregate. Reads the JSON
 // the cron uploaded to blob; falls back to the bundled fixture in dev /
 // before the first cron has run. Page rendering uses Next.js ISR
-// (`export const revalidate = N`) to cache the rendered HTML — this
+// (`export const revalidate = N`) to cache the rendered HTML. This
 // loader doesn't need its own cache layer.
 
 import { get } from "@vercel/blob"

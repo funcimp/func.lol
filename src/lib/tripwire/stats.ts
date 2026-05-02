@@ -59,7 +59,7 @@ export async function buildAggregates(topPathsLimit: number = DEFAULT_TOP_PATHS)
   `)
   const lifetime = lifetimeResult.rows[0]
   if (!lifetime || lifetime.total_events === 0) {
-    throw new Error("no events in tripwire_events — run ingest first")
+    throw new Error("no events in tripwire_events; run ingest first")
   }
 
   const byCategory = await db.execute<CategoryRow>(sql`

@@ -4,12 +4,13 @@
 // ids already in tripwire_events (PK lookup against the candidate id list),
 // fetches the new ones, enriches each IP with ASN data from the bundled
 // GeoLite2-ASN.mmdb, and bulk-inserts. ON CONFLICT (id) DO NOTHING is the
-// belt to the SELECT's suspenders — the id list could change between the
+// belt to the SELECT's suspenders. The id list could change between the
 // dedup query and the insert if another job ran in parallel.
 //
 // Filename shape from src/proxy.ts: events/<YYYY-MM-DD>/<ms>-<id>.json. The
-// id is everything after the first hyphen and before .json — covers both
-// the new cuid2 form and the older compound ids written by the sync tool.
+// id is everything after the first hyphen and before .json, which covers
+// both the new cuid2 form and the older compound ids written by the sync
+// tool.
 //
 // Pure library: no console.log, no process.exit. Callers (the CLI script
 // and the cron route) decide how to log and surface results.
@@ -62,7 +63,7 @@ function lookupAsn(reader: ReaderModel, ip: string): AsnLookup {
   try {
     result = reader.asn(ip)
   } catch {
-    // Private / unrouted / not-in-db — fall through.
+    // Private / unrouted / not-in-db. Fall through.
   }
   if (!result?.autonomousSystemNumber) return { asn: null, asnName: null }
   return {

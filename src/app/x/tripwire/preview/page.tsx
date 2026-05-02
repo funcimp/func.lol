@@ -14,7 +14,7 @@ import type { Aggregates } from "@/lib/tripwire/stats"
 import { Hero, StatsPanel } from "../_components/StatsPanel"
 
 export const metadata: Metadata = {
-  title: "Tripwire stats — preview",
+  title: "Tripwire stats preview",
   robots: { index: false, follow: false },
 }
 

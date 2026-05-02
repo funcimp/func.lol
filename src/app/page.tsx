@@ -41,6 +41,12 @@ export default function Home() {
         </p>
         <nav className="flex flex-col gap-1">
           <Link
+            href="/x/tripwire"
+            className="font-mono text-[20px] underline hover:opacity-70"
+          >
+            Tripwire
+          </Link>
+          <Link
             href="/x/prime-moments"
             className="font-mono text-[20px] underline hover:opacity-70"
           >

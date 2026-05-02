@@ -6,8 +6,8 @@
 // matching demo route → the browser inflates the response transparently
 // (Content-Encoding: gzip) and we display the resulting size + a clipped
 // preview of the decompressed body. The wire bytes are tiny (kilobytes);
-// the inflated bytes are megabytes — the same trick the production bombs
-// pull on scanners, scaled down so a visitor's tab survives.
+// the inflated bytes are megabytes. It's the same trick the production
+// bombs pull on scanners, scaled down so a visitor's tab survives.
 
 import { useState } from "react"
 import { momentColor } from "./colors"

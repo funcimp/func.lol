@@ -1,11 +1,11 @@
 // src/app/x/tripwire/_components/StatsPanel.tsx
 //
 // Tripwire stats viz. Solid-fill bars throughout in the prime-moments
-// palette (no dither — V2 dither is reserved per DESIGN.md for separate
-// experiments; here color carries the meaning). Each component is data-
-// agnostic and takes its slice of the aggregate as a prop, so the same
-// components render the live blob (production /x/tripwire) and the
-// fixture (preview /x/tripwire/preview).
+// palette (no dither, since V2 dither is reserved per DESIGN.md for
+// separate experiments; here color carries the meaning). Each component
+// is data-agnostic and takes its slice of the aggregate as a prop, so
+// the same components render the live blob (production /x/tripwire)
+// and the fixture (preview /x/tripwire/preview).
 
 import type { Aggregates } from "@/lib/tripwire/stats"
 import {
@@ -15,7 +15,7 @@ import {
   type CategoryColors,
 } from "./colors"
 
-// === Hero — four big numbers in moment colors ===
+// === Hero: four big numbers in moment colors ===
 
 export function Hero({ lifetime }: { lifetime: Aggregates["lifetime"] }) {
   const stats = [
@@ -55,7 +55,7 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
   )
 }
 
-// === Daily activity — solid bars, count printed above so the visual
+// === Daily activity: solid bars, count printed above so the visual
 // encoding is never ambiguous ===
 
 export function DailyActivity({ byDay }: { byDay: Aggregates["byDay"] }) {
@@ -119,7 +119,7 @@ export function DailyActivity({ byDay }: { byDay: Aggregates["byDay"] }) {
   )
 }
 
-// === Categories — stacked proportion bar with legend ===
+// === Categories: stacked proportion bar with legend ===
 
 export function Categories({
   byCategory,
@@ -177,7 +177,7 @@ export function Categories({
   )
 }
 
-// === UA families — solid colored bars ===
+// === UA families: solid colored bars ===
 
 export function UaFamilies({ byUaFamily }: { byUaFamily: Aggregates["byUaFamily"] }) {
   const max = byUaFamily.reduce((m, u) => Math.max(m, u.count), 1)
@@ -216,7 +216,7 @@ export function UaFamilies({ byUaFamily }: { byUaFamily: Aggregates["byUaFamily"
   )
 }
 
-// === Top paths — ranked list with category-colored bar ===
+// === Top paths: ranked list with category-colored bar ===
 
 export function TopPaths({
   topPaths,
@@ -275,7 +275,7 @@ export function TopPaths({
   )
 }
 
-// === ASNs — top N, top 4 colored, rest mono ===
+// === ASNs: top N, top 4 colored, rest mono ===
 
 export function AsnBars({
   byAsn,
