@@ -33,8 +33,13 @@ const ID_LOOKUP_CHUNK = 1000
 
 let cachedAsnReader: ReaderModel | null = null
 
-async function getAsnReader(): Promise<ReaderModel> {
-  if (cachedAsnReader) return cachedAsnReader
+async function getAsnReader(log: (msg: string) => void): Promise<ReaderModel> {
+  if (cachedAsnReader) {
+    log("asn reader: cached hit")
+    return cachedAsnReader
+  }
+  const t0 = Date.now()
+  log("asn reader: fetching blob")
   const file = await get(ASN_BLOB_KEY, { access: "private" })
   if (!file || file.statusCode !== 200) {
     throw new Error(
@@ -42,14 +47,24 @@ async function getAsnReader(): Promise<ReaderModel> {
         `Run scripts/tripwire/sync-geoip-to-blob.ts to populate it.`,
     )
   }
+  const t1 = Date.now()
+  log(`asn reader: get() returned in ${t1 - t0}ms, draining stream`)
   const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
+  const t2 = Date.now()
+  log(`asn reader: drained ${buf.length} bytes in ${t2 - t1}ms, opening`)
   cachedAsnReader = Reader.openBuffer(buf)
+  log(`asn reader: opened in ${Date.now() - t2}ms`)
   return cachedAsnReader
 }
 
 export interface IngestOptions {
   batchSize?: number
   onProgress?: (msg: string) => void
+  // Stop ingesting (and return what's done so far) when wall-clock crosses
+  // this absolute deadline timestamp (ms since epoch). Lets the cron route
+  // bail before the platform kills it at maxDuration, so each run makes
+  // partial progress instead of timing out with zero inserts.
+  deadlineMs?: number
 }
 
 export interface IngestResult {
@@ -182,19 +197,38 @@ async function insertBatch(rows: schema.NewTripwireEventRow[]): Promise<number> 
 export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestResult> {
   const batchSize = opts.batchSize ?? DEFAULT_BATCH
   const log = opts.onProgress ?? (() => {})
+  const deadlineMs = opts.deadlineMs ?? Number.POSITIVE_INFINITY
+  const overDeadline = () => Date.now() >= deadlineMs
 
-  const reader = await getAsnReader()
+  const reader = await getAsnReader(log)
+
+  const tList = Date.now()
   const { refs, unrecognized } = await listAllBlobs(log)
+  log(`list: ${refs.length} blobs in ${Date.now() - tList}ms`)
+
+  const tDedup = Date.now()
   const allIds = refs.map((r) => r.id)
   const known = await existingIds(allIds)
   const todo = refs.filter((r) => !known.has(r.id))
+  log(`dedup: ${known.size} known, ${todo.length} todo in ${Date.now() - tDedup}ms`)
 
   let inserted = 0
   let skipped = 0
+  let bailedAtBatch: number | null = null
   for (let i = 0; i < todo.length; i += batchSize) {
+    if (overDeadline()) {
+      bailedAtBatch = Math.floor(i / batchSize) + 1
+      log(`deadline reached, bailing at batch ${bailedAtBatch}`)
+      break
+    }
     const slice = todo.slice(i, i + batchSize)
+    const tBatch = Date.now()
     const rows: schema.NewTripwireEventRow[] = []
     for (const ref of slice) {
+      if (overDeadline()) {
+        log(`deadline reached mid-batch, flushing partial`)
+        break
+      }
       const event = await fetchEvent(ref.url, log)
       if (!event) {
         skipped++
@@ -203,8 +237,15 @@ export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestR
       rows.push(rowFromEvent(ref, event, lookupAsn(reader, event.ip)))
     }
     inserted += await insertBatch(rows)
-    log(`batch ${Math.floor(i / batchSize) + 1}: +${rows.length} (running total ${inserted})`)
+    log(
+      `batch ${Math.floor(i / batchSize) + 1}: +${rows.length} (running total ${inserted}) in ${Date.now() - tBatch}ms`,
+    )
+    if (overDeadline()) {
+      bailedAtBatch = Math.floor(i / batchSize) + 1
+      break
+    }
   }
+  if (bailedAtBatch !== null) log(`partial run, will resume next invocation`)
 
   return {
     listed: refs.length,

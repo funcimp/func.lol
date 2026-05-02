@@ -12,9 +12,11 @@
 // request that doesn't match. Without this, anyone can hit this URL and
 // drive load against Neon + Blob from the open internet.
 //
-// The .mmdb is bundled with the deploy via outputFileTracingIncludes in
-// next.config.ts. process.cwd() in a Vercel function is the project root,
-// which is where data/GeoLite2-ASN.mmdb lives at deploy time.
+// Time budget: maxDuration is 300s, but ingest gets a 240s deadline so
+// buildAggregates + publishAggregates have headroom to finish even if
+// ingest hits the cap. A partial-progress run is far more useful than a
+// FUNCTION_INVOCATION_TIMEOUT with zero inserts; the next invocation
+// picks up where this one left off (ingestion is dedup'd by event id).
 
 import { NextResponse, type NextRequest } from "next/server"
 import { revalidateTag } from "next/cache"
@@ -24,6 +26,8 @@ import { buildAggregates, publishAggregates } from "@/lib/tripwire/stats"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
+
+const INGEST_BUDGET_MS = 240_000
 
 function unauthorized() {
   return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
@@ -39,10 +43,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (auth !== `Bearer ${secret}`) return unauthorized()
 
   const startedAt = Date.now()
-  const log = (msg: string) => console.log(`[cron/tripwire-stats] ${msg}`)
+  const log = (msg: string) =>
+    console.log(`[cron/tripwire-stats] +${Date.now() - startedAt}ms ${msg}`)
 
   log("ingest starting")
-  const ingest = await ingestNewEvents({ onProgress: log })
+  const ingest = await ingestNewEvents({
+    onProgress: log,
+    deadlineMs: startedAt + INGEST_BUDGET_MS,
+  })
   log(
     `ingest done · listed=${ingest.listed} known=${ingest.alreadyKnown} ` +
       `inserted=${ingest.inserted} skipped=${ingest.skipped}`,
