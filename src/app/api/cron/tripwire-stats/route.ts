@@ -17,6 +17,7 @@
 // which is where data/GeoLite2-ASN.mmdb lives at deploy time.
 
 import { NextResponse, type NextRequest } from "next/server"
+import { revalidateTag } from "next/cache"
 import { ingestNewEvents } from "@/lib/tripwire/ingest"
 import { buildAggregates, publishAggregates } from "@/lib/tripwire/stats"
 
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   log("publish starting")
   await publishAggregates(aggregates)
+  revalidateTag("tripwire-aggregates", "max")
   log("publish done")
 
   return NextResponse.json({

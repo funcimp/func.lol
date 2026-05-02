@@ -7,27 +7,16 @@
 import { put } from "@vercel/blob"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
+import {
+  STATS_BLOB_KEY,
+  DEFAULT_TOP_PATHS,
+  type Aggregates,
+} from "@/lib/tripwire/aggregate-shape"
 
-export const STATS_BLOB_KEY = "stats/tripwire-aggregates.json"
-export const DEFAULT_TOP_PATHS = 100
-
-export interface Aggregates {
-  generatedAt: string
-  lifetime: {
-    totalEvents: number
-    earliestTs: string
-    latestTs: string
-    daysSinceFirst: number
-    distinctIps: number
-    distinctPaths: number
-    distinctAsns: number
-  }
-  byCategory: Array<{ category: string; count: number }>
-  byUaFamily: Array<{ ua: string; count: number }>
-  byDay: Array<{ date: string; count: number }>
-  topPaths: Array<{ path: string; count: number; category?: string }>
-  byAsn: Array<{ asn: string; name: string; count: number }>
-}
+// Re-export so existing callers can keep importing from "@/lib/tripwire/stats".
+// The page-side loader imports STATS_BLOB_KEY straight from aggregate-shape so
+// it never pulls drizzle into the page bundle.
+export { STATS_BLOB_KEY, DEFAULT_TOP_PATHS, type Aggregates }
 
 type LifetimeRow = {
   total_events: number
