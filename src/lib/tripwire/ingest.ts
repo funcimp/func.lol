@@ -2,7 +2,7 @@
 //
 // Bronze → silver. Lists every event under the events/ blob prefix, skips
 // ids already in tripwire_events (PK lookup against the candidate id list),
-// fetches the new ones, enriches each IP with ASN data from the bundled
+// fetches the new ones, enriches each IP with ASN data from
 // GeoLite2-ASN.mmdb, and bulk-inserts. ON CONFLICT (id) DO NOTHING is the
 // belt to the SELECT's suspenders. The id list could change between the
 // dedup query and the insert if another job ran in parallel.
@@ -12,23 +12,43 @@
 // both the new cuid2 form and the older compound ids written by the sync
 // tool.
 //
+// The ASN db lives in blob (geoip/GeoLite2-ASN.mmdb), not in the deploy
+// artifact. Refresh it any time with `bun run scripts/tripwire/sync-geoip-
+// to-blob.ts`; no redeploy needed. The reader is cached at module level
+// so warm Fluid Compute instances reuse it across cron invocations and
+// only the first cold instance pays the ~10MB blob fetch.
+//
 // Pure library: no console.log, no process.exit. Callers (the CLI script
 // and the cron route) decide how to log and surface results.
 
 import { list, get } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { inArray } from "drizzle-orm"
-import { join } from "node:path"
 import { getDb, schema } from "@/db"
 import { isTripwireEvent, type TripwireEvent } from "@/lib/tripwire/patterns"
 
-const ASN_DB_PATH = join(process.cwd(), "data", "GeoLite2-ASN.mmdb")
+const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
 const DEFAULT_BATCH = 200
 const ID_LOOKUP_CHUNK = 1000
 
+let cachedAsnReader: ReaderModel | null = null
+
+async function getAsnReader(): Promise<ReaderModel> {
+  if (cachedAsnReader) return cachedAsnReader
+  const file = await get(ASN_BLOB_KEY, { access: "private" })
+  if (!file || file.statusCode !== 200) {
+    throw new Error(
+      `Failed to fetch ${ASN_BLOB_KEY} from blob (status: ${file?.statusCode ?? "no response"}). ` +
+        `Run scripts/tripwire/sync-geoip-to-blob.ts to populate it.`,
+    )
+  }
+  const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
+  cachedAsnReader = Reader.openBuffer(buf)
+  return cachedAsnReader
+}
+
 export interface IngestOptions {
   batchSize?: number
-  asnDbPath?: string
   onProgress?: (msg: string) => void
 }
 
@@ -161,10 +181,9 @@ async function insertBatch(rows: schema.NewTripwireEventRow[]): Promise<number> 
 
 export async function ingestNewEvents(opts: IngestOptions = {}): Promise<IngestResult> {
   const batchSize = opts.batchSize ?? DEFAULT_BATCH
-  const asnDbPath = opts.asnDbPath ?? ASN_DB_PATH
   const log = opts.onProgress ?? (() => {})
 
-  const reader = await Reader.open(asnDbPath)
+  const reader = await getAsnReader()
   const { refs, unrecognized } = await listAllBlobs(log)
   const allIds = refs.map((r) => r.id)
   const known = await existingIds(allIds)
