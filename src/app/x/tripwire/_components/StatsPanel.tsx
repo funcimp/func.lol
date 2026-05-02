@@ -7,7 +7,7 @@
 // the same components render the live blob (production /x/tripwire)
 // and the fixture (preview /x/tripwire/preview).
 
-import type { Aggregates } from "@/lib/tripwire/stats"
+import type { Aggregates } from "@/lib/tripwire/aggregate-shape"
 import {
   buildCategoryColors,
   categoryColor,

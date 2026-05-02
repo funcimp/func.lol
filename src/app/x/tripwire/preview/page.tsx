@@ -10,7 +10,7 @@ import Link from "next/link"
 
 import ThemeToggle from "@/components/ThemeToggle"
 import fixture from "../_fixtures/aggregates.sample.json"
-import type { Aggregates } from "@/lib/tripwire/stats"
+import type { Aggregates } from "@/lib/tripwire/aggregate-shape"
 import { Hero, StatsPanel } from "../_components/StatsPanel"
 
 export const metadata: Metadata = {

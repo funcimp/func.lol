@@ -8,7 +8,7 @@
 
 import { get } from "@vercel/blob"
 import fixture from "@/app/x/tripwire/_fixtures/aggregates.sample.json"
-import { STATS_BLOB_KEY, type Aggregates } from "@/lib/tripwire/stats"
+import { STATS_BLOB_KEY, type Aggregates } from "@/lib/tripwire/aggregate-shape"
 
 export async function getAggregates(): Promise<Aggregates> {
   try {
