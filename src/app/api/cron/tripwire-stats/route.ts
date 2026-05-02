@@ -20,7 +20,7 @@
 
 import { NextResponse, type NextRequest } from "next/server"
 import { revalidateTag } from "next/cache"
-import { ingestNewEvents } from "@/lib/tripwire/ingest"
+import { ingestNewEvents, type IngestLogEvent } from "@/lib/tripwire/ingest"
 import { buildAggregates, publishAggregates } from "@/lib/tripwire/stats"
 
 export const runtime = "nodejs"
@@ -43,30 +43,40 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (auth !== `Bearer ${secret}`) return unauthorized()
 
   const startedAt = Date.now()
-  const log = (msg: string) =>
-    console.log(`[cron/tripwire-stats] +${Date.now() - startedAt}ms ${msg}`)
+  const emit = (fields: Record<string, unknown>) =>
+    console.log(JSON.stringify({
+      event: "cron.tripwire_stats",
+      elapsed_ms: Date.now() - startedAt,
+      ...fields,
+    }))
+  const onProgress = (e: IngestLogEvent) => emit(e)
 
-  log("ingest starting")
+  emit({ step: "ingest.start" })
   const ingest = await ingestNewEvents({
-    onProgress: log,
+    onProgress,
     deadlineMs: startedAt + INGEST_BUDGET_MS,
   })
-  log(
-    `ingest done · listed=${ingest.listed} known=${ingest.alreadyKnown} ` +
-      `inserted=${ingest.inserted} skipped=${ingest.skipped}`,
-  )
+  emit({
+    step: "ingest.done",
+    listed: ingest.listed,
+    known: ingest.alreadyKnown,
+    inserted: ingest.inserted,
+    skipped: ingest.skipped,
+  })
 
-  log("aggregate starting")
+  emit({ step: "aggregate.start" })
   const aggregates = await buildAggregates()
-  log(
-    `aggregate done · total=${aggregates.lifetime.totalEvents} ` +
-      `ips=${aggregates.lifetime.distinctIps} asns=${aggregates.lifetime.distinctAsns}`,
-  )
+  emit({
+    step: "aggregate.done",
+    total: aggregates.lifetime.totalEvents,
+    ips: aggregates.lifetime.distinctIps,
+    asns: aggregates.lifetime.distinctAsns,
+  })
 
-  log("publish starting")
+  emit({ step: "publish.start" })
   await publishAggregates(aggregates)
   revalidateTag("tripwire-aggregates", "max")
-  log("publish done")
+  emit({ step: "publish.done" })
 
   return NextResponse.json({
     ok: true,
