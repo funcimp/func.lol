@@ -25,6 +25,7 @@ import { list, get } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
+import { streamToBuffer, streamToText } from "@/lib/blob-stream"
 import { isTripwireEvent, type TripwireEvent } from "@/lib/tripwire/patterns"
 
 const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
@@ -58,7 +59,7 @@ async function getAsnReader(log: (e: IngestLogEvent) => void): Promise<ReaderMod
   }
   const t1 = Date.now()
   log({ step: "asn_reader.fetch_done", get_ms: t1 - t0 })
-  const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
+  const buf = await streamToBuffer(file.stream)
   const t2 = Date.now()
   log({ step: "asn_reader.drain_done", drain_ms: t2 - t1, bytes: buf.length })
   cachedAsnReader = Reader.openBuffer(buf)
@@ -142,7 +143,7 @@ async function fetchEvent(url: string, log: (e: IngestLogEvent) => void): Promis
     log({ step: "fetch_event.bad_status", url, statusCode: file?.statusCode ?? null })
     return null
   }
-  const text = await new Response(file.stream).text()
+  const text = await streamToText(file.stream)
   let parsed: unknown
   try {
     parsed = JSON.parse(text)

@@ -25,6 +25,7 @@
 import { get } from "@vercel/blob"
 import { after } from "next/server"
 import fixture from "@/app/x/tripwire/_fixtures/aggregates.sample.json"
+import { streamToText } from "@/lib/blob-stream"
 import { STATS_BLOB_KEY, type Aggregates } from "@/lib/tripwire/aggregate-shape"
 
 const STALE_AFTER_MS = 5 * 60 * 1000
@@ -41,7 +42,7 @@ async function fetchOnce(): Promise<Aggregates | null> {
   try {
     const file = await get(STATS_BLOB_KEY, { access: "private" })
     if (file && file.statusCode === 200) {
-      const text = await new Response(file.stream).text()
+      const text = await streamToText(file.stream)
       return JSON.parse(text) as Aggregates
     }
   } catch (err) {
