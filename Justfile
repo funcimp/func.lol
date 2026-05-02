@@ -15,6 +15,34 @@ tripwire-analyze-404s *args:
 tripwire-build-bombs:
     bun run scripts/tripwire/build-bombs.ts
 
+tripwire-download-geoip *args:
+    bun run scripts/tripwire/download-geoip.ts {{args}}
+
+tripwire-ingest-events *args:
+    bun run scripts/tripwire/ingest-events.ts {{args}}
+
+tripwire-build-stats *args:
+    bun run scripts/tripwire/build-stats.ts {{args}}
+
+# Refresh the GeoIP db (if stale), ingest any new bronze events into Neon,
+# and rebuild the aggregate JSON. Pass --upload to also publish to blob.
+tripwire-update-stats *args:
+    just tripwire-download-geoip
+    just tripwire-ingest-events
+    just tripwire-build-stats {{args}}
+
+# === Database (Drizzle + Neon) ===
+# drizzle-kit doesn't load .env.local on its own, so wrap it in dotenv-cli.
+
+db-generate:
+    bunx dotenv -e .env.local -- bunx drizzle-kit generate
+
+db-migrate:
+    bunx dotenv -e .env.local -- bunx drizzle-kit migrate
+
+db-studio:
+    bunx dotenv -e .env.local -- bunx drizzle-kit studio
+
 # === General dev ===
 
 dev:

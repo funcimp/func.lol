@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
   // otherwise swallow one form before the proxy ever runs, and scanners that
   // do not follow redirects would escape the trap.
   skipTrailingSlashRedirect: true,
+
+  // Bundle the MaxMind ASN db with the cron route's function so
+  // Reader.open() can find it at runtime. Without this, Vercel's tracer
+  // wouldn't pull a non-imported binary file into the deploy.
+  outputFileTracingIncludes: {
+    "/api/cron/tripwire-stats": ["data/GeoLite2-ASN.mmdb"],
+  },
 };
 
 export default nextConfig;

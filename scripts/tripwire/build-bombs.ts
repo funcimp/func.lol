@@ -5,18 +5,26 @@ import path from "node:path"
 import { buildBomb, DEFAULT_PAYLOAD } from "../../src/lib/tripwire/bomb"
 import { BOMB_KINDS } from "../../src/lib/tripwire/patterns"
 
-const PRODUCTION_TARGET = 2_000_000_000 // ~2 GB decompressed
+const PRODUCTION_TARGET = 2_000_000_000 // ~2 GB decompressed (proxy bombs)
+const DEMO_TARGET = 2_000_000          // ~2 MB decompressed (browser-safe demo)
 const PAYLOAD_TEXT = DEFAULT_PAYLOAD
 
 const publicDir = path.join(process.cwd(), "public")
 const cachePath = path.join(publicDir, ".bomb-cache.txt")
 
+function prodFile(kind: string): string {
+  return path.join(publicDir, `.bomb.${kind}.gz`)
+}
+function demoFile(kind: string): string {
+  return path.join(publicDir, `.bomb-demo.${kind}.gz`)
+}
+
 function inputHash(): string {
   const bombSourcePath = path.join(process.cwd(), "src/lib/tripwire/bomb.ts")
   const bombSource = readFileSync(bombSourcePath, "utf8")
   const input = JSON.stringify({
-    version: 1,
-    target: PRODUCTION_TARGET,
+    version: 2,
+    targets: { prod: PRODUCTION_TARGET, demo: DEMO_TARGET },
     payload: PAYLOAD_TEXT,
     kinds: BOMB_KINDS,
     bombSource,
@@ -25,7 +33,22 @@ function inputHash(): string {
 }
 
 function outputsExist(): boolean {
-  return BOMB_KINDS.every((k) => existsSync(path.join(publicDir, `.bomb.${k}.gz`)))
+  return BOMB_KINDS.every((k) => existsSync(prodFile(k)) && existsSync(demoFile(k)))
+}
+
+async function buildOne(kind: string, target: number, outPath: string): Promise<void> {
+  const start = Date.now()
+  const bytes = await buildBomb({
+    kind: kind as (typeof BOMB_KINDS)[number],
+    targetDecompressedBytes: target,
+    payloadText: PAYLOAD_TEXT,
+  })
+  writeFileSync(outPath, bytes)
+  const ratio = (target / bytes.length).toFixed(0)
+  const ms = Date.now() - start
+  console.log(
+    `[tripwire] ${kind} (${(target / 1_000_000).toFixed(0)}MB target): ${bytes.length.toLocaleString()} bytes (${ratio}:1) in ${ms} ms → ${outPath}`,
+  )
 }
 
 async function main() {
@@ -44,19 +67,8 @@ async function main() {
   }
 
   for (const kind of BOMB_KINDS) {
-    const start = Date.now()
-    const bytes = await buildBomb({
-      kind,
-      targetDecompressedBytes: PRODUCTION_TARGET,
-      payloadText: PAYLOAD_TEXT,
-    })
-    const outPath = path.join(publicDir, `.bomb.${kind}.gz`)
-    writeFileSync(outPath, bytes)
-    const ratio = (PRODUCTION_TARGET / bytes.length).toFixed(0)
-    const ms = Date.now() - start
-    console.log(
-      `[tripwire] ${kind}: ${bytes.length.toLocaleString()} bytes (${ratio}:1) in ${ms} ms → ${outPath}`,
-    )
+    await buildOne(kind, PRODUCTION_TARGET, prodFile(kind))
+    await buildOne(kind, DEMO_TARGET, demoFile(kind))
   }
 
   writeFileSync(cachePath, hash + "\n")

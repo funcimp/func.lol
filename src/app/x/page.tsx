@@ -19,6 +19,17 @@ type Lab = {
 
 const labs: Lab[] = [
   {
+    slug: "tripwire",
+    title: "Tripwire",
+    blurb:
+      "An experiment in zip bombing bad actors who ignore robots.txt.",
+    publishedAt: "2026-04-22",
+    links: {
+      github:
+        "https://github.com/funcimp/func.lol/tree/main/research/tripwire",
+    },
+  },
+  {
     slug: "prime-moments",
     title: "Prime Moments",
     blurb:
