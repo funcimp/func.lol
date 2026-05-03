@@ -345,3 +345,82 @@ export function StatsPanel({ aggregates }: { aggregates: Aggregates }) {
     </>
   )
 }
+
+// === Skeletons: structurally mirror the real components so heights
+// match and nothing reflows when live data streams in. animate-pulse
+// + moment-color washes give the "loading" feel without a separate
+// asset or dependency.
+
+const STAT_LABELS = ["scanner attempts", "distinct IPs", "distinct paths", "ASNs"]
+
+export function HeroSkeleton() {
+  return (
+    <section className="mb-12 animate-pulse">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+        {STAT_LABELS.map((label, i) => (
+          <div key={label}>
+            <div
+              aria-hidden="true"
+              className="h-[40px] sm:h-[48px] w-[2.5em] opacity-25"
+              style={{ backgroundColor: momentColor(i) }}
+            />
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-55 mt-2">
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div aria-hidden="true" className="h-[14px] mt-4 w-3/4 bg-current opacity-15" />
+    </section>
+  )
+}
+
+function SectionSkeletonHeader({ title }: { title: string }) {
+  return (
+    <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-3">
+      {title}
+    </h3>
+  )
+}
+
+function BarRowsSkeleton({ rows }: { rows: number }) {
+  return (
+    <ul className="space-y-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li key={i} aria-hidden="true" className="h-[16px] bg-current opacity-10" />
+      ))}
+    </ul>
+  )
+}
+
+export function StatsPanelSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <section className="mb-12">
+        <SectionSkeletonHeader title="daily activity" />
+        <div aria-hidden="true" className="h-[128px] bg-current opacity-10" />
+      </section>
+      <section className="mb-12">
+        <SectionSkeletonHeader title="what they were looking for" />
+        <div aria-hidden="true" className="h-[32px] bg-current opacity-15 mb-3" />
+        <ul className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <li key={i} aria-hidden="true" className="h-[14px] bg-current opacity-10" />
+          ))}
+        </ul>
+      </section>
+      <section className="mb-12">
+        <SectionSkeletonHeader title="ua families" />
+        <BarRowsSkeleton rows={5} />
+      </section>
+      <section className="mb-12">
+        <SectionSkeletonHeader title="most-probed paths" />
+        <BarRowsSkeleton rows={15} />
+      </section>
+      <section className="mb-12">
+        <SectionSkeletonHeader title="where they came from / origin networks (top 10)" />
+        <BarRowsSkeleton rows={10} />
+      </section>
+    </div>
+  )
+}

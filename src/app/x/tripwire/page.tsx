@@ -6,7 +6,12 @@ import { Suspense } from "react"
 import ThemeToggle from "@/components/ThemeToggle"
 import { getAggregates } from "@/lib/tripwire/aggregates"
 import { BombDemo } from "./_components/BombDemo"
-import { Hero, StatsPanel } from "./_components/StatsPanel"
+import {
+  Hero,
+  HeroSkeleton,
+  StatsPanel,
+  StatsPanelSkeleton,
+} from "./_components/StatsPanel"
 
 export const metadata: Metadata = {
   title: "Tripwire",
@@ -67,15 +72,6 @@ async function StatsLive() {
   return <StatsPanel aggregates={aggregates} />
 }
 
-// Layout-holding skeletons so the shell ships with the right vertical
-// space and nothing reflows when the live data streams in.
-function HeroSkeleton() {
-  return <section aria-busy="true" className="mb-12 h-[136px]" />
-}
-
-function StatsSkeleton() {
-  return <div aria-busy="true" className="h-[1100px]" />
-}
 
 export default function TripwirePage() {
   return (
@@ -223,7 +219,7 @@ export default function TripwirePage() {
             Once the trap was running, the next step was obvious. Share
             some of what I&rsquo;ve caught so far.
           </p>
-          <Suspense fallback={<StatsSkeleton />}>
+          <Suspense fallback={<StatsPanelSkeleton />}>
             <StatsLive />
           </Suspense>
         </section>
