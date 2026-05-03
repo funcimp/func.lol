@@ -62,7 +62,12 @@ export function consoleLogger(opts: ConsoleLoggerOptions = {}): Logger {
 }
 
 function readLevel(): Level {
-  const raw = (process.env.LOG_LEVEL ?? "info").toLowerCase()
+  // Default: quiet on production, debug everywhere else (preview, dev).
+  // Crons run identical code in every environment, so a preview deploy
+  // gets the per-step trace without needing a manual env var. LOG_LEVEL
+  // overrides if set explicitly.
+  const fallback = process.env.VERCEL_ENV === "production" ? "info" : "debug"
+  const raw = (process.env.LOG_LEVEL ?? fallback).toLowerCase()
   if (
     raw === "debug" ||
     raw === "info" ||
