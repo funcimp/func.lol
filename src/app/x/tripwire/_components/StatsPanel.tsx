@@ -3,9 +3,7 @@
 // Tripwire stats viz. Solid-fill bars throughout in the prime-moments
 // palette (no dither, since V2 dither is reserved per DESIGN.md for
 // separate experiments; here color carries the meaning). Each component
-// is data-agnostic and takes its slice of the aggregate as a prop, so
-// the same components render the live blob (production /x/tripwire)
-// and the fixture (preview /x/tripwire/preview).
+// is data-agnostic and takes its slice of the aggregate as a prop.
 
 import type { Aggregates } from "@/lib/tripwire/aggregate-shape"
 import {
