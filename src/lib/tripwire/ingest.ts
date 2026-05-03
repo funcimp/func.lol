@@ -11,7 +11,6 @@
 // Pure library: no console.log, no process.exit. Callers (the CLI script
 // and the cron route) decide how to log and surface results.
 
-import { list } from "@vercel/blob"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
 import { log } from "@/lib/log"
@@ -61,6 +60,35 @@ function idFromPathname(pathname: string): string | null {
   return match ? match[2] : null
 }
 
+interface BlobListPage {
+  blobs: Array<{ pathname: string; url: string; size: number; uploadedAt: string }>
+  cursor?: string
+  hasMore: boolean
+}
+
+// Direct call to Vercel Blob's list API. We bypass @vercel/blob's list()
+// for the same reason we bypass get(): the SDK ends in `apiResponse.json()`
+// after the Response object goes out of scope, which under Bun on Vercel
+// can leave the body stream stuck waiting for EOF. By keeping our own
+// Response in scope across the .json() drain, the request completes.
+async function listEventsPage(cursor: string | undefined): Promise<BlobListPage> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
+  const params = new URLSearchParams({ prefix: "events/" })
+  if (cursor) params.set("cursor", cursor)
+  const res = await fetch(`https://vercel.com/api/blob/?${params}`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      "x-api-version": "12",
+    },
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    throw new Error(`blob list failed: ${res.status} ${res.statusText}`)
+  }
+  return (await res.json()) as BlobListPage
+}
+
 async function listAllBlobs(
   log: (e: IngestLogEvent) => void,
 ): Promise<{ refs: BlobRef[]; unrecognized: number }> {
@@ -72,7 +100,7 @@ async function listAllBlobs(
     page++
     const t0 = Date.now()
     ilog.debug({ step: "list.page_start", page, cursor: cursor ?? null })
-    const result = await list({ prefix: "events/", cursor })
+    const result = await listEventsPage(cursor)
     ilog.debug({
       step: "list.page_done",
       page,
