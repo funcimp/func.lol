@@ -11,7 +11,7 @@
 // Pure library: no console.log, no process.exit. Callers (the CLI script
 // and the cron route) decide how to log and surface results.
 
-import { list, get } from "@vercel/blob"
+import { list } from "@vercel/blob"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
 import { log } from "@/lib/log"
@@ -98,20 +98,30 @@ async function fetchEvent(
   url: string,
   log: (e: IngestLogEvent) => void,
 ): Promise<TripwireEvent | null> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
+
+  // Direct fetch instead of @vercel/blob's get(): get() returns
+  // response.body and lets the Response go out of scope, which under
+  // Bun on Vercel can leave the body stream stuck waiting for EOF.
+  // Each event JSON is read once, so no caching.
   const t0 = Date.now()
-  ilog.debug({ step: "fetch_event.get_start", url })
-  const file = await get(url, { access: "private" })
-  ilog.debug({
-    step: "fetch_event.get_done",
-    elapsed_ms: Date.now() - t0,
-    status: file?.statusCode ?? null,
+  ilog.debug({ step: "fetch_event.fetch_start", url })
+  const res = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
   })
-  if (!file || file.statusCode !== 200) {
-    log({ step: "fetch_event.bad_status", url, statusCode: file?.statusCode ?? null })
+  ilog.debug({
+    step: "fetch_event.fetch_done",
+    elapsed_ms: Date.now() - t0,
+    status: res.status,
+  })
+  if (!res.ok) {
+    log({ step: "fetch_event.bad_status", url, statusCode: res.status })
     return null
   }
   const t1 = Date.now()
-  const text = await new Response(file.stream).text()
+  const text = await res.text()
   ilog.debug({
     step: "fetch_event.drain_done",
     elapsed_ms: Date.now() - t1,

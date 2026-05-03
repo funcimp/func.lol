@@ -8,6 +8,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { revalidateTag } from "next/cache"
 import { buildAggregates, publishAggregates } from "@/lib/tripwire/stats"
+import { STATS_BLOB_TAG } from "@/lib/tripwire/aggregate-shape"
 import { checkCronAuth } from "@/lib/cron-helpers"
 import { log } from "@/lib/log"
 
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   cronLog.info({ step: "publish_start" })
   await publishAggregates(aggregates)
-  revalidateTag("tripwire-aggregates", "max")
+  revalidateTag(STATS_BLOB_TAG, "max")
   cronLog.info({ step: "publish_done", elapsed_ms: Date.now() - startedAt })
 
   return NextResponse.json({
