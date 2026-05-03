@@ -11,6 +11,9 @@
 
 import { put } from "@vercel/blob"
 import { gunzipSync } from "node:zlib"
+import { log } from "@/lib/log"
+
+const glog = log.child({ event: "tripwire.sync_geoip" })
 
 const DOWNLOAD_URL =
   "https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz"
@@ -28,8 +31,16 @@ async function downloadTarball(
   licenseKey: string,
 ): Promise<Buffer> {
   const auth = Buffer.from(`${accountId}:${licenseKey}`).toString("base64")
+  const t0 = Date.now()
+  glog.debug({ step: "maxmind.fetch_start", url: DOWNLOAD_URL })
   const res = await fetch(DOWNLOAD_URL, {
     headers: { Authorization: `Basic ${auth}` },
+  })
+  glog.debug({
+    step: "maxmind.fetch_headers",
+    elapsed_ms: Date.now() - t0,
+    status: res.status,
+    content_length: res.headers.get("content-length"),
   })
   if (!res.ok) {
     const body = await res.text().catch(() => "")
@@ -37,7 +48,14 @@ async function downloadTarball(
       `MaxMind download failed: ${res.status} ${res.statusText}. ${body.slice(0, 200)}`,
     )
   }
-  return Buffer.from(await res.arrayBuffer())
+  const t1 = Date.now()
+  const buf = Buffer.from(await res.arrayBuffer())
+  glog.debug({
+    step: "maxmind.fetch_body_done",
+    elapsed_ms: Date.now() - t1,
+    bytes: buf.length,
+  })
+  return buf
 }
 
 // POSIX ustar header. We only need name, size, typeflag, prefix.
@@ -94,14 +112,25 @@ export async function syncGeoipToBlob(): Promise<SyncGeoipResult> {
   }
 
   const tarball = await downloadTarball(accountId, licenseKey)
-  const mmdb = extractFileFromTarGz(tarball, MMDB_NAME)
 
+  const tExtract = Date.now()
+  glog.debug({ step: "extract.start", bytes: tarball.length })
+  const mmdb = extractFileFromTarGz(tarball, MMDB_NAME)
+  glog.debug({
+    step: "extract.done",
+    elapsed_ms: Date.now() - tExtract,
+    mmdb_bytes: mmdb.length,
+  })
+
+  const tPut = Date.now()
+  glog.debug({ step: "blob.put_start", key: ASN_BLOB_KEY, bytes: mmdb.length })
   await put(ASN_BLOB_KEY, mmdb, {
     access: "private",
     contentType: "application/octet-stream",
     addRandomSuffix: false,
     allowOverwrite: true,
   })
+  glog.debug({ step: "blob.put_done", elapsed_ms: Date.now() - tPut })
 
   return {
     tarballBytes: tarball.length,

@@ -15,7 +15,10 @@ import { list, get } from "@vercel/blob"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
 import { streamToText } from "@/lib/blob-stream"
+import { log } from "@/lib/log"
 import { isTripwireEvent, type TripwireEvent } from "@/lib/tripwire/patterns"
+
+const ilog = log.child({ event: "tripwire.ingest" })
 
 const DEFAULT_BATCH = 200
 const ID_LOOKUP_CHUNK = 1000
@@ -65,9 +68,20 @@ async function listAllBlobs(
   const refs: BlobRef[] = []
   let unrecognized = 0
   let cursor: string | undefined
+  let page = 0
   do {
-    const page = await list({ prefix: "events/", cursor })
-    for (const blob of page.blobs) {
+    page++
+    const t0 = Date.now()
+    ilog.debug({ step: "list.page_start", page, cursor: cursor ?? null })
+    const result = await list({ prefix: "events/", cursor })
+    ilog.debug({
+      step: "list.page_done",
+      page,
+      elapsed_ms: Date.now() - t0,
+      blobs: result.blobs.length,
+      has_cursor: Boolean(result.cursor),
+    })
+    for (const blob of result.blobs) {
       const id = idFromPathname(blob.pathname)
       if (!id) {
         unrecognized++
@@ -76,7 +90,7 @@ async function listAllBlobs(
       }
       refs.push({ pathname: blob.pathname, url: blob.url, id })
     }
-    cursor = page.cursor
+    cursor = result.cursor
   } while (cursor)
   return { refs, unrecognized }
 }
@@ -85,12 +99,25 @@ async function fetchEvent(
   url: string,
   log: (e: IngestLogEvent) => void,
 ): Promise<TripwireEvent | null> {
+  const t0 = Date.now()
+  ilog.debug({ step: "fetch_event.get_start", url })
   const file = await get(url, { access: "private" })
+  ilog.debug({
+    step: "fetch_event.get_done",
+    elapsed_ms: Date.now() - t0,
+    status: file?.statusCode ?? null,
+  })
   if (!file || file.statusCode !== 200) {
     log({ step: "fetch_event.bad_status", url, statusCode: file?.statusCode ?? null })
     return null
   }
+  const t1 = Date.now()
   const text = await streamToText(file.stream)
+  ilog.debug({
+    step: "fetch_event.drain_done",
+    elapsed_ms: Date.now() - t1,
+    bytes: text.length,
+  })
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
@@ -131,10 +158,18 @@ async function existingIds(ids: string[]): Promise<Set<string>> {
   const db = getDb()
   for (let i = 0; i < ids.length; i += ID_LOOKUP_CHUNK) {
     const chunk = ids.slice(i, i + ID_LOOKUP_CHUNK)
+    const t0 = Date.now()
+    ilog.debug({ step: "dedup.chunk_start", offset: i, size: chunk.length })
     const rows = await db
       .select({ id: schema.tripwireEvents.id })
       .from(schema.tripwireEvents)
       .where(inArray(schema.tripwireEvents.id, chunk))
+    ilog.debug({
+      step: "dedup.chunk_done",
+      offset: i,
+      elapsed_ms: Date.now() - t0,
+      matched: rows.length,
+    })
     for (const r of rows) out.add(r.id)
   }
   return out
@@ -143,7 +178,10 @@ async function existingIds(ids: string[]): Promise<Set<string>> {
 async function insertBatch(rows: schema.NewTripwireEventRow[]): Promise<number> {
   if (rows.length === 0) return 0
   const db = getDb()
+  const t0 = Date.now()
+  ilog.debug({ step: "insert.start", rows: rows.length })
   await db.insert(schema.tripwireEvents).values(rows).onConflictDoNothing()
+  ilog.debug({ step: "insert.done", rows: rows.length, elapsed_ms: Date.now() - t0 })
   return rows.length
 }
 

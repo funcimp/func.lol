@@ -7,7 +7,8 @@
 
 import { NextResponse, type NextRequest } from "next/server"
 import { syncGeoipToBlob } from "@/lib/tripwire/sync-geoip"
-import { checkCronAuth, makeCronLogger } from "@/lib/cron-helpers"
+import { checkCronAuth } from "@/lib/cron-helpers"
+import { log } from "@/lib/log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -18,11 +19,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError
 
   const startedAt = Date.now()
-  const log = makeCronLogger("cron.tripwire_asn_update", startedAt)
+  const cronLog = log.child({ event: "cron.tripwire_asn_update" })
 
-  log({ step: "start" })
+  cronLog.info({ step: "start" })
   const result = await syncGeoipToBlob()
-  log({ step: "done", ...result })
+  cronLog.info({ step: "done", elapsed_ms: Date.now() - startedAt, ...result })
 
   return NextResponse.json({
     ok: true,
