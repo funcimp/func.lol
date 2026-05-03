@@ -14,7 +14,6 @@
 import { list, get } from "@vercel/blob"
 import { inArray } from "drizzle-orm"
 import { getDb, schema } from "@/db"
-import { streamToText } from "@/lib/blob-stream"
 import { log } from "@/lib/log"
 import { isTripwireEvent, type TripwireEvent } from "@/lib/tripwire/patterns"
 
@@ -112,7 +111,7 @@ async function fetchEvent(
     return null
   }
   const t1 = Date.now()
-  const text = await streamToText(file.stream)
+  const text = await new Response(file.stream).text()
   ilog.debug({
     step: "fetch_event.drain_done",
     elapsed_ms: Date.now() - t1,

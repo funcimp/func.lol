@@ -11,7 +11,6 @@
 // failure is better than silently lying about freshness.
 
 import { get } from "@vercel/blob"
-import { streamToText } from "@/lib/blob-stream"
 import { STATS_BLOB_KEY, type Aggregates } from "@/lib/tripwire/aggregate-shape"
 
 const TTL_MS = 2 * 60 * 1000
@@ -28,7 +27,7 @@ export async function getAggregates(): Promise<Aggregates> {
       `blob get failed (status ${file?.statusCode ?? "no response"})`,
     )
   }
-  const text = await streamToText(file.stream)
+  const text = await new Response(file.stream).text()
   const data = JSON.parse(text) as Aggregates
   cached = { data, fetchedAt: Date.now() }
   return data

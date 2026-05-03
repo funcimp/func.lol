@@ -15,7 +15,6 @@ import { get, put } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
-import { streamToBuffer } from "@/lib/blob-stream"
 import { log } from "@/lib/log"
 import {
   STATS_BLOB_KEY,
@@ -54,7 +53,7 @@ async function getAsnReader(): Promise<ReaderModel> {
   }
   const t1 = Date.now()
   slog.debug({ step: "asn.stream_to_buffer_start" })
-  const buf = await streamToBuffer(file.stream)
+  const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
   slog.debug({
     step: "asn.stream_to_buffer_done",
     elapsed_ms: Date.now() - t1,
