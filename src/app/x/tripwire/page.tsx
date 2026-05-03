@@ -4,13 +4,9 @@ import Link from "next/link"
 import { Suspense } from "react"
 
 import ThemeToggle from "@/components/ThemeToggle"
-import fixture from "@/app/x/tripwire/_fixtures/aggregates.sample.json"
-import type { Aggregates } from "@/lib/tripwire/aggregate-shape"
 import { getAggregates } from "@/lib/tripwire/aggregates"
 import { BombDemo } from "./_components/BombDemo"
 import { Hero, StatsPanel } from "./_components/StatsPanel"
-
-const FIXTURE = fixture as Aggregates
 
 export const metadata: Metadata = {
   title: "Tripwire",
@@ -18,11 +14,10 @@ export const metadata: Metadata = {
     "An experiment in zip bombing bad actors who ignore robots.txt.",
 }
 
-// ISR: the stats blob is refreshed by the hourly cron at
-// /api/cron/tripwire-stats. 5-minute revalidate gives stale-while-
-// revalidate semantics. High-traffic pages re-render against the
-// freshest blob in the background; low-traffic pages still see fresh
-// data thanks to the cron.
+// ISR caches the rendered HTML at the edge for 5 minutes. The
+// build-stats cron writes the analytics blob every 15 minutes, so
+// total worst-case staleness from "scanner hits bait" → "user sees it"
+// is one cron interval (15m) plus the ISR window (5m) = ~20m.
 export const revalidate = 300
 
 // IPs are RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24,
@@ -72,6 +67,16 @@ async function StatsLive() {
   return <StatsPanel aggregates={aggregates} />
 }
 
+// Layout-holding skeletons so the shell ships with the right vertical
+// space and nothing reflows when the live data streams in.
+function HeroSkeleton() {
+  return <section aria-busy="true" className="mb-12 h-[136px]" />
+}
+
+function StatsSkeleton() {
+  return <div aria-busy="true" className="h-[1100px]" />
+}
+
 export default function TripwirePage() {
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
@@ -95,7 +100,7 @@ export default function TripwirePage() {
           </p>
         </header>
 
-        <Suspense fallback={<Hero lifetime={FIXTURE.lifetime} />}>
+        <Suspense fallback={<HeroSkeleton />}>
           <HeroLive />
         </Suspense>
 
@@ -218,7 +223,7 @@ export default function TripwirePage() {
             Once the trap was running, the next step was obvious. Share
             some of what I&rsquo;ve caught so far.
           </p>
-          <Suspense fallback={<StatsPanel aggregates={FIXTURE} />}>
+          <Suspense fallback={<StatsSkeleton />}>
             <StatsLive />
           </Suspense>
         </section>
