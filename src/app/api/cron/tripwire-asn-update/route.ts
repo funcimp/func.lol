@@ -6,8 +6,10 @@
 // whatever ASN db is currently in blob.
 
 import { NextResponse, type NextRequest } from "next/server"
-import { syncGeoipToBlob } from "@/lib/tripwire/sync-geoip"
-import { checkCronAuth, makeCronLogger } from "@/lib/cron-helpers"
+import { revalidateTag } from "next/cache"
+import { syncGeoipToBlob, ASN_BLOB_TAG } from "@/lib/tripwire/sync-geoip"
+import { checkCronAuth } from "@/lib/cron-helpers"
+import { log } from "@/lib/log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -18,11 +20,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError
 
   const startedAt = Date.now()
-  const log = makeCronLogger("cron.tripwire_asn_update", startedAt)
+  const cronLog = log.child({ event: "cron.tripwire_asn_update" })
 
-  log({ step: "start" })
+  cronLog.info({ step: "start" })
   const result = await syncGeoipToBlob()
-  log({ step: "done", ...result })
+  // Invalidate the build-stats fetch cache so the next build-stats run
+  // picks up the freshly-uploaded mmdb instead of serving the stale one.
+  revalidateTag(ASN_BLOB_TAG, "max")
+  cronLog.info({ step: "done", elapsed_ms: Date.now() - startedAt, ...result })
 
   return NextResponse.json({
     ok: true,

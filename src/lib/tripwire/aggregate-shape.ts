@@ -8,6 +8,10 @@
 // before this split.
 
 export const STATS_BLOB_KEY = "stats/tripwire-aggregates.json"
+// Next.js fetch-cache tag. The page-side loader fetches with this tag;
+// the build-stats cron calls revalidateTag after a successful publish,
+// so warm pages flip to fresh aggregates without polling on a TTL.
+export const STATS_BLOB_TAG = "tripwire-aggregates"
 export const DEFAULT_TOP_PATHS = 100
 
 export interface Aggregates {

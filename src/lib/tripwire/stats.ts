@@ -11,18 +11,19 @@
 // it across cron invocations and only the first cold instance pays the
 // ~10MB blob fetch.
 
-import { get, put } from "@vercel/blob"
+import { head, put } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
-import { streamToBuffer } from "@/lib/blob-stream"
+import { log } from "@/lib/log"
+import { ASN_BLOB_KEY, ASN_BLOB_TAG } from "@/lib/tripwire/sync-geoip"
 import {
   STATS_BLOB_KEY,
   DEFAULT_TOP_PATHS,
   type Aggregates,
 } from "@/lib/tripwire/aggregate-shape"
 
-const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
+const slog = log.child({ event: "tripwire.stats" })
 
 // Re-export so existing callers can keep importing from "@/lib/tripwire/stats".
 // The page-side loader imports STATS_BLOB_KEY straight from aggregate-shape so
@@ -32,16 +33,51 @@ export { STATS_BLOB_KEY, DEFAULT_TOP_PATHS, type Aggregates }
 let cachedAsnReader: ReaderModel | null = null
 
 async function getAsnReader(): Promise<ReaderModel> {
-  if (cachedAsnReader) return cachedAsnReader
-  const file = await get(ASN_BLOB_KEY, { access: "private" })
-  if (!file || file.statusCode !== 200) {
+  if (cachedAsnReader) {
+    slog.debug({ step: "asn.cache_hit" })
+    return cachedAsnReader
+  }
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
+
+  // head() resolves the (stable) blob URL for the pathname. The body is
+  // small JSON metadata, so it doesn't trip the large-body stream hang we
+  // hit when calling get() on the 12MB mmdb directly.
+  const tHead = Date.now()
+  slog.debug({ step: "asn.head_start", key: ASN_BLOB_KEY })
+  const meta = await head(ASN_BLOB_KEY)
+  slog.debug({ step: "asn.head_done", elapsed_ms: Date.now() - tHead, url: meta.url })
+
+  // Direct fetch with the bearer token, tagged for the Next.js data cache.
+  // tripwire-asn-update calls revalidateTag(ASN_BLOB_TAG) after a fresh put,
+  // so we only pay for the 12MB drain when the mmdb actually changed.
+  const tFetch = Date.now()
+  slog.debug({ step: "asn.fetch_start" })
+  const res = await fetch(meta.url, {
+    headers: { authorization: `Bearer ${token}` },
+    next: { tags: [ASN_BLOB_TAG] },
+  })
+  slog.debug({
+    step: "asn.fetch_done",
+    elapsed_ms: Date.now() - tFetch,
+    status: res.status,
+    cache: res.headers.get("x-vercel-cache"),
+  })
+  if (!res.ok) {
     throw new Error(
-      `Failed to fetch ${ASN_BLOB_KEY} from blob (status: ${file?.statusCode ?? "no response"}). ` +
+      `Failed to fetch ${ASN_BLOB_KEY} (status: ${res.status} ${res.statusText}). ` +
         `Run the tripwire-asn-update cron / sync-geoip-to-blob.ts to populate it.`,
     )
   }
-  const buf = await streamToBuffer(file.stream)
+
+  const tBuf = Date.now()
+  slog.debug({ step: "asn.array_buffer_start" })
+  const buf = Buffer.from(await res.arrayBuffer())
+  slog.debug({ step: "asn.array_buffer_done", elapsed_ms: Date.now() - tBuf, bytes: buf.length })
+
+  const tOpen = Date.now()
   cachedAsnReader = Reader.openBuffer(buf)
+  slog.debug({ step: "asn.reader_open_done", elapsed_ms: Date.now() - tOpen })
   return cachedAsnReader
 }
 
@@ -83,6 +119,8 @@ export async function buildAggregates(
 ): Promise<Aggregates> {
   const db = getDb()
 
+  const tQ1 = Date.now()
+  slog.debug({ step: "sql.lifetime.start" })
   const lifetimeResult = await db.execute<LifetimeRow>(sql`
     SELECT
       COUNT(*)::int             AS total_events,
@@ -92,11 +130,14 @@ export async function buildAggregates(
       COUNT(DISTINCT path)::int AS distinct_paths
     FROM tripwire_events
   `)
+  slog.debug({ step: "sql.lifetime.done", elapsed_ms: Date.now() - tQ1 })
   const lifetime = lifetimeResult.rows[0]
   if (!lifetime || lifetime.total_events === 0) {
     throw new Error("no events in tripwire_events; run ingest first")
   }
 
+  const tQ2 = Date.now()
+  slog.debug({ step: "sql.byCategory.start" })
   const byCategory = await db.execute<CategoryRow>(sql`
     SELECT category, COUNT(*)::int AS count
     FROM tripwire_events
@@ -104,14 +145,20 @@ export async function buildAggregates(
     GROUP BY category
     ORDER BY count DESC, category ASC
   `)
+  slog.debug({ step: "sql.byCategory.done", elapsed_ms: Date.now() - tQ2, rows: byCategory.rows.length })
 
+  const tQ3 = Date.now()
+  slog.debug({ step: "sql.byUaFamily.start" })
   const byUaFamily = await db.execute<UaRow>(sql`
     SELECT COALESCE(ua_family, 'unknown') AS ua, COUNT(*)::int AS count
     FROM tripwire_events
     GROUP BY ua
     ORDER BY count DESC, ua ASC
   `)
+  slog.debug({ step: "sql.byUaFamily.done", elapsed_ms: Date.now() - tQ3, rows: byUaFamily.rows.length })
 
+  const tQ4 = Date.now()
+  slog.debug({ step: "sql.byDay.start" })
   const byDay = await db.execute<DayRow>(sql`
     SELECT TO_CHAR(ts AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
            COUNT(*)::int AS count
@@ -119,7 +166,10 @@ export async function buildAggregates(
     GROUP BY date
     ORDER BY date ASC
   `)
+  slog.debug({ step: "sql.byDay.done", elapsed_ms: Date.now() - tQ4, rows: byDay.rows.length })
 
+  const tQ5 = Date.now()
+  slog.debug({ step: "sql.topPaths.start", limit: topPathsLimit })
   const topPaths = await db.execute<PathRow>(sql`
     SELECT path,
            COUNT(*)::int AS count,
@@ -129,19 +179,27 @@ export async function buildAggregates(
     ORDER BY count DESC, path ASC
     LIMIT ${topPathsLimit}
   `)
+  slog.debug({ step: "sql.topPaths.done", elapsed_ms: Date.now() - tQ5, rows: topPaths.rows.length })
 
   // ASN enrichment at query time: fold each event's IP through the mmdb
   // and roll up. Lifetime.distinctAsns is computed from the rolled-up map
   // rather than from a SQL DISTINCT — the column-stored value is no
   // longer the source of truth for ASN since we stopped writing it during
   // ingest.
+  const tQ6 = Date.now()
+  slog.debug({ step: "sql.ipCounts.start" })
   const ipCountsResult = await db.execute<IpCountRow>(sql`
     SELECT ip, COUNT(*)::int AS count
     FROM tripwire_events
     WHERE ip IS NOT NULL AND ip <> ''
     GROUP BY ip
   `)
+  slog.debug({ step: "sql.ipCounts.done", elapsed_ms: Date.now() - tQ6, rows: ipCountsResult.rows.length })
+
   const reader = await getAsnReader()
+
+  const tEnrich = Date.now()
+  slog.debug({ step: "asn.enrich.start", ips: ipCountsResult.rows.length })
   const asnTotals = new Map<string, { name: string; count: number }>()
   for (const row of ipCountsResult.rows) {
     const lookup = lookupAsn(reader, row.ip)
@@ -153,6 +211,11 @@ export async function buildAggregates(
   const byAsn = [...asnTotals.entries()]
     .map(([asn, v]) => ({ asn, name: v.name, count: v.count }))
     .sort((a, b) => (b.count - a.count) || a.asn.localeCompare(b.asn))
+  slog.debug({
+    step: "asn.enrich.done",
+    elapsed_ms: Date.now() - tEnrich,
+    asns: byAsn.length,
+  })
 
   const earliestDate = new Date(lifetime.earliest_ts)
   const daysSinceFirst = Math.max(
@@ -184,10 +247,14 @@ export async function buildAggregates(
 }
 
 export async function publishAggregates(agg: Aggregates): Promise<void> {
-  await put(STATS_BLOB_KEY, JSON.stringify(agg, null, 2), {
+  const body = JSON.stringify(agg, null, 2)
+  const t0 = Date.now()
+  slog.debug({ step: "publish.put_start", key: STATS_BLOB_KEY, bytes: body.length })
+  await put(STATS_BLOB_KEY, body, {
     access: "private",
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
   })
+  slog.debug({ step: "publish.put_done", elapsed_ms: Date.now() - t0 })
 }

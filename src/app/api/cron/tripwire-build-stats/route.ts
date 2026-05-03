@@ -8,7 +8,9 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { revalidateTag } from "next/cache"
 import { buildAggregates, publishAggregates } from "@/lib/tripwire/stats"
-import { checkCronAuth, makeCronLogger } from "@/lib/cron-helpers"
+import { STATS_BLOB_TAG } from "@/lib/tripwire/aggregate-shape"
+import { checkCronAuth } from "@/lib/cron-helpers"
+import { log } from "@/lib/log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -19,21 +21,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError
 
   const startedAt = Date.now()
-  const log = makeCronLogger("cron.tripwire_build_stats", startedAt)
+  const cronLog = log.child({ event: "cron.tripwire_build_stats" })
 
-  log({ step: "build_start" })
+  cronLog.info({ step: "build_start" })
   const aggregates = await buildAggregates()
-  log({
+  cronLog.info({
     step: "build_done",
+    elapsed_ms: Date.now() - startedAt,
     total: aggregates.lifetime.totalEvents,
     ips: aggregates.lifetime.distinctIps,
     asns: aggregates.lifetime.distinctAsns,
   })
 
-  log({ step: "publish_start" })
+  cronLog.info({ step: "publish_start" })
   await publishAggregates(aggregates)
-  revalidateTag("tripwire-aggregates", "max")
-  log({ step: "publish_done" })
+  revalidateTag(STATS_BLOB_TAG, "max")
+  cronLog.info({ step: "publish_done", elapsed_ms: Date.now() - startedAt })
 
   return NextResponse.json({
     ok: true,
