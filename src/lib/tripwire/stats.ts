@@ -11,7 +11,7 @@
 // it across cron invocations and only the first cold instance pays the
 // ~10MB blob fetch.
 
-import { head, put } from "@vercel/blob"
+import { put } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
@@ -32,6 +32,16 @@ export { STATS_BLOB_KEY, DEFAULT_TOP_PATHS, type Aggregates }
 
 let cachedAsnReader: ReaderModel | null = null
 
+// Token format is `vercel_blob_rw_<storeId>_<rest>`. The SDK does the
+// same split internally to construct private blob URLs.
+function privateBlobUrl(pathname: string, token: string): string {
+  const storeId = token.split("_")[3]
+  if (!storeId) {
+    throw new Error("could not extract store id from BLOB_READ_WRITE_TOKEN")
+  }
+  return `https://${storeId}.private.blob.vercel-storage.com/${pathname}`
+}
+
 async function getAsnReader(): Promise<ReaderModel> {
   if (cachedAsnReader) {
     slog.debug({ step: "asn.cache_hit" })
@@ -40,20 +50,14 @@ async function getAsnReader(): Promise<ReaderModel> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
 
-  // head() resolves the (stable) blob URL for the pathname. The body is
-  // small JSON metadata, so it doesn't trip the large-body stream hang we
-  // hit when calling get() on the 12MB mmdb directly.
-  const tHead = Date.now()
-  slog.debug({ step: "asn.head_start", key: ASN_BLOB_KEY })
-  const meta = await head(ASN_BLOB_KEY)
-  slog.debug({ step: "asn.head_done", elapsed_ms: Date.now() - tHead, url: meta.url })
-
   // Direct fetch with the bearer token, tagged for the Next.js data cache.
   // tripwire-asn-update calls revalidateTag(ASN_BLOB_TAG) after a fresh put,
   // so we only pay for the 12MB drain when the mmdb actually changed.
+  // We bypass @vercel/blob's head() because it goes through the SDK's
+  // body-drain pattern that hangs on Bun-on-Vercel.
   const tFetch = Date.now()
-  slog.debug({ step: "asn.fetch_start" })
-  const res = await fetch(meta.url, {
+  slog.debug({ step: "asn.fetch_start", key: ASN_BLOB_KEY })
+  const res = await fetch(privateBlobUrl(ASN_BLOB_KEY, token), {
     headers: { authorization: `Bearer ${token}` },
     next: { tags: [ASN_BLOB_TAG] },
   })

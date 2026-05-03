@@ -11,11 +11,17 @@
 // instance without crossing the network at all. Stale data is fine for
 // up to 2 minutes — the cron only runs every 15.
 //
+// We bypass @vercel/blob's head()/get() entirely. The SDK ends every
+// API call with `await apiResponse.json()` after its internal Response
+// goes out of scope, which under Bun on Vercel can leave the body
+// stream stuck waiting for EOF. We construct the blob URL ourselves
+// from BLOB_READ_WRITE_TOKEN's storeId and call fetch directly so the
+// Response stays in scope across the .json() drain.
+//
 // On any fetch error we throw — `src/app/x/tripwire/error.tsx` surfaces
 // a retry button. We deliberately don't fall back to stale data; a hard
 // failure is better than silently lying about freshness.
 
-import { head } from "@vercel/blob"
 import {
   STATS_BLOB_KEY,
   STATS_BLOB_TAG,
@@ -26,6 +32,16 @@ const TTL_MS = 2 * 60 * 1000
 
 let cached: { data: Aggregates; fetchedAt: number } | null = null
 
+// Token format is `vercel_blob_rw_<storeId>_<rest>`. The SDK does the
+// same split internally to construct private blob URLs.
+function privateBlobUrl(pathname: string, token: string): string {
+  const storeId = token.split("_")[3]
+  if (!storeId) {
+    throw new Error("could not extract store id from BLOB_READ_WRITE_TOKEN")
+  }
+  return `https://${storeId}.private.blob.vercel-storage.com/${pathname}`
+}
+
 export async function getAggregates(): Promise<Aggregates> {
   if (cached && Date.now() - cached.fetchedAt < TTL_MS) {
     return cached.data
@@ -33,8 +49,7 @@ export async function getAggregates(): Promise<Aggregates> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
 
-  const meta = await head(STATS_BLOB_KEY)
-  const res = await fetch(meta.url, {
+  const res = await fetch(privateBlobUrl(STATS_BLOB_KEY, token), {
     headers: { authorization: `Bearer ${token}` },
     next: { tags: [STATS_BLOB_TAG] },
   })

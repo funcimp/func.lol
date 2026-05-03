@@ -5,6 +5,7 @@ import { Suspense } from "react"
 
 import ThemeToggle from "@/components/ThemeToggle"
 import { getAggregates } from "@/lib/tripwire/aggregates"
+import type { Aggregates } from "@/lib/tripwire/aggregate-shape"
 import { BombDemo } from "./_components/BombDemo"
 import {
   Hero,
@@ -59,21 +60,25 @@ function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   )
 }
 
-// Async leaves: the blob fetch happens here, suspended out of the page
-// shell so the response streams immediately and the numbers stream in
-// when the fetch resolves.
-async function HeroLive() {
-  const aggregates = await getAggregates()
-  return <Hero lifetime={aggregates.lifetime} />
+// Async leaves: each one awaits a shared promise that the page kicks
+// off (without awaiting) so the page shell streams immediately, the
+// fetch happens exactly once, and both Suspense boundaries reveal
+// when the data lands. Calling getAggregates() inside each leaf
+// independently used to race on a cold module cache and one of the
+// SDK calls would hang, leaving its boundary stuck on the skeleton.
+async function HeroLive({ aggregates }: { aggregates: Promise<Aggregates> }) {
+  const data = await aggregates
+  return <Hero lifetime={data.lifetime} />
 }
 
-async function StatsLive() {
-  const aggregates = await getAggregates()
-  return <StatsPanel aggregates={aggregates} />
+async function StatsLive({ aggregates }: { aggregates: Promise<Aggregates> }) {
+  const data = await aggregates
+  return <StatsPanel aggregates={data} />
 }
 
 
 export default function TripwirePage() {
+  const aggregates = getAggregates()
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
       <div className="mx-auto max-w-[720px]">
@@ -97,7 +102,7 @@ export default function TripwirePage() {
         </header>
 
         <Suspense fallback={<HeroSkeleton />}>
-          <HeroLive />
+          <HeroLive aggregates={aggregates} />
         </Suspense>
 
         <article className="prose-hyphens text-[16px] leading-[1.65]">
@@ -220,7 +225,7 @@ export default function TripwirePage() {
             some of what I&rsquo;ve caught so far.
           </p>
           <Suspense fallback={<StatsPanelSkeleton />}>
-            <StatsLive />
+            <StatsLive aggregates={aggregates} />
           </Suspense>
         </section>
 
