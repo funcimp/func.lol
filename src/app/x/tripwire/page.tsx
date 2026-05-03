@@ -1,11 +1,17 @@
 // src/app/x/tripwire/page.tsx
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Suspense } from "react"
 
 import ThemeToggle from "@/components/ThemeToggle"
 import { getAggregates } from "@/lib/tripwire/aggregates"
 import { BombDemo } from "./_components/BombDemo"
-import { Hero, StatsPanel } from "./_components/StatsPanel"
+import {
+  Hero,
+  HeroSkeleton,
+  StatsPanel,
+  StatsPanelSkeleton,
+} from "./_components/StatsPanel"
 
 export const metadata: Metadata = {
   title: "Tripwire",
@@ -13,11 +19,10 @@ export const metadata: Metadata = {
     "An experiment in zip bombing bad actors who ignore robots.txt.",
 }
 
-// ISR: the stats blob is refreshed by the hourly cron at
-// /api/cron/tripwire-stats. 5-minute revalidate gives stale-while-
-// revalidate semantics. High-traffic pages re-render against the
-// freshest blob in the background; low-traffic pages still see fresh
-// data thanks to the cron.
+// ISR caches the rendered HTML at the edge for 5 minutes. The
+// build-stats cron writes the analytics blob every 15 minutes, so
+// total worst-case staleness from "scanner hits bait" → "user sees it"
+// is one cron interval (15m) plus the ISR window (5m) = ~20m.
 export const revalidate = 300
 
 // IPs are RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24,
@@ -54,8 +59,21 @@ function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   )
 }
 
-export default async function TripwirePage() {
+// Async leaves: the blob fetch happens here, suspended out of the page
+// shell so the response streams immediately and the numbers stream in
+// when the fetch resolves.
+async function HeroLive() {
   const aggregates = await getAggregates()
+  return <Hero lifetime={aggregates.lifetime} />
+}
+
+async function StatsLive() {
+  const aggregates = await getAggregates()
+  return <StatsPanel aggregates={aggregates} />
+}
+
+
+export default function TripwirePage() {
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
       <div className="mx-auto max-w-[720px]">
@@ -78,7 +96,9 @@ export default async function TripwirePage() {
           </p>
         </header>
 
-        <Hero lifetime={aggregates.lifetime} />
+        <Suspense fallback={<HeroSkeleton />}>
+          <HeroLive />
+        </Suspense>
 
         <article className="prose-hyphens text-[16px] leading-[1.65]">
           <section className="mb-9">
@@ -199,7 +219,9 @@ export default async function TripwirePage() {
             Once the trap was running, the next step was obvious. Share
             some of what I&rsquo;ve caught so far.
           </p>
-          <StatsPanel aggregates={aggregates} />
+          <Suspense fallback={<StatsPanelSkeleton />}>
+            <StatsLive />
+          </Suspense>
         </section>
 
         <article className="prose-hyphens text-[16px] leading-[1.65]">
