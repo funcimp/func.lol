@@ -4,6 +4,7 @@ import { gzipSync } from "node:zlib"
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs"
 import path from "node:path"
 import * as nextServer from "next/server"
+import * as realBlob from "@vercel/blob"
 
 const { NextRequest } = nextServer
 
@@ -24,7 +25,11 @@ interface PutCall {
 }
 const putCalls: PutCall[] = []
 
+// Spread real @vercel/blob exports so the mocked module keeps the same
+// shape as the real one (other test files import list/get/etc. — if we
+// only ship `put` here, those imports break when this re-mock runs).
 mock.module("@vercel/blob", () => ({
+  ...realBlob,
   put: async (pathname: string, body: string, options: Record<string, unknown>) => {
     putCalls.push({ pathname, body, options })
     return { url: `https://blob.example/${pathname}`, pathname }
@@ -168,8 +173,10 @@ describe("proxy", () => {
     })
 
     test("blob put failure is caught, doesn't break the bomb response", async () => {
-      // Re-mock to throw on this test only.
+      // Re-mock to throw on this test only. Spread real exports to keep
+      // the module shape stable for other test files.
       mock.module("@vercel/blob", () => ({
+        ...realBlob,
         put: async () => {
           throw new Error("simulated blob outage")
         },
@@ -186,6 +193,7 @@ describe("proxy", () => {
 
       // Restore the capturing mock for subsequent tests.
       mock.module("@vercel/blob", () => ({
+        ...realBlob,
         put: async (pathname: string, body: string, options: Record<string, unknown>) => {
           putCalls.push({ pathname, body, options })
           return { url: `https://blob.example/${pathname}`, pathname }
