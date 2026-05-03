@@ -18,6 +18,10 @@ const glog = log.child({ event: "tripwire.sync_geoip" })
 const DOWNLOAD_URL =
   "https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz"
 export const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
+// Next.js fetch-cache tag. Build-stats fetches the mmdb with this tag;
+// this cron calls revalidateTag after a successful upload, so subsequent
+// build-stats runs get the new mmdb without paying for the 12MB drain.
+export const ASN_BLOB_TAG = "asn-mmdb"
 const MMDB_NAME = "GeoLite2-ASN.mmdb"
 
 export interface SyncGeoipResult {

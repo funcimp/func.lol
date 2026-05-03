@@ -11,11 +11,12 @@
 // it across cron invocations and only the first cold instance pays the
 // ~10MB blob fetch.
 
-import { get, put } from "@vercel/blob"
+import { head, put } from "@vercel/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
 import { log } from "@/lib/log"
+import { ASN_BLOB_KEY, ASN_BLOB_TAG } from "@/lib/tripwire/sync-geoip"
 import {
   STATS_BLOB_KEY,
   DEFAULT_TOP_PATHS,
@@ -23,7 +24,6 @@ import {
 } from "@/lib/tripwire/aggregate-shape"
 
 const slog = log.child({ event: "tripwire.stats" })
-const ASN_BLOB_KEY = "geoip/GeoLite2-ASN.mmdb"
 
 // Re-export so existing callers can keep importing from "@/lib/tripwire/stats".
 // The page-side loader imports STATS_BLOB_KEY straight from aggregate-shape so
@@ -37,31 +37,47 @@ async function getAsnReader(): Promise<ReaderModel> {
     slog.debug({ step: "asn.cache_hit" })
     return cachedAsnReader
   }
-  const t0 = Date.now()
-  slog.debug({ step: "asn.blob_get_start", key: ASN_BLOB_KEY })
-  const file = await get(ASN_BLOB_KEY, { access: "private" })
-  slog.debug({
-    step: "asn.blob_get_done",
-    elapsed_ms: Date.now() - t0,
-    status: file?.statusCode ?? null,
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
+
+  // head() resolves the (stable) blob URL for the pathname. The body is
+  // small JSON metadata, so it doesn't trip the large-body stream hang we
+  // hit when calling get() on the 12MB mmdb directly.
+  const tHead = Date.now()
+  slog.debug({ step: "asn.head_start", key: ASN_BLOB_KEY })
+  const meta = await head(ASN_BLOB_KEY)
+  slog.debug({ step: "asn.head_done", elapsed_ms: Date.now() - tHead, url: meta.url })
+
+  // Direct fetch with the bearer token, tagged for the Next.js data cache.
+  // tripwire-asn-update calls revalidateTag(ASN_BLOB_TAG) after a fresh put,
+  // so we only pay for the 12MB drain when the mmdb actually changed.
+  const tFetch = Date.now()
+  slog.debug({ step: "asn.fetch_start" })
+  const res = await fetch(meta.url, {
+    headers: { authorization: `Bearer ${token}` },
+    next: { tags: [ASN_BLOB_TAG] },
   })
-  if (!file || file.statusCode !== 200) {
+  slog.debug({
+    step: "asn.fetch_done",
+    elapsed_ms: Date.now() - tFetch,
+    status: res.status,
+    cache: res.headers.get("x-vercel-cache"),
+  })
+  if (!res.ok) {
     throw new Error(
-      `Failed to fetch ${ASN_BLOB_KEY} from blob (status: ${file?.statusCode ?? "no response"}). ` +
+      `Failed to fetch ${ASN_BLOB_KEY} (status: ${res.status} ${res.statusText}). ` +
         `Run the tripwire-asn-update cron / sync-geoip-to-blob.ts to populate it.`,
     )
   }
-  const t1 = Date.now()
-  slog.debug({ step: "asn.stream_to_buffer_start" })
-  const buf = Buffer.from(await new Response(file.stream).arrayBuffer())
-  slog.debug({
-    step: "asn.stream_to_buffer_done",
-    elapsed_ms: Date.now() - t1,
-    bytes: buf.length,
-  })
-  const t2 = Date.now()
+
+  const tBuf = Date.now()
+  slog.debug({ step: "asn.array_buffer_start" })
+  const buf = Buffer.from(await res.arrayBuffer())
+  slog.debug({ step: "asn.array_buffer_done", elapsed_ms: Date.now() - tBuf, bytes: buf.length })
+
+  const tOpen = Date.now()
   cachedAsnReader = Reader.openBuffer(buf)
-  slog.debug({ step: "asn.reader_open_done", elapsed_ms: Date.now() - t2 })
+  slog.debug({ step: "asn.reader_open_done", elapsed_ms: Date.now() - tOpen })
   return cachedAsnReader
 }
 
