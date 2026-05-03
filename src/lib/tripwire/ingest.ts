@@ -71,10 +71,10 @@ interface BlobListPage {
 // after the Response object goes out of scope, which under Bun on Vercel
 // can leave the body stream stuck waiting for EOF. By keeping our own
 // Response in scope across the .json() drain, the request completes.
-async function listEventsPage(cursor: string | undefined): Promise<BlobListPage> {
+async function listBlobsPage(prefix: string, cursor: string | undefined): Promise<BlobListPage> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
-  const params = new URLSearchParams({ prefix: "events/" })
+  const params = new URLSearchParams({ prefix })
   if (cursor) params.set("cursor", cursor)
   const res = await fetch(`https://vercel.com/api/blob/?${params}`, {
     headers: {
@@ -89,36 +89,55 @@ async function listEventsPage(cursor: string | undefined): Promise<BlobListPage>
   return (await res.json()) as BlobListPage
 }
 
+// Bound the listing to the trailing INGEST_WINDOW_DAYS UTC dates. Cron runs
+// every 5 minutes, so a 2-day window leaves 24h+ of slack against any cron
+// outage. Events older than the window won't be auto-ingested by the cron;
+// the CLI script (scripts/tripwire/ingest-events.ts) still walks the full
+// events/ prefix and can backfill manually if a longer outage happens.
+const INGEST_WINDOW_DAYS = 2
+
+export function recentDatePrefixes(now: Date): string[] {
+  const out: string[] = []
+  for (let i = 0; i < INGEST_WINDOW_DAYS; i++) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
+    out.push(`events/${d.toISOString().slice(0, 10)}/`)
+  }
+  return out
+}
+
 async function listAllBlobs(
   log: (e: IngestLogEvent) => void,
 ): Promise<{ refs: BlobRef[]; unrecognized: number }> {
   const refs: BlobRef[] = []
   let unrecognized = 0
-  let cursor: string | undefined
-  let page = 0
-  do {
-    page++
-    const t0 = Date.now()
-    ilog.debug({ step: "list.page_start", page, cursor: cursor ?? null })
-    const result = await listEventsPage(cursor)
-    ilog.debug({
-      step: "list.page_done",
-      page,
-      elapsed_ms: Date.now() - t0,
-      blobs: result.blobs.length,
-      has_cursor: Boolean(result.cursor),
-    })
-    for (const blob of result.blobs) {
-      const id = idFromPathname(blob.pathname)
-      if (!id) {
-        unrecognized++
-        log({ step: "list.unrecognized_blob", pathname: blob.pathname })
-        continue
+  for (const prefix of recentDatePrefixes(new Date())) {
+    let cursor: string | undefined
+    let page = 0
+    do {
+      page++
+      const t0 = Date.now()
+      ilog.debug({ step: "list.page_start", prefix, page, cursor: cursor ?? null })
+      const result = await listBlobsPage(prefix, cursor)
+      ilog.debug({
+        step: "list.page_done",
+        prefix,
+        page,
+        elapsed_ms: Date.now() - t0,
+        blobs: result.blobs.length,
+        has_cursor: Boolean(result.cursor),
+      })
+      for (const blob of result.blobs) {
+        const id = idFromPathname(blob.pathname)
+        if (!id) {
+          unrecognized++
+          log({ step: "list.unrecognized_blob", pathname: blob.pathname })
+          continue
+        }
+        refs.push({ pathname: blob.pathname, url: blob.url, id })
       }
-      refs.push({ pathname: blob.pathname, url: blob.url, id })
-    }
-    cursor = result.cursor
-  } while (cursor)
+      cursor = result.cursor
+    } while (cursor)
+  }
   return { refs, unrecognized }
 }
 
