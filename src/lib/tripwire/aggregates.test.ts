@@ -1,6 +1,5 @@
 // src/lib/tripwire/aggregates.test.ts
-import { describe, test, expect, beforeEach, mock } from "bun:test"
-import * as blob from "@vercel/blob"
+import { describe, test, expect, beforeEach } from "bun:test"
 import { STATS_BLOB_TAG, type Aggregates } from "@/lib/tripwire/aggregate-shape"
 
 const SAMPLE: Aggregates = {
@@ -21,23 +20,16 @@ const SAMPLE: Aggregates = {
   byAsn: [],
 }
 
-const FAKE_URL = "https://store.private.blob.vercel-storage.com/stats/tripwire-aggregates.json"
+// Token format: vercel_blob_rw_<storeId>_<rest>. With this fixture the
+// derived URL is https://teststore.private.blob.vercel-storage.com/<key>.
+process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_teststore_secret"
+const EXPECTED_URL =
+  "https://teststore.private.blob.vercel-storage.com/stats/tripwire-aggregates.json"
 
-interface HeadCall { pathname: string }
 interface FetchCall { url: string; init: RequestInit | undefined }
-
-const headCalls: HeadCall[] = []
 const fetchCalls: FetchCall[] = []
 type FetchMode = "ok" | "bad-status"
 let fetchMode: FetchMode = "ok"
-
-mock.module("@vercel/blob", () => ({
-  ...blob,
-  head: async (pathname: string) => {
-    headCalls.push({ pathname })
-    return { url: FAKE_URL, pathname }
-  },
-}))
 
 const realFetch = globalThis.fetch
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -51,13 +43,10 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   })
 }) as typeof fetch
 
-process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token"
-
 const { getAggregates, _resetAggregatesCacheForTests } = await import("./aggregates")
 
 beforeEach(() => {
   _resetAggregatesCacheForTests()
-  headCalls.length = 0
   fetchCalls.length = 0
   fetchMode = "ok"
 })
@@ -66,12 +55,12 @@ describe("getAggregates", () => {
   test("cache miss fetches and parses the blob", async () => {
     const result = await getAggregates()
     expect(result).toEqual(SAMPLE)
-    expect(headCalls).toHaveLength(1)
-    expect(headCalls[0].pathname).toBe("stats/tripwire-aggregates.json")
     expect(fetchCalls).toHaveLength(1)
-    expect(fetchCalls[0].url).toBe(FAKE_URL)
+    expect(fetchCalls[0].url).toBe(EXPECTED_URL)
     const headers = new Headers(fetchCalls[0].init?.headers)
-    expect(headers.get("authorization")).toBe("Bearer vercel_blob_rw_test_token")
+    expect(headers.get("authorization")).toBe(
+      "Bearer vercel_blob_rw_teststore_secret",
+    )
     const next = (fetchCalls[0].init as { next?: { tags?: string[] } } | undefined)?.next
     expect(next?.tags).toEqual([STATS_BLOB_TAG])
   })
