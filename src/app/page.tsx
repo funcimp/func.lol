@@ -27,11 +27,14 @@ export default function Home() {
       <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 gap-7">
         <h1 className="sr-only">func.lol</h1>
         <FuncImpMark className="w-[260px] h-auto sm:w-[320px]" />
-        <p className="text-[14px] leading-[1.45] opacity-55 max-w-[38ch]">
-          Experiments by{" "}
+        <p className="text-[14px] leading-[1.45] text-ink/55 max-w-[38ch]">
+          <Link href="/x" className="underline text-ink hover:opacity-70">
+            Experiments
+          </Link>{" "}
+          by{" "}
           <a
             href="https://n.2p5.xyz"
-            className="underline"
+            className="underline text-ink hover:opacity-70"
             target="_blank"
             rel="noreferrer"
           >
@@ -39,20 +42,6 @@ export default function Home() {
           </a>
           .
         </p>
-        <nav className="flex flex-col gap-1">
-          <Link
-            href="/x/tripwire"
-            className="font-mono text-[20px] underline hover:opacity-70"
-          >
-            Tripwire
-          </Link>
-          <Link
-            href="/x/prime-moments"
-            className="font-mono text-[20px] underline hover:opacity-70"
-          >
-            Prime Moments
-          </Link>
-        </nav>
       </div>
     </main>
   );
