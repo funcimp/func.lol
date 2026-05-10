@@ -1,134 +1,215 @@
 // research/penrose/01-coord-representation.ts
 //
-// Q: At what world-position magnitude does Float64 lose enough precision
-//    that pointToCoord stops behaving locally smoothly?
+// Q: Where does Float64 disagree with a high-precision oracle for the
+//    pentagrid pointToCoord operation, and what does the oracle cost?
 //
-// Method: at magnitude R, sample N points at random angles. For each
-//   point p_a, compute p_b = p_a + δ·(cos θ, sin θ) with δ = 1e-3 (a
-//   small sub-tile step). Compare coord(p_a) and coord(p_b). Each
-//   sample is categorized:
+// Method: implement pointToCoord twice.
 //
-//     quantized — p_b == p_a at the Float64 level (Δp got rounded to 0)
-//     stable    — coords equal
-//     adjacent  — coords differ by at most 1 in every index (expected
-//                 near a tile boundary; happens at any R)
-//     jump      — coords differ by >1 in some index (Float64 lost
-//                 enough bits that p·e_j is computed inconsistently
-//                 between p_a and p_b)
+//   Exact   — BigInt arithmetic. Constants computed algebraically from
+//             √5 via BigInt sqrt, scaled to ~50 decimal digits. The
+//             scale is large enough that floor() of the projection is
+//             provably correct for any magnitude tested below.
 //
-//   "jump" is the failure signal. At low R it should be 0%. The first
-//   R where it appears is the practical Float64 ceiling for the
-//   shipped Coord type.
+//   Float64 — straight Float64. The candidate cheap implementation.
 //
-// Decision input: ship `Coord = readonly [number, number, number, number, number]`
-//   if jump rate stays at 0% across the explorer's reachable range
-//   (estimated below). Switch to bigint elements + Float64 viewport-anchor
-//   pattern otherwise.
+// At each magnitude R, sample N random points (generated as BigInt so
+// both implementations see the same intended position; Float64 receives
+// the Float64-cast version). Compare the two 5-tuples coord-by-coord.
+//
+// First disagreement = the precision-drift boundary. Throughput numbers
+// at the bottom price the difference.
+//
+// Decision input: ship `Coord = readonly [bigint, ...]` with exact math
+// for correctness at any size. Use Float64 only as a per-frame optimization
+// if the perf budget forces a viewport-anchor compromise.
 //
 // Run: bun run research/penrose/01-coord-representation.ts
 
-const E: ReadonlyArray<readonly [number, number]> = Array.from(
-  { length: 5 },
-  (_, j) => {
-    const a = (2 * Math.PI * j) / 5;
-    return [Math.cos(a), Math.sin(a)] as const;
-  },
-);
+const SCALE = 10n ** 50n;
+const SCALE_F = Number(SCALE);
 
-function gammaFromSeed(seed: string): readonly number[] {
+function bigintSqrt(n: bigint): bigint {
+  if (n < 0n) throw new Error("negative");
+  if (n < 2n) return n;
+  let x = n;
+  let y = (x + 1n) / 2n;
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2n;
+  }
+  return x;
+}
+
+function bigintFloorDiv(n: bigint, d: bigint): bigint {
+  if (d <= 0n) throw new Error("d must be positive");
+  if (n >= 0n) return n / d;
+  const q = n / d;
+  return n % d === 0n ? q : q - 1n;
+}
+
+// Algebraic constants at scale SCALE.
+//   cos(2π/5) = (√5 - 1) / 4
+//   cos(4π/5) = -(√5 + 1) / 4
+//   sin(2π/5) = √(10 + 2√5) / 4
+//   sin(4π/5) = √(10 - 2√5) / 4
+const SQRT5 = bigintSqrt(5n * SCALE * SCALE);
+const T_PLUS = 10n * SCALE + 2n * SQRT5;
+const T_MINUS = 10n * SCALE - 2n * SQRT5;
+const SQRT_T_PLUS = bigintSqrt(T_PLUS * SCALE);
+const SQRT_T_MINUS = bigintSqrt(T_MINUS * SCALE);
+
+const COS_HI: readonly bigint[] = [
+  SCALE,
+  bigintFloorDiv(SQRT5 - SCALE, 4n),
+  bigintFloorDiv(-(SQRT5 + SCALE), 4n),
+  bigintFloorDiv(-(SQRT5 + SCALE), 4n),
+  bigintFloorDiv(SQRT5 - SCALE, 4n),
+];
+
+const SIN_HI: readonly bigint[] = [
+  0n,
+  bigintFloorDiv(SQRT_T_PLUS, 4n),
+  bigintFloorDiv(SQRT_T_MINUS, 4n),
+  bigintFloorDiv(-SQRT_T_MINUS, 4n),
+  bigintFloorDiv(-SQRT_T_PLUS, 4n),
+];
+
+const COS_F: readonly number[] = COS_HI.map((c) => Number(c) / SCALE_F);
+const SIN_F: readonly number[] = SIN_HI.map((s) => Number(s) / SCALE_F);
+
+// pointToCoord — exact. pxBig, pyBig at scale SCALE (i.e., the real
+// coordinate × SCALE). gammaBig at scale SCALE.
+function pointToCoordExact(pxBig: bigint, pyBig: bigint, gammaBig: readonly bigint[]): readonly bigint[] {
+  const SCALE2 = SCALE * SCALE;
+  const out: bigint[] = new Array(5);
+  for (let j = 0; j < 5; j++) {
+    const proj = pxBig * COS_HI[j] + pyBig * SIN_HI[j] + gammaBig[j] * SCALE;
+    out[j] = bigintFloorDiv(proj, SCALE2);
+  }
+  return out;
+}
+
+// pointToCoord — Float64.
+function pointToCoordFloat(px: number, py: number, gamma: readonly number[]): readonly number[] {
+  const out: number[] = new Array(5);
+  for (let j = 0; j < 5; j++) {
+    out[j] = Math.floor(px * COS_F[j] + py * SIN_F[j] + gamma[j]);
+  }
+  return out;
+}
+
+// gamma: derive BigInt natively from a deterministic hash, then cast to
+// Float64. Both implementations get equivalent inputs; only Float64's
+// computation has precision loss.
+function gammaFromSeed(seed: string): { exact: readonly bigint[]; float: readonly number[] } {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 16777619) >>> 0;
   }
-  const gs = new Array(5).fill(0).map((_, i) => {
-    h = Math.imul(h ^ (i + 1), 16777619) >>> 0;
-    return h / 0xffffffff - 0.5;
-  });
-  const m = gs.reduce((a, b) => a + b, 0) / 5;
-  return gs.map((g) => g - m);
-}
-
-type Coord = readonly [number, number, number, number, number];
-
-function pointToCoord(p: readonly [number, number], gamma: readonly number[]): Coord {
-  const c = [0, 0, 0, 0, 0];
-  for (let j = 0; j < 5; j++) {
-    c[j] = Math.floor(p[0] * E[j][0] + p[1] * E[j][1] + gamma[j]);
-  }
-  return c as unknown as Coord;
-}
-
-function classify(a: Coord, b: Coord): "stable" | "adjacent" | "jump" {
-  let maxDelta = 0;
+  const raw: bigint[] = [];
   for (let i = 0; i < 5; i++) {
-    const d = Math.abs(a[i] - b[i]);
-    if (d > maxDelta) maxDelta = d;
+    h = Math.imul(h ^ (i + 1), 16777619) >>> 0;
+    // h is in [0, 2^32). Map to [-SCALE/2, SCALE/2).
+    raw.push((BigInt(h) * SCALE) / (1n << 32n) - SCALE / 2n);
   }
-  if (maxDelta === 0) return "stable";
-  if (maxDelta === 1) return "adjacent";
-  return "jump";
+  const sum = raw.reduce((a, b) => a + b, 0n);
+  const exact = raw.map((g) => g - sum / 5n);
+  const float = exact.map((g) => Number(g) / SCALE_F);
+  return { exact, float };
 }
 
-const DELTA = 1e-3;
-const SAMPLES = 10_000;
-const MAGNITUDES = [0, 1e2, 1e4, 1e6, 1e8, 1e9, 1e10, 1e11, 1e12, 1e14, 1e16];
+// Random point at magnitude approximately magBig.
+function randomPoint(magBig: bigint): { pxBig: bigint; pyBig: bigint; pxF: number; pyF: number } {
+  const theta = Math.random() * 2 * Math.PI;
+  const DIR_SCALE = 10n ** 15n;
+  const dirCos = BigInt(Math.round(Math.cos(theta) * 1e15));
+  const dirSin = BigInt(Math.round(Math.sin(theta) * 1e15));
+  // px = magBig · dirCos · SCALE / DIR_SCALE.
+  const pxBig = (magBig * dirCos * SCALE) / DIR_SCALE;
+  const pyBig = (magBig * dirSin * SCALE) / DIR_SCALE;
+  const pxF = Number(pxBig) / SCALE_F;
+  const pyF = Number(pyBig) / SCALE_F;
+  return { pxBig, pyBig, pxF, pyF };
+}
 
-const gamma = gammaFromSeed("funclol");
+const seed = "funclol";
+const { exact: gammaE, float: gammaF } = gammaFromSeed(seed);
 
-type Row = { mag: number; quantized: number; stable: number; adjacent: number; jump: number };
-const rows: Row[] = [];
+const MAGNITUDES: { label: string; mag: bigint }[] = [
+  { label: "0", mag: 0n },
+  { label: "1e+3", mag: 10n ** 3n },
+  { label: "1e+6", mag: 10n ** 6n },
+  { label: "1e+9", mag: 10n ** 9n },
+  { label: "1e+12", mag: 10n ** 12n },
+  { label: "1e+13", mag: 10n ** 13n },
+  { label: "1e+14", mag: 10n ** 14n },
+  { label: "1e+15", mag: 10n ** 15n },
+  { label: "1e+18", mag: 10n ** 18n },
+  { label: "1e+24", mag: 10n ** 24n },
+  { label: "1e+30", mag: 10n ** 30n },
+  { label: "1e+40", mag: 10n ** 40n },
+];
 
-for (const mag of MAGNITUDES) {
-  const counts = { quantized: 0, stable: 0, adjacent: 0, jump: 0 };
+const SAMPLES = 1000;
+
+console.log(`seed=${seed}  samples=${SAMPLES}  oracle scale=10^50\n`);
+console.log("|p|       agree     disagree  first disagreement");
+console.log("--------  --------  --------  ------------------");
+
+const disagreements: { mag: string; rate: number }[] = [];
+for (const { label, mag } of MAGNITUDES) {
+  let agree = 0;
+  let disagree = 0;
+  let example = "";
   for (let i = 0; i < SAMPLES; i++) {
-    const phi = Math.random() * 2 * Math.PI;
-    const px = mag * Math.cos(phi);
-    const py = mag * Math.sin(phi);
-    const theta = Math.random() * 2 * Math.PI;
-    const pxB = px + DELTA * Math.cos(theta);
-    const pyB = py + DELTA * Math.sin(theta);
-    if (pxB === px && pyB === py) {
-      counts.quantized++;
-      continue;
+    const { pxBig, pyBig, pxF, pyF } = randomPoint(mag);
+    const coordE = pointToCoordExact(pxBig, pyBig, gammaE);
+    const coordF = pointToCoordFloat(pxF, pyF, gammaF);
+    let same = true;
+    for (let j = 0; j < 5; j++) {
+      const f = coordF[j];
+      if (!Number.isFinite(f) || Math.abs(f) > Number.MAX_SAFE_INTEGER || BigInt(f) !== coordE[j]) {
+        same = false;
+        break;
+      }
     }
-    const ca = pointToCoord([px, py], gamma);
-    const cb = pointToCoord([pxB, pyB], gamma);
-    counts[classify(ca, cb)]++;
+    if (same) agree++;
+    else {
+      disagree++;
+      if (example === "") {
+        example = `exact=[${coordE.join(",")}]  float=[${coordF.join(",")}]`;
+      }
+    }
   }
-  rows.push({ mag, ...counts });
+  const rate = disagree / SAMPLES;
+  disagreements.push({ mag: label, rate });
+  const ag = `${((agree / SAMPLES) * 100).toFixed(1)}%`.padEnd(8);
+  const dis = `${(rate * 100).toFixed(1)}%`.padEnd(8);
+  console.log(`${label.padEnd(8)}  ${ag}  ${dis}  ${example.slice(0, 70)}`);
 }
 
-console.log(`seed=funclol  samples=${SAMPLES}  δ=${DELTA}\n`);
-console.log("|p|       quantized  stable  adjacent  jump");
-console.log("--------  ---------  ------  --------  ----");
-for (const r of rows) {
-  const tag = (r.mag === 0 ? "0" : r.mag.toExponential(0)).padEnd(8);
-  const q = `${((r.quantized / SAMPLES) * 100).toFixed(1)}%`.padEnd(9);
-  const s = `${((r.stable / SAMPLES) * 100).toFixed(1)}%`.padEnd(6);
-  const a = `${((r.adjacent / SAMPLES) * 100).toFixed(1)}%`.padEnd(8);
-  const j = `${((r.jump / SAMPLES) * 100).toFixed(2)}%`;
-  console.log(`${tag}  ${q}  ${s}  ${a}  ${j}`);
+const firstBad = disagreements.find((d) => d.rate > 0);
+console.log("");
+console.log(
+  firstBad
+    ? `first disagreement at |p|=${firstBad.mag} (rate ${(firstBad.rate * 100).toFixed(1)}%)`
+    : "no disagreement across tested range",
+);
+
+// Throughput.
+console.log("");
+const BENCH_N = 50_000;
+const bp = randomPoint(10n ** 6n);
+{
+  const t0 = performance.now();
+  for (let i = 0; i < BENCH_N; i++) pointToCoordExact(bp.pxBig, bp.pyBig, gammaE);
+  const dt = performance.now() - t0;
+  console.log(`exact:    ${((dt / BENCH_N) * 1000).toFixed(2)} µs/call  (${BENCH_N} calls in ${dt.toFixed(0)} ms)`);
 }
-
-const firstJump = rows.find((r) => r.jump > 0);
-const firstQuantized = rows.find((r) => r.quantized > 0);
-console.log("");
-console.log(
-  `first jump:      ${firstJump ? `|p|=${firstJump.mag.toExponential(0)} (${firstJump.jump}/${SAMPLES})` : "none in tested range"}`,
-);
-console.log(
-  `first quantized: ${firstQuantized ? `|p|=${firstQuantized.mag.toExponential(0)} (${firstQuantized.quantized}/${SAMPLES})` : "none in tested range"}`,
-);
-
-// Reach estimate. At zoom z in a 1500px viewport, one screen-width per
-// second of panning moves world by 1500/z units/sec. Plausible upper
-// bound for one user session:
-//   z=1     1500 u/s × 3600 s/hr  = 5.4e6 per hour
-//   z=10    150 u/s × 3600 s/hr   = 5.4e5 per hour
-//   z=1000  1.5 u/s × 3600 s/hr   = 5.4e3 per hour
-console.log("");
-console.log("reach estimate (one continuous hour of panning):");
-console.log("  zoom=1     →  |p| ≈ 5e6");
-console.log("  zoom=10    →  |p| ≈ 5e5");
-console.log("  zoom=1000  →  |p| ≈ 5e3");
+{
+  const t0 = performance.now();
+  for (let i = 0; i < BENCH_N; i++) pointToCoordFloat(bp.pxF, bp.pyF, gammaF);
+  const dt = performance.now() - t0;
+  console.log(`float64:  ${((dt / BENCH_N) * 1000).toFixed(2)} µs/call  (${BENCH_N} calls in ${dt.toFixed(0)} ms)`);
+}

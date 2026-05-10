@@ -2,7 +2,9 @@
 
 **Question.** Does the de Bruijn pentagrid enumeration meet the <4ms-at-1500-tiles budget in the plan?
 
-**Decision.** Yes, unaided. Ship the algorithm as-is.
+**Status.** Float64 numbers below settle the lower bound. [`01-coord-representation.md`](./01-coord-representation.md) shows Float64 starts disagreeing with the exact oracle at |p|=10¹², so a Float64-only enumerator silently produces wrong tiles past that magnitude. A BigInt-exact rerun is required to confirm whether exact enumeration fits the budget directly, or whether the explorer needs the viewport-anchor pattern (BigInt anchor + Float64 offsets, periodic re-anchor) to keep the hot path on Float64.
+
+**Float64 numbers (provisional).**
 
 ## Method
 

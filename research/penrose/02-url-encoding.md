@@ -2,7 +2,9 @@
 
 **Question.** Compare base62 (prime-moments precedent) against alternatives for the share-link state codec.
 
-**Decision.** Keep base62. Mirror the prime-moments codec verbatim.
+**Status.** Needs rerun. [`01-coord-representation.md`](./01-coord-representation.md) settled on `Coord = readonly [bigint, ...]`, so the URL must encode arbitrary BigInts, not 32-bit fixed-point. The numbers below test the int32 case and are kept as a baseline for the bigint-aware version.
+
+**Provisional decision.** Keep base62 in spirit; switch from fixed-width int32 to variable-length BigInt-base62. The base62 alphabet still gives ~5.95 bits/char, which is within a few percent of base64url's 6 bits/char, and base62 stays URL-safe without padding.
 
 ## Method
 
