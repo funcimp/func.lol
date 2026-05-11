@@ -153,17 +153,39 @@ export function pointToCoordAnchored(
   return c as unknown as Coord;
 }
 
-// Enumerate rhombi whose pentagrid cell intersects the offset-relative
-// rect. Returns each tile with its 4 vertices in offset coords (small
-// Float64) and its absolute BigInt coord.
+// Enumerate P3 rhombi whose tile-space position falls in the viewport
+// rect. Each tile is at v_N = Σ_l n_l · e_l (de Bruijn dual lattice),
+// with 4 unit-length corners {v_N, v_N + e_j, v_N + e_j + e_k, v_N + e_k}.
 //
-// Tile shape: bounded by 4 pentagrid lines, two from family j and two
-// from family k. The 4 vertices are line-pair intersections, computed
-// in Float64. Tile type: k-j mod 5 ∈ {1, 4} → thick; ∈ {2, 3} → thin.
+// rect is in TILE-space offset coords (relative to the anchor's lattice
+// point). Pentagrid-space line bounds are derived from the rect via
+// p ≈ (2/5)(v - Γ), where Γ = Σ_l γ_l · e_l. We over-iterate slightly
+// to cover edge cases, then drop rhombi whose v_N is far outside rect.
+//
+// Tile type: |k - j| ∈ {1, 4} → thick (72° rhombus); {2, 3} → thin (36°).
 export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
   const tiles: Tile[] = [];
   const gamma = anchor.fProj;
   const seen = new Set<string>();
+
+  // Γ = Σ_l γ_l · e_l. Used to translate between tile- and pentagrid-space.
+  let gammaCorrX = 0, gammaCorrY = 0;
+  for (let l = 0; l < 5; l++) {
+    gammaCorrX += gamma[l] * COS_F[l];
+    gammaCorrY += gamma[l] * SIN_F[l];
+  }
+
+  // Pentagrid-space rect: p = (2/5)(v - Γ), with safety margin for the
+  // O(1) bounded fractional correction Σ_l frac_l · e_l.
+  const SHRINK = 2 / 5;
+  const SAFETY = 3;
+  const pgRect: Rect = {
+    x0: SHRINK * (rect.x0 - gammaCorrX) - SAFETY,
+    y0: SHRINK * (rect.y0 - gammaCorrY) - SAFETY,
+    x1: SHRINK * (rect.x1 - gammaCorrX) + SAFETY,
+    y1: SHRINK * (rect.y1 - gammaCorrY) + SAFETY,
+  };
+
   for (let j = 0; j < 4; j++) {
     for (let k = j + 1; k < 5; k++) {
       const ejx = COS_F[j], ejy = SIN_F[j];
@@ -171,45 +193,54 @@ export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
       const det = ejx * eky - ejy * ekx;
       if (Math.abs(det) < 1e-12) continue;
       const invDet = 1 / det;
-      // Step vectors for moving to adjacent line-pair intersections.
-      const dxJ = eky * invDet, dyJ = -ekx * invDet;
-      const dxK = -ejy * invDet, dyK = ejx * invDet;
-      // Line-index bounds derived from rect corner projections.
-      const pj0 = rect.x0 * ejx + rect.y0 * ejy;
-      const pj1 = rect.x1 * ejx + rect.y0 * ejy;
-      const pj2 = rect.x0 * ejx + rect.y1 * ejy;
-      const pj3 = rect.x1 * ejx + rect.y1 * ejy;
-      const pk0 = rect.x0 * ekx + rect.y0 * eky;
-      const pk1 = rect.x1 * ekx + rect.y0 * eky;
-      const pk2 = rect.x0 * ekx + rect.y1 * eky;
-      const pk3 = rect.x1 * ekx + rect.y1 * eky;
+
+      // Line-index bounds from pentagrid-space rect projections.
+      const pj0 = pgRect.x0 * ejx + pgRect.y0 * ejy;
+      const pj1 = pgRect.x1 * ejx + pgRect.y0 * ejy;
+      const pj2 = pgRect.x0 * ejx + pgRect.y1 * ejy;
+      const pj3 = pgRect.x1 * ejx + pgRect.y1 * ejy;
+      const pk0 = pgRect.x0 * ekx + pgRect.y0 * eky;
+      const pk1 = pgRect.x1 * ekx + pgRect.y0 * eky;
+      const pk2 = pgRect.x0 * ekx + pgRect.y1 * eky;
+      const pk3 = pgRect.x1 * ekx + pgRect.y1 * eky;
       const kjMin = Math.floor(Math.min(pj0, pj1, pj2, pj3) + gamma[j]) - 1;
       const kjMax = Math.ceil(Math.max(pj0, pj1, pj2, pj3) + gamma[j]) + 1;
       const kkMin = Math.floor(Math.min(pk0, pk1, pk2, pk3) + gamma[k]) - 1;
       const kkMax = Math.ceil(Math.max(pk0, pk1, pk2, pk3) + gamma[k]) + 1;
       const type: TileType = k - j === 1 || k - j === 4 ? "thick" : "thin";
+
       for (let kj = kjMin; kj <= kjMax; kj++) {
         const aj = kj - gamma[j];
         for (let kk = kkMin; kk <= kkMax; kk++) {
           const ak = kk - gamma[k];
           const px = (eky * aj - ejy * ak) * invDet;
           const py = (-ekx * aj + ejx * ak) * invDet;
-          if (px < rect.x0 || px > rect.x1 || py < rect.y0 || py > rect.y1) continue;
-          // Offset coords (small integers) for the 5-tuple.
+          if (px < pgRect.x0 || px > pgRect.x1 || py < pgRect.y0 || py > pgRect.y1) continue;
+
+          // Offset coords (small ints) for the 5-tuple.
           const o0 = j === 0 ? kj : k === 0 ? kk : Math.floor(px * COS_F[0] + py * SIN_F[0] + gamma[0]);
           const o1 = j === 1 ? kj : k === 1 ? kk : Math.floor(px * COS_F[1] + py * SIN_F[1] + gamma[1]);
           const o2 = j === 2 ? kj : k === 2 ? kk : Math.floor(px * COS_F[2] + py * SIN_F[2] + gamma[2]);
           const o3 = j === 3 ? kj : k === 3 ? kk : Math.floor(px * COS_F[3] + py * SIN_F[3] + gamma[3]);
           const o4 = j === 4 ? kj : k === 4 ? kk : Math.floor(px * COS_F[4] + py * SIN_F[4] + gamma[4]);
-          // Dedup on the offset key — small ints, no BigInt-add cost.
           const key = `${o0},${o1},${o2},${o3},${o4}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          // Rhombus vertices in offset coords.
-          const v00: Vec2 = [px, py];
-          const v10: Vec2 = [px + dxJ, py + dyJ];
-          const v11: Vec2 = [px + dxJ + dxK, py + dyJ + dyK];
-          const v01: Vec2 = [px + dxK, py + dyK];
+
+          // v_N in tile-space offset coords = Σ_l o_l · e_l.
+          const vx = o0 * COS_F[0] + o1 * COS_F[1] + o2 * COS_F[2] + o3 * COS_F[3] + o4 * COS_F[4];
+          const vy = o0 * SIN_F[0] + o1 * SIN_F[1] + o2 * SIN_F[2] + o3 * SIN_F[3] + o4 * SIN_F[4];
+
+          // Cull rhombi whose entire bounding box falls outside the tile rect.
+          // Rhombus spans roughly [vx, vx + max(|ejx|+|ekx|)]; conservatively
+          // ±2 in each axis.
+          if (vx + 2 < rect.x0 || vx - 2 > rect.x1 || vy + 2 < rect.y0 || vy - 2 > rect.y1) continue;
+
+          // Unit-side P3 rhombus vertices.
+          const v00: Vec2 = [vx, vy];
+          const v10: Vec2 = [vx + ejx, vy + ejy];
+          const v11: Vec2 = [vx + ejx + ekx, vy + ejy + eky];
+          const v01: Vec2 = [vx + ekx, vy + eky];
           const coord: Coord = [
             anchor.nProj[0] + BigInt(o0),
             anchor.nProj[1] + BigInt(o1),
@@ -223,4 +254,22 @@ export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
     }
   }
   return tiles;
+}
+
+// Point-in-polygon test for the hover readout. Tile vertices are
+// convex (a rhombus); a half-plane test against each of the 4 edges
+// is enough.
+export function tileContains(tile: Tile, x: number, y: number): boolean {
+  const verts = tile.vertices;
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const [ax, ay] = verts[i];
+    const [bx, by] = verts[(i + 1) % 4];
+    const cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+    if (cross === 0) continue;
+    const s = cross > 0 ? 1 : -1;
+    if (sign === 0) sign = s;
+    else if (sign !== s) return false;
+  }
+  return true;
 }

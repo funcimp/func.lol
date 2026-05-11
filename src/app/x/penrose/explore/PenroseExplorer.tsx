@@ -6,7 +6,7 @@ import {
   enumerateTiles,
   gammaFromSeed,
   makeAnchor,
-  pointToCoordAnchored,
+  tileContains,
   type Anchor,
   type Coord,
   type Tile,
@@ -39,6 +39,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const dirtyRef = useRef<boolean>(true);
   const rafRef = useRef<number | null>(null);
+  const tilesRef = useRef<Tile[]>([]);
 
   // Hover readout state. Updates on pointermove via the readout ref to
   // avoid React re-render on every cursor pixel.
@@ -102,13 +103,21 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         maybeReAnchor();
         requestRender();
       }
-      // Hover readout (cheap; one BigInt-aware pointToCoord call).
+      // Hover readout: point-in-polygon against the visible tiles
+      // (small list, the test is O(k) where k is tile count).
       const rect = canvas.getBoundingClientRect();
       const cx = e.clientX - rect.left - sizeRef.current.w / 2;
       const cy = e.clientY - rect.top - sizeRef.current.h / 2;
       const worldX = cx / zoomRef.current + offsetRef.current[0];
       const worldY = cy / zoomRef.current + offsetRef.current[1];
-      setHoverCoord(pointToCoordAnchored(anchorRef.current, [worldX, worldY]));
+      let found: Tile | null = null;
+      for (const tile of tilesRef.current) {
+        if (tileContains(tile, worldX, worldY)) {
+          found = tile;
+          break;
+        }
+      }
+      setHoverCoord(found ? found.coord : null);
     };
     const onPointerUp = (e: PointerEvent) => {
       panning = false;
@@ -182,6 +191,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         y1: offsetRef.current[1] + halfH + margin,
       };
       const tiles = enumerateTiles(anchorRef.current, rect);
+      tilesRef.current = tiles;
       drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, {
         thickFill,
         thinFill,
