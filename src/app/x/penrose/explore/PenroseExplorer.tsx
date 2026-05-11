@@ -83,31 +83,16 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       attributeFilter: ["data-theme"],
     });
 
-    // Pan: pointer drag updates offset.
-    let panning = false;
-    let lastX = 0, lastY = 0;
-    const onPointerDown = (e: PointerEvent) => {
-      panning = true;
-      canvas.setPointerCapture(e.pointerId);
-      lastX = e.clientX;
-      lastY = e.clientY;
-    };
-    const onPointerMove = (e: PointerEvent) => {
-      if (panning) {
-        const dx = e.clientX - lastX;
-        const dy = e.clientY - lastY;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        offsetRef.current[0] -= dx / zoomRef.current;
-        offsetRef.current[1] -= dy / zoomRef.current;
-        maybeReAnchor();
-        requestRender();
-      }
-      // Hover readout: point-in-polygon against the visible tiles
-      // (small list, the test is O(k) where k is tile count).
+    // Pan + pinch via pointer events. One Map of active pointers handles
+    // mouse, pen, and 1-or-more touches uniformly. Pinch fires when 2+
+    // pointers are active (touch only — mouse/pen never have 2).
+    const pointers = new Map<number, [number, number]>();
+    let gesture: { midX: number; midY: number; dist: number } | null = null;
+
+    const updateHover = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left - sizeRef.current.w / 2;
-      const cy = e.clientY - rect.top - sizeRef.current.h / 2;
+      const cx = clientX - rect.left - sizeRef.current.w / 2;
+      const cy = clientY - rect.top - sizeRef.current.h / 2;
       const worldX = cx / zoomRef.current + offsetRef.current[0];
       const worldY = cy / zoomRef.current + offsetRef.current[1];
       let found: Tile | null = null;
@@ -119,13 +104,77 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       }
       setHoverCoord(found ? found.coord : null);
     };
+
+    const refreshGesture = () => {
+      if (pointers.size < 2) {
+        gesture = null;
+        return;
+      }
+      const pts = [...pointers.values()];
+      const midX = (pts[0][0] + pts[1][0]) / 2;
+      const midY = (pts[0][1] + pts[1][1]) / 2;
+      const dist = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+      gesture = { midX, midY, dist };
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      canvas.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      refreshGesture();
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      const prev = pointers.get(e.pointerId);
+      if (prev) {
+        const dx = e.clientX - prev[0];
+        const dy = e.clientY - prev[1];
+        pointers.set(e.pointerId, [e.clientX, e.clientY]);
+
+        if (pointers.size === 1) {
+          // Single-pointer pan.
+          offsetRef.current[0] -= dx / zoomRef.current;
+          offsetRef.current[1] -= dy / zoomRef.current;
+          maybeReAnchor();
+          requestRender();
+        } else if (pointers.size >= 2 && gesture !== null) {
+          // Pinch zoom + two-finger pan.
+          const pts = [...pointers.values()];
+          const midX = (pts[0][0] + pts[1][0]) / 2;
+          const midY = (pts[0][1] + pts[1][1]) / 2;
+          const dist = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+          if (dist > 0 && gesture.dist > 0) {
+            const rect = canvas.getBoundingClientRect();
+            const px = midX - rect.left - sizeRef.current.w / 2;
+            const py = midY - rect.top - sizeRef.current.h / 2;
+            const worldX = px / zoomRef.current + offsetRef.current[0];
+            const worldY = py / zoomRef.current + offsetRef.current[1];
+            const newZoom = clamp(zoomRef.current * (dist / gesture.dist), 4, 800);
+            zoomRef.current = newZoom;
+            // Anchor zoom on the midpoint.
+            offsetRef.current[0] = worldX - px / newZoom;
+            offsetRef.current[1] = worldY - py / newZoom;
+            // Pan from midpoint shift (two-finger drag).
+            offsetRef.current[0] -= (midX - gesture.midX) / newZoom;
+            offsetRef.current[1] -= (midY - gesture.midY) / newZoom;
+            maybeReAnchor();
+            requestRender();
+          }
+          gesture = { midX, midY, dist };
+        }
+      }
+      // Hover readout. For touch, only meaningful at pointermove with
+      // capture (one finger), but harmless to update always.
+      updateHover(e.clientX, e.clientY);
+    };
+
     const onPointerUp = (e: PointerEvent) => {
-      panning = false;
+      pointers.delete(e.pointerId);
       try {
         canvas.releasePointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
+      refreshGesture();
     };
 
     // Zoom: wheel pivots on cursor.
