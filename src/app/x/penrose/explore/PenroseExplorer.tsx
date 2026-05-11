@@ -307,7 +307,7 @@ function drawTiles(
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  // 1. Rhombus outlines — every tile, single ink color, restrained.
+  // 1. Rhombus outlines — every tile, ink, structural weight.
   ctx.beginPath();
   for (const tile of tiles) {
     const [v0, v1, v2, v3] = tile.vertices;
@@ -318,17 +318,14 @@ function drawTiles(
     ctx.lineTo(p3[0], p3[1]);
     ctx.closePath();
   }
-  ctx.globalAlpha = 0.5;
-  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = palette.outline;
   ctx.stroke();
 
   // 2. Long-diagonal decoration — connects acute vertices of each rhombus.
-  // For the (j, k) iteration order [vLL, vLR, vUR, vUL]:
-  //   thick (72°/108°): acute = LL & UR → diagonal v0 to v2
-  //   thin (36°/144°):  acute = LR & UL → diagonal v1 to v3
-  // Five acute corners meeting at a vertex (sun/star configurations) make
-  // the diagonals converge into 5-pointed stars — the Ammann-ish gesture.
+  // Roughly 1/3 the outline width so the borders dominate and the
+  // decoration reads as inner tracery.
   ctx.beginPath();
   for (const tile of tiles) {
     const [v0, v1, v2, v3] = tile.vertices;
@@ -338,7 +335,7 @@ function drawTiles(
     ctx.lineTo(b[0], b[1]);
   }
   ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = 0.75;
   ctx.strokeStyle = palette.decoration;
   ctx.stroke();
 
