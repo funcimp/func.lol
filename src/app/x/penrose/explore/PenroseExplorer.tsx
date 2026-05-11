@@ -165,6 +165,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const dpr = dprRef.current;
       const ink = readCssVar("--color-ink") || "#161616";
       const paper = readCssVar("--color-paper") || "#f5f3ec";
+      const thickFill = readCssVar("--color-moment-1") || ink;
+      const thinFill = readCssVar("--color-moment-3") || ink;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = paper;
       ctx!.fillRect(0, 0, w, h);
@@ -180,7 +182,11 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         y1: offsetRef.current[1] + halfH + margin,
       };
       const tiles = enumerateTiles(anchorRef.current, rect);
-      drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, ink, paper);
+      drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, {
+        thickFill,
+        thinFill,
+        stroke: ink,
+      });
       setTileCount(tiles.length);
     }
 
@@ -223,6 +229,8 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.min(Math.max(x, lo), hi);
 }
 
+type Palette = { thickFill: string; thinFill: string; stroke: string };
+
 function drawTiles(
   ctx: CanvasRenderingContext2D,
   tiles: readonly Tile[],
@@ -230,33 +238,55 @@ function drawTiles(
   h: number,
   offset: readonly [number, number],
   zoom: number,
-  ink: string,
-  paper: string,
+  palette: Palette,
 ) {
   const cx = w / 2;
   const cy = h / 2;
-  // Two passes: thin tiles (paper fill) first as background, thick on top.
+  const project = (v: readonly [number, number]) => [
+    (v[0] - offset[0]) * zoom + cx,
+    (v[1] - offset[1]) * zoom + cy,
+  ];
+
+  // Bin by type so each fill pass is a single solid color.
   const thick: Tile[] = [];
   const thin: Tile[] = [];
   for (const t of tiles) (t.type === "thick" ? thick : thin).push(t);
 
-  const drawSet = (set: Tile[], fill: string) => {
-    ctx.beginPath();
+  const buildPath = (set: Tile[]) => {
     for (const tile of set) {
       const [v0, v1, v2, v3] = tile.vertices;
-      ctx.moveTo((v0[0] - offset[0]) * zoom + cx, (v0[1] - offset[1]) * zoom + cy);
-      ctx.lineTo((v1[0] - offset[0]) * zoom + cx, (v1[1] - offset[1]) * zoom + cy);
-      ctx.lineTo((v2[0] - offset[0]) * zoom + cx, (v2[1] - offset[1]) * zoom + cy);
-      ctx.lineTo((v3[0] - offset[0]) * zoom + cx, (v3[1] - offset[1]) * zoom + cy);
+      const p0 = project(v0), p1 = project(v1), p2 = project(v2), p3 = project(v3);
+      ctx.moveTo(p0[0], p0[1]);
+      ctx.lineTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.lineTo(p3[0], p3[1]);
       ctx.closePath();
     }
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
   };
 
-  drawSet(thin, paper);
-  drawSet(thick, ink);
+  // Fill thick rhombi (warm gold, low alpha).
+  ctx.beginPath();
+  buildPath(thick);
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = palette.thickFill;
+  ctx.fill();
+
+  // Fill thin rhombi (muted purple, low alpha).
+  ctx.beginPath();
+  buildPath(thin);
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = palette.thinFill;
+  ctx.fill();
+
+  // Stroke everything in one pass — line work over the muted fills.
+  ctx.beginPath();
+  buildPath(thick);
+  buildPath(thin);
+  ctx.globalAlpha = 0.32;
+  ctx.lineWidth = 1;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = palette.stroke;
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
 }
