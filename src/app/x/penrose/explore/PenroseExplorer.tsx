@@ -221,9 +221,10 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       dirtyRef.current = false;
       const { w, h } = sizeRef.current;
       const dpr = dprRef.current;
-      const outline = readCssVar("--color-ink") || "#161616";
+      const outlineThick = readCssVar("--color-moment-4") || "#161616";
+      const outlineThin = readCssVar("--color-moment-1") || "#161616";
       const paper = readCssVar("--color-paper") || "#f5f3ec";
-      const decoration = readCssVar("--color-moment-1") || outline;
+      const decoration = readCssVar("--color-moment-3") || outlineThick;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = paper;
       ctx!.fillRect(0, 0, w, h);
@@ -241,7 +242,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const tiles = enumerateTiles(anchorRef.current, rect);
       tilesRef.current = tiles;
       drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, {
-        outline,
+        outlineThick,
+        outlineThin,
         decoration,
       });
       setTileCount(tiles.length);
@@ -286,7 +288,7 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.min(Math.max(x, lo), hi);
 }
 
-type Palette = { outline: string; decoration: string };
+type Palette = { outlineThick: string; outlineThin: string; decoration: string };
 
 function drawTiles(
   ctx: CanvasRenderingContext2D,
@@ -307,25 +309,38 @@ function drawTiles(
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  // 1. Rhombus outlines — every tile, ink, structural weight.
-  ctx.beginPath();
+  // 1. Outlines, per-tile, clipped to the rhombus interior. The clip
+  //    means the stroke band sits inside the shape rather than centered
+  //    on the edge, so adjacent rhombi of different types meet cleanly
+  //    at shared edges (no muddy color mixing on the boundary).
+  //    Stroke width is doubled because the outer half is clipped away.
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = 4; // half clipped → visible width ≈ 2px
   for (const tile of tiles) {
     const [v0, v1, v2, v3] = tile.vertices;
     const p0 = project(v0), p1 = project(v1), p2 = project(v2), p3 = project(v3);
+    ctx.save();
+    ctx.beginPath();
     ctx.moveTo(p0[0], p0[1]);
     ctx.lineTo(p1[0], p1[1]);
     ctx.lineTo(p2[0], p2[1]);
     ctx.lineTo(p3[0], p3[1]);
     ctx.closePath();
+    ctx.clip();
+    // Rebuild the path for stroking (clip is allowed to consume it).
+    ctx.beginPath();
+    ctx.moveTo(p0[0], p0[1]);
+    ctx.lineTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath();
+    ctx.strokeStyle = tile.type === "thick" ? palette.outlineThick : palette.outlineThin;
+    ctx.stroke();
+    ctx.restore();
   }
-  ctx.globalAlpha = 0.7;
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = palette.outline;
-  ctx.stroke();
 
   // 2. Long-diagonal decoration — connects acute vertices of each rhombus.
-  // Roughly 1/3 the outline width so the borders dominate and the
-  // decoration reads as inner tracery.
+  //    Thin line, ~1/3 the outline weight, lets the borders dominate.
   ctx.beginPath();
   for (const tile of tiles) {
     const [v0, v1, v2, v3] = tile.vertices;
