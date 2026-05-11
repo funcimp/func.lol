@@ -223,8 +223,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const dpr = dprRef.current;
       const outline = readCssVar("--color-ink") || "#161616";
       const paper = readCssVar("--color-paper") || "#f5f3ec";
-      const thickMidline = readCssVar("--color-moment-4") || outline;
-      const thinMidline = readCssVar("--color-moment-1") || outline;
+      const decoration = readCssVar("--color-moment-1") || outline;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = paper;
       ctx!.fillRect(0, 0, w, h);
@@ -243,8 +242,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       tilesRef.current = tiles;
       drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, {
         outline,
-        thickMidline,
-        thinMidline,
+        decoration,
       });
       setTileCount(tiles.length);
     }
@@ -288,7 +286,7 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.min(Math.max(x, lo), hi);
 }
 
-type Palette = { outline: string; thickMidline: string; thinMidline: string };
+type Palette = { outline: string; decoration: string };
 
 function drawTiles(
   ctx: CanvasRenderingContext2D,
@@ -306,65 +304,42 @@ function drawTiles(
     (v[1] - offset[1]) * zoom + cy,
   ];
 
-  const thick: Tile[] = [];
-  const thin: Tile[] = [];
-  for (const t of tiles) (t.type === "thick" ? thick : thin).push(t);
-
-  const buildOutlinePath = (set: Tile[]) => {
-    for (const tile of set) {
-      const [v0, v1, v2, v3] = tile.vertices;
-      const p0 = project(v0), p1 = project(v1), p2 = project(v2), p3 = project(v3);
-      ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-      ctx.lineTo(p2[0], p2[1]);
-      ctx.lineTo(p3[0], p3[1]);
-      ctx.closePath();
-    }
-  };
-
-  // Midlines: for each rhombus, connect the midpoints of its two pairs
-  // of opposite edges. Midlines from adjacent rhombi meet at shared
-  // edge midpoints, so they form continuous tracery across the tiling.
-  const buildMidlinePath = (set: Tile[]) => {
-    for (const tile of set) {
-      const [v0, v1, v2, v3] = tile.vertices;
-      const m01: [number, number] = [(v0[0] + v1[0]) / 2, (v0[1] + v1[1]) / 2];
-      const m12: [number, number] = [(v1[0] + v2[0]) / 2, (v1[1] + v2[1]) / 2];
-      const m23: [number, number] = [(v2[0] + v3[0]) / 2, (v2[1] + v3[1]) / 2];
-      const m30: [number, number] = [(v3[0] + v0[0]) / 2, (v3[1] + v0[1]) / 2];
-      const p01 = project(m01), p12 = project(m12);
-      const p23 = project(m23), p30 = project(m30);
-      ctx.moveTo(p01[0], p01[1]); ctx.lineTo(p23[0], p23[1]);
-      ctx.moveTo(p12[0], p12[1]); ctx.lineTo(p30[0], p30[1]);
-    }
-  };
-
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  // 1. Rhombus outlines — every tile, ink, restrained.
+  // 1. Rhombus outlines — every tile, single ink color, restrained.
   ctx.beginPath();
-  buildOutlinePath(thick);
-  buildOutlinePath(thin);
-  ctx.globalAlpha = 0.45;
+  for (const tile of tiles) {
+    const [v0, v1, v2, v3] = tile.vertices;
+    const p0 = project(v0), p1 = project(v1), p2 = project(v2), p3 = project(v3);
+    ctx.moveTo(p0[0], p0[1]);
+    ctx.lineTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath();
+  }
+  ctx.globalAlpha = 0.5;
   ctx.lineWidth = 1;
   ctx.strokeStyle = palette.outline;
   ctx.stroke();
 
-  // 2. Midlines for thick rhombi — slate, slightly thicker.
+  // 2. Long-diagonal decoration — connects acute vertices of each rhombus.
+  // For the (j, k) iteration order [vLL, vLR, vUR, vUL]:
+  //   thick (72°/108°): acute = LL & UR → diagonal v0 to v2
+  //   thin (36°/144°):  acute = LR & UL → diagonal v1 to v3
+  // Five acute corners meeting at a vertex (sun/star configurations) make
+  // the diagonals converge into 5-pointed stars — the Ammann-ish gesture.
   ctx.beginPath();
-  buildMidlinePath(thick);
+  for (const tile of tiles) {
+    const [v0, v1, v2, v3] = tile.vertices;
+    const a = tile.type === "thick" ? project(v0) : project(v1);
+    const b = tile.type === "thick" ? project(v2) : project(v3);
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+  }
   ctx.globalAlpha = 0.85;
   ctx.lineWidth = 1.25;
-  ctx.strokeStyle = palette.thickMidline;
-  ctx.stroke();
-
-  // 3. Midlines for thin rhombi — gold.
-  ctx.beginPath();
-  buildMidlinePath(thin);
-  ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 1.25;
-  ctx.strokeStyle = palette.thinMidline;
+  ctx.strokeStyle = palette.decoration;
   ctx.stroke();
 
   ctx.globalAlpha = 1;
