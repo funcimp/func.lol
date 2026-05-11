@@ -174,8 +174,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const dpr = dprRef.current;
       const ink = readCssVar("--color-ink") || "#161616";
       const paper = readCssVar("--color-paper") || "#f5f3ec";
-      const thickFill = readCssVar("--color-moment-1") || ink;
-      const thinFill = readCssVar("--color-moment-3") || ink;
+      const thickFill = readCssVar("--color-moment-4") || ink;
+      const thinFill = readCssVar("--color-moment-1") || ink;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = paper;
       ctx!.fillRect(0, 0, w, h);
@@ -274,29 +274,26 @@ function drawTiles(
     }
   };
 
-  // Fill thick rhombi (warm gold, low alpha).
+  // Fill thick rhombi (slate, solid).
   ctx.beginPath();
   buildPath(thick);
-  ctx.globalAlpha = 0.22;
   ctx.fillStyle = palette.thickFill;
   ctx.fill();
 
-  // Fill thin rhombi (muted purple, low alpha).
+  // Fill thin rhombi (gold, solid).
   ctx.beginPath();
   buildPath(thin);
-  ctx.globalAlpha = 0.22;
   ctx.fillStyle = palette.thinFill;
   ctx.fill();
 
-  // Stroke everything in one pass — line work over the muted fills.
+  // Stroke every rhombus in one pass — thin ink line for edge definition.
   ctx.beginPath();
   buildPath(thick);
   buildPath(thin);
-  ctx.globalAlpha = 0.32;
-  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 0.75;
   ctx.lineJoin = "round";
   ctx.strokeStyle = palette.stroke;
   ctx.stroke();
-
   ctx.globalAlpha = 1;
 }

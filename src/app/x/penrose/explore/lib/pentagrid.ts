@@ -227,20 +227,24 @@ export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
           if (seen.has(key)) continue;
           seen.add(key);
 
-          // v_N in tile-space offset coords = Σ_l o_l · e_l.
+          // v_N in tile-space offset coords = Σ_l o_l · e_l. This is the
+          // "upper-right" corner of the rhombus (n_j=kj, n_k=kk). The
+          // other 3 corners come from the 3 adjacent cells around this
+          // pentagrid vertex (n_j=kj-1 and/or n_k=kk-1), each sharing
+          // the same "other 3 floors" so they differ from v_N only by
+          // -e_j and/or -e_k.
           const vx = o0 * COS_F[0] + o1 * COS_F[1] + o2 * COS_F[2] + o3 * COS_F[3] + o4 * COS_F[4];
           const vy = o0 * SIN_F[0] + o1 * SIN_F[1] + o2 * SIN_F[2] + o3 * SIN_F[3] + o4 * SIN_F[4];
 
           // Cull rhombi whose entire bounding box falls outside the tile rect.
-          // Rhombus spans roughly [vx, vx + max(|ejx|+|ekx|)]; conservatively
-          // ±2 in each axis.
           if (vx + 2 < rect.x0 || vx - 2 > rect.x1 || vy + 2 < rect.y0 || vy - 2 > rect.y1) continue;
 
-          // Unit-side P3 rhombus vertices.
-          const v00: Vec2 = [vx, vy];
-          const v10: Vec2 = [vx + ejx, vy + ejy];
-          const v11: Vec2 = [vx + ejx + ekx, vy + ejy + eky];
-          const v01: Vec2 = [vx + ekx, vy + eky];
+          // Unit-side P3 rhombus, traced in order around the corner cluster
+          // at the pentagrid vertex.
+          const vUR: Vec2 = [vx, vy];                       // n_j=kj,   n_k=kk
+          const vUL: Vec2 = [vx - ejx, vy - ejy];           // n_j=kj-1, n_k=kk
+          const vLL: Vec2 = [vx - ejx - ekx, vy - ejy - eky]; // n_j=kj-1, n_k=kk-1
+          const vLR: Vec2 = [vx - ekx, vy - eky];           // n_j=kj,   n_k=kk-1
           const coord: Coord = [
             anchor.nProj[0] + BigInt(o0),
             anchor.nProj[1] + BigInt(o1),
@@ -248,7 +252,7 @@ export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
             anchor.nProj[3] + BigInt(o3),
             anchor.nProj[4] + BigInt(o4),
           ];
-          tiles.push({ coord, type, vertices: [v00, v10, v11, v01] });
+          tiles.push({ coord, type, vertices: [vLL, vLR, vUR, vUL] });
         }
       }
     }
