@@ -166,7 +166,6 @@ export function pointToCoordAnchored(
 export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
   const tiles: Tile[] = [];
   const gamma = anchor.fProj;
-  const seen = new Set<string>();
 
   // Γ = Σ_l γ_l · e_l. Used to translate between tile- and pentagrid-space.
   let gammaCorrX = 0, gammaCorrY = 0;
@@ -217,15 +216,18 @@ export function enumerateTiles(anchor: Anchor, rect: Rect): Tile[] {
           const py = (-ekx * aj + ejx * ak) * invDet;
           if (px < pgRect.x0 || px > pgRect.x1 || py < pgRect.y0 || py > pgRect.y1) continue;
 
-          // Offset coords (small ints) for the 5-tuple.
+          // Offset coords (small ints) for the cell_UR — the cell on the
+          // +e_j, +e_k side of the pentagrid vertex. The other 3 cells
+          // around the vertex differ from cell_UR by -e_j and/or -e_k.
+          // NOTE: cell_UR is NOT unique per rhombus — multiple rhombi
+          // (from different (j, k) pairs) can share a tile-space corner
+          // at the same cell. The iteration over (j, k, kj, kk) is what
+          // gives unique rhombi, so we don't dedup on cell_UR.
           const o0 = j === 0 ? kj : k === 0 ? kk : Math.floor(px * COS_F[0] + py * SIN_F[0] + gamma[0]);
           const o1 = j === 1 ? kj : k === 1 ? kk : Math.floor(px * COS_F[1] + py * SIN_F[1] + gamma[1]);
           const o2 = j === 2 ? kj : k === 2 ? kk : Math.floor(px * COS_F[2] + py * SIN_F[2] + gamma[2]);
           const o3 = j === 3 ? kj : k === 3 ? kk : Math.floor(px * COS_F[3] + py * SIN_F[3] + gamma[3]);
           const o4 = j === 4 ? kj : k === 4 ? kk : Math.floor(px * COS_F[4] + py * SIN_F[4] + gamma[4]);
-          const key = `${o0},${o1},${o2},${o3},${o4}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
 
           // v_N in tile-space offset coords = Σ_l o_l · e_l. This is the
           // "upper-right" corner of the rhombus (n_j=kj, n_k=kk). The
