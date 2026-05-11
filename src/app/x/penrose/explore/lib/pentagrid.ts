@@ -9,58 +9,50 @@
 // γ_eff = fProj. Absolute coords are anchor.nProj + the Float64-derived
 // offset coord.
 
-const ZERO = BigInt(0);
-const ONE = BigInt(1);
-const TWO = BigInt(2);
-const FOUR = BigInt(4);
-const FIVE = BigInt(5);
-const TEN = BigInt(10);
-const TWO_POW_32 = BigInt(1) << BigInt(32);
-const HALF_SCALE_EXP = BigInt(50);
-const SCALE = TEN ** HALF_SCALE_EXP;
+const SCALE = 10n ** 50n;
 const SCALE_F = Number(SCALE);
 const SCALE2 = SCALE * SCALE;
 
 function bigintSqrt(n: bigint): bigint {
-  if (n < ZERO) throw new Error("negative");
-  if (n < TWO) return n;
+  if (n < 0n) throw new Error("negative");
+  if (n < 2n) return n;
   let x = n;
-  let y = (x + ONE) / TWO;
+  let y = (x + 1n) / 2n;
   while (y < x) {
     x = y;
-    y = (x + n / x) / TWO;
+    y = (x + n / x) / 2n;
   }
   return x;
 }
 
 function bigintFloorDiv(n: bigint, d: bigint): bigint {
-  if (d === ZERO) throw new Error("div by zero");
-  if (d < ZERO) {
+  if (d === 0n) throw new Error("div by zero");
+  if (d < 0n) {
     n = -n;
     d = -d;
   }
-  if (n >= ZERO) return n / d;
-  return n % d === ZERO ? n / d : n / d - ONE;
+  if (n >= 0n) return n / d;
+  return n % d === 0n ? n / d : n / d - 1n;
 }
 
 // Algebraic constants. cos(2π/5) = (√5 - 1)/4, sin(2π/5) = √(10+2√5)/4.
-const SQRT5 = bigintSqrt(FIVE * SCALE2);
-const SQRT_T_PLUS = bigintSqrt((TEN * SCALE + TWO * SQRT5) * SCALE);
-const SQRT_T_MINUS = bigintSqrt((TEN * SCALE - TWO * SQRT5) * SCALE);
+const SQRT5 = bigintSqrt(5n * SCALE2);
+const SQRT_T_PLUS = bigintSqrt((10n * SCALE + 2n * SQRT5) * SCALE);
+const SQRT_T_MINUS = bigintSqrt((10n * SCALE - 2n * SQRT5) * SCALE);
 
 const COS_HI: readonly bigint[] = [
   SCALE,
-  bigintFloorDiv(SQRT5 - SCALE, FOUR),
-  bigintFloorDiv(-(SQRT5 + SCALE), FOUR),
-  bigintFloorDiv(-(SQRT5 + SCALE), FOUR),
-  bigintFloorDiv(SQRT5 - SCALE, FOUR),
+  bigintFloorDiv(SQRT5 - SCALE, 4n),
+  bigintFloorDiv(-(SQRT5 + SCALE), 4n),
+  bigintFloorDiv(-(SQRT5 + SCALE), 4n),
+  bigintFloorDiv(SQRT5 - SCALE, 4n),
 ];
 const SIN_HI: readonly bigint[] = [
-  ZERO,
-  bigintFloorDiv(SQRT_T_PLUS, FOUR),
-  bigintFloorDiv(SQRT_T_MINUS, FOUR),
-  bigintFloorDiv(-SQRT_T_MINUS, FOUR),
-  bigintFloorDiv(-SQRT_T_PLUS, FOUR),
+  0n,
+  bigintFloorDiv(SQRT_T_PLUS, 4n),
+  bigintFloorDiv(SQRT_T_MINUS, 4n),
+  bigintFloorDiv(-SQRT_T_MINUS, 4n),
+  bigintFloorDiv(-SQRT_T_PLUS, 4n),
 ];
 
 export const COS_F: readonly number[] = COS_HI.map((c) => Number(c) / SCALE_F);
@@ -98,10 +90,10 @@ export function gammaFromSeed(seed: string): {
   const raw: bigint[] = [];
   for (let i = 0; i < 5; i++) {
     h = Math.imul(h ^ (i + 1), 16777619) >>> 0;
-    raw.push((BigInt(h) * SCALE) / TWO_POW_32 - SCALE / TWO);
+    raw.push((BigInt(h) * SCALE) / (1n << 32n) - SCALE / 2n);
   }
-  const sum = raw.reduce((a, b) => a + b, ZERO);
-  const shift = sum / FIVE;
+  const sum = raw.reduce((a, b) => a + b, 0n);
+  const shift = sum / 5n;
   const exact = raw.map((g) => g - shift) as unknown as readonly [bigint, bigint, bigint, bigint, bigint];
   const float = exact.map((g) => Number(g) / SCALE_F) as unknown as readonly [number, number, number, number, number];
   return { exact, float };

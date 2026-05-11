@@ -32,7 +32,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
 
   // Pan / zoom state in refs (no re-renders on each frame).
   const gammaRef = useRef(gammaFromSeed(seed));
-  const anchorRef = useRef<Anchor>(makeAnchor(BigInt(0), BigInt(0), gammaRef.current.exact));
+  const anchorRef = useRef<Anchor>(makeAnchor(0n, 0n, gammaRef.current.exact));
   const offsetRef = useRef<[number, number]>([0, 0]);
   const zoomRef = useRef<number>(40);
   const dprRef = useRef<number>(1);
@@ -142,7 +142,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         // fractional part as the new offset so the view doesn't jump.
         const stepX = BigInt(Math.trunc(ox));
         const stepY = BigInt(Math.trunc(oy));
-        const SCALE_BIG = BigInt(10) ** BigInt(50);
+        const SCALE_BIG = 10n ** 50n;
         const newX = anchorRef.current.x + stepX * SCALE_BIG;
         const newY = anchorRef.current.y + stepY * SCALE_BIG;
         anchorRef.current = makeAnchor(newX, newY, gammaRef.current.exact);
