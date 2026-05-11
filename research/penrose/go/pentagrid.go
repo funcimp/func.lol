@@ -262,3 +262,111 @@ func minF(a, b, c, d float64) float64 {
 func maxF(a, b, c, d float64) float64 {
 	return math.Max(math.Max(a, b), math.Max(c, d))
 }
+
+// Anchor holds an exact world position plus precomputed per-direction
+// projections. The anchor's integer projection (NProj) is BigInt;
+// the fractional remainder (FProj) is Float64 in [0, 1) and feeds the
+// per-frame enumeration loop as γ_eff. Per-tile absolute coords are
+// built by adding NProj[j] to the offset-frame floor result.
+type Anchor struct {
+	X, Y  *big.Int
+	NProj [5]*big.Int
+	FProj [5]float64
+}
+
+// MakeAnchor computes the projections for a given world position.
+// Call once per re-anchor; cheap to throw away when the offset grows
+// past the precision threshold and a new anchor is picked.
+func MakeAnchor(x, y *big.Int, gamma [5]*big.Int) *Anchor {
+	a := &Anchor{X: new(big.Int).Set(x), Y: new(big.Int).Set(y)}
+	scale2F, _ := new(big.Float).SetInt(Scale2).Float64()
+	for j := 0; j < 5; j++ {
+		proj := new(big.Int).Mul(x, CosHi[j])
+		t := new(big.Int).Mul(y, SinHi[j])
+		proj.Add(proj, t)
+		t.Mul(gamma[j], Scale)
+		proj.Add(proj, t)
+
+		n := floorDiv(proj, Scale2)
+		remainder := new(big.Int).Mul(n, Scale2)
+		remainder.Sub(proj, remainder)
+		// remainder is in [0, Scale²); convert to Float64 in [0, 1).
+		rf, _ := new(big.Float).SetInt(remainder).Float64()
+		a.NProj[j] = n
+		a.FProj[j] = rf / scale2F
+	}
+	return a
+}
+
+// EnumerateAnchored counts unique tiles in the offset-relative rect.
+// The inner loop is pure Float64 with γ_eff = anchor.FProj; for each
+// found tile, the absolute pentagrid coord is anchor.NProj[j] + the
+// Float64-derived offset coord. Dedup key is the absolute 5-tuple, to
+// match the JS Q4 benchmark for fair comparison.
+func EnumerateAnchored(anchor *Anchor, rect Rect) int {
+	seen := make(map[string]struct{}, 2048)
+	gamma := anchor.FProj
+
+	rx0, rx1 := float64(rect.X0), float64(rect.X1)
+	ry0, ry1 := float64(rect.Y0), float64(rect.Y1)
+
+	tmpAbs := [5]*big.Int{}
+	for i := range tmpAbs {
+		tmpAbs[i] = new(big.Int)
+	}
+
+	for j := 0; j < 4; j++ {
+		for k := j + 1; k < 5; k++ {
+			ejx, ejy := CosF[j], SinF[j]
+			ekx, eky := CosF[k], SinF[k]
+			det := ejx*eky - ejy*ekx
+			if math.Abs(det) < 1e-12 {
+				continue
+			}
+			invDet := 1 / det
+
+			pj0 := rx0*ejx + ry0*ejy
+			pj1 := rx1*ejx + ry0*ejy
+			pj2 := rx0*ejx + ry1*ejy
+			pj3 := rx1*ejx + ry1*ejy
+			pk0 := rx0*ekx + ry0*eky
+			pk1 := rx1*ekx + ry0*eky
+			pk2 := rx0*ekx + ry1*eky
+			pk3 := rx1*ekx + ry1*eky
+
+			kjMin := int64(math.Floor(minF(pj0, pj1, pj2, pj3)+gamma[j])) - 1
+			kjMax := int64(math.Ceil(maxF(pj0, pj1, pj2, pj3)+gamma[j])) + 1
+			kkMin := int64(math.Floor(minF(pk0, pk1, pk2, pk3)+gamma[k])) - 1
+			kkMax := int64(math.Ceil(maxF(pk0, pk1, pk2, pk3)+gamma[k])) + 1
+
+			for kj := kjMin; kj <= kjMax; kj++ {
+				aj := float64(kj) - gamma[j]
+				for kk := kkMin; kk <= kkMax; kk++ {
+					ak := float64(kk) - gamma[k]
+					px := (eky*aj - ejy*ak) * invDet
+					py := (-ekx*aj + ejx*ak) * invDet
+					if px < rx0 || px > rx1 || py < ry0 || py > ry1 {
+						continue
+					}
+					var o [5]int64
+					for l := 0; l < 5; l++ {
+						switch l {
+						case j:
+							o[l] = kj
+						case k:
+							o[l] = kk
+						default:
+							o[l] = int64(math.Floor(px*CosF[l] + py*SinF[l] + gamma[l]))
+						}
+					}
+					for l := 0; l < 5; l++ {
+						tmpAbs[l].Add(anchor.NProj[l], big.NewInt(o[l]))
+					}
+					key := fmt.Sprintf("%s,%s,%s,%s,%s", tmpAbs[0], tmpAbs[1], tmpAbs[2], tmpAbs[3], tmpAbs[4])
+					seen[key] = struct{}{}
+				}
+			}
+		}
+	}
+	return len(seen)
+}
