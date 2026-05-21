@@ -9,7 +9,7 @@
 // so the tarball is decompressed and parsed in memory: no shelling out
 // to tar, no temp files.
 
-import { put } from "@vercel/blob"
+import { putBlob } from "@/lib/blob"
 import { gunzipSync } from "node:zlib"
 import { log } from "@/lib/log"
 
@@ -128,7 +128,7 @@ export async function syncGeoipToBlob(): Promise<SyncGeoipResult> {
 
   const tPut = Date.now()
   glog.debug({ step: "blob.put_start", key: ASN_BLOB_KEY, bytes: mmdb.length })
-  await put(ASN_BLOB_KEY, mmdb, {
+  await putBlob(ASN_BLOB_KEY, mmdb, {
     access: "private",
     contentType: "application/octet-stream",
     addRandomSuffix: false,

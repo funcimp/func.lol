@@ -11,7 +11,7 @@
 // it across cron invocations and only the first cold instance pays the
 // ~10MB blob fetch.
 
-import { put } from "@vercel/blob"
+import { putBlob } from "@/lib/blob"
 import { Reader, type Asn, type ReaderModel } from "@maxmind/geoip2-node"
 import { sql } from "drizzle-orm"
 import { getDb } from "@/db"
@@ -254,7 +254,7 @@ export async function publishAggregates(agg: Aggregates): Promise<void> {
   const body = JSON.stringify(agg, null, 2)
   const t0 = Date.now()
   slog.debug({ step: "publish.put_start", key: STATS_BLOB_KEY, bytes: body.length })
-  await put(STATS_BLOB_KEY, body, {
+  await putBlob(STATS_BLOB_KEY, body, {
     access: "private",
     contentType: "application/json",
     addRandomSuffix: false,

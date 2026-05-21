@@ -1,7 +1,7 @@
 // src/proxy.ts
 import { NextResponse, after, type NextRequest } from "next/server"
-import { put } from "@vercel/blob"
 import { createId } from "@paralleldrive/cuid2"
+import { putBlob } from "@/lib/blob"
 import {
   matchBait,
   categoryToBomb,
@@ -25,7 +25,7 @@ function archiveEvent(event: TripwireEvent): void {
   const id = event.req_id ?? createId()
   const pathname = `events/${date}/${ms}-${id}.json`
   after(() =>
-    put(pathname, JSON.stringify(event), {
+    putBlob(pathname, JSON.stringify(event), {
       access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
