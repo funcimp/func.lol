@@ -34,7 +34,11 @@ let cached: { data: Aggregates; fetchedAt: number } | null = null
 
 // Token format is `vercel_blob_rw_<storeId>_<rest>`. The SDK does the
 // same split internally to construct private blob URLs.
+// BLOB_BASE_URL overrides the host so E2E tests can point reads at the
+// local fake server (see e2e/fake-blob.ts).
 function privateBlobUrl(pathname: string, token: string): string {
+  const fake = process.env.BLOB_BASE_URL
+  if (fake) return `${fake}/${pathname}`
   const storeId = token.split("_")[3]
   if (!storeId) {
     throw new Error("could not extract store id from BLOB_READ_WRITE_TOKEN")

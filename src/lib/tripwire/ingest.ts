@@ -71,12 +71,15 @@ interface BlobListPage {
 // after the Response object goes out of scope, which under Bun on Vercel
 // can leave the body stream stuck waiting for EOF. By keeping our own
 // Response in scope across the .json() drain, the request completes.
+// BLOB_BASE_URL overrides the host so E2E can point the list call at the
+// local fake server (see e2e/fake-blob.ts).
 async function listBlobsPage(prefix: string, cursor: string | undefined): Promise<BlobListPage> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
   if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is not set")
   const params = new URLSearchParams({ prefix })
   if (cursor) params.set("cursor", cursor)
-  const res = await fetch(`https://vercel.com/api/blob/?${params}`, {
+  const base = process.env.BLOB_BASE_URL ?? "https://vercel.com"
+  const res = await fetch(`${base}/api/blob/?${params}`, {
     headers: {
       authorization: `Bearer ${token}`,
       "x-api-version": "12",
