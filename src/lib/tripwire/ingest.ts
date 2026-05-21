@@ -90,8 +90,8 @@ async function listBlobsPage(prefix: string, cursor: string | undefined): Promis
 }
 
 // Bound the listing to the trailing INGEST_WINDOW_DAYS UTC dates. Cron runs
-// every 5 minutes, so a 2-day window leaves 24h+ of slack against any cron
-// outage. Events older than the window won't be auto-ingested by the cron;
+// hourly, so a 2-day window leaves ~47h of slack against any cron outage.
+// Events older than the window won't be auto-ingested by the cron;
 // the CLI script (scripts/tripwire/ingest-events.ts) still walks the full
 // events/ prefix and can backfill manually if a longer outage happens.
 const INGEST_WINDOW_DAYS = 2
