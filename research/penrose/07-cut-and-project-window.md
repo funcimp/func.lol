@@ -1,8 +1,13 @@
 # Penrose — The exact cut-and-project window, and the validated engine
 
+> **Correction (2026-06-23).** "Genuinely open (our contribution)" below is wrong.
+> The window is D'Andrea 2023 **Prop 5.15**; the address↔coordinate map is **Theorem
+> 5.16**. Both are classical de Bruijn theory, reproduced under test, not new results.
+> See `STATUS.md` → "Provenance." Kept as a record of the reasoning.
+
 Research note. Records the exact acceptance window (from the literature), the
 inflation/offset rule, a validated cut-and-project engine built from them, and the
-two pieces that remain genuinely open (which are our contribution). This is the
+two pieces that were thought open at the time (corrected above). This is the
 technical foundation for the Z⁵ substitution alphabet and the address↔coordinate
 bridge.
 

@@ -1,5 +1,11 @@
 # Penrose — The bridge: substitution → de Bruijn coordinates
 
+> **Correction (2026-06-23).** This is not the "open-conjecture case." The bridge is
+> D'Andrea 2023 **§5.3** (Prop 5.14 cut-and-project characterization, Theorem 5.16
+> composition), i.e. classical de Bruijn. We reproduce it under test; we do not solve
+> arXiv:2603.13553's broader conjecture. See `STATUS.md` → "Provenance." Kept as a
+> record of the reasoning.
+
 Research note. The result that closes the address↔coordinate gap: the substitution
 tiling, lifted to ℤ⁵ by edge-integration, is a cut-and-project tiling, so every
 substitution-rendered tile gets its exact de Bruijn coordinate. Built and validated

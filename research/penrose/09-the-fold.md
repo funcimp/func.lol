@@ -1,5 +1,12 @@
 # Penrose — The fold: the closed-form address↔coordinate recursion
 
+> **Correction (2026-06-23).** The fold is **not** novel and not the cocycle paper's
+> open problem. It is D'Andrea 2023 **Theorem 5.16** exactly: `coord' = −A·coord +
+> m·ones` equals the composition map Φ via the cyclotomic identity `C = J − A` and
+> `m = index − c`, and the carry `c ∈ {0,1,1,2}` we re-derived is Theorem 5.16's `c`.
+> Equivalently de Bruijn 1990 §3.12. See `STATUS.md` → "Provenance." Kept as a record
+> of the reasoning (the skeptical carry re-derivation still stands as good practice).
+
 Research note. The local, O(log) form of the substitution → de-Bruijn-coordinate
 map, and the resolution of the additive index correction that was the open piece.
 Built and tested in `research/penrose/cap/fold.ts`.

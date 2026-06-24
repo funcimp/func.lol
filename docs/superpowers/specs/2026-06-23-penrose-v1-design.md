@@ -1,6 +1,11 @@
 # Penrose — v1 Design
 
-**Status:** spec
+> **SUPERSEDED (2026-06-24).** This spec was written against the old de Bruijn pentagrid
+> viewport-anchor engine, which had a real re-anchor bug and was replaced by the tested
+> cut-and-project / substitution engine. The current spec is
+> `2026-06-24-penrose-v1-design.md`. Kept for history.
+
+**Status:** superseded
 **Date:** 2026-06-23
 **Source:** brainstorming session (terminal + visual companion)
 
@@ -12,15 +17,15 @@ The bug is the headline. The exported `Tile.coord` is many-to-one (the review me
 
 Brainstorming sharpened the purpose. This is not an explorer with an essay attached. It is a guided introduction to Penrose tilings for people who have never met one: an explorable explanation where small playable figures each teach one idea, ending in a full explorer.
 
-Three deep properties drive the teaching, and they are one structure seen three ways. **Non-locality:** local matching rules are necessary but not sufficient, so laying tiles by them alone hits dead ends. Penrose's anecdote (Ball, *Prospect*): he spotted a university tiling whose edge tile broke the rules, so it "would go wrong somewhere in the middle of the lawn." **Local indistinguishability:** any two tilings share every finite patch yet differ globally, faulting along "veins." **φ-inflation:** each tile subdivides into φ-smaller tiles and composes into φ-larger supertiles indefinitely, with a unique grouping. That unique hierarchy is the hidden skeleton the three expose, and the exact 5-tuple address under the cursor is it made explicit: the tile's place in the 5D lattice that local rules cannot see.
+Three deep properties drive the teaching, and they are one structure seen three ways. **Non-locality:** local matching rules are necessary but not sufficient, so laying tiles by them alone hits dead ends. Penrose's anecdote (Ball, *Prospect*): he spotted a university tiling whose edge tile broke the rules, so it "would go wrong somewhere in the middle of the lawn." **Local indistinguishability:** any two tilings share every finite patch yet differ globally, faulting along "veins." **φ-inflation:** each tile subdivides into φ-smaller tiles and composes into φ-larger supertiles indefinitely, with a unique grouping. That unique hierarchy is the hidden skeleton the three expose, and the exact address under the cursor is it made explicit: which two of the five grids cross here and at which lines, the tile's place in the 5D lattice that local rules cannot see.
 
-This is safe at any size because we never lay tiles locally. The de Bruijn pentagrid is global: each tile is a deterministic projection from a 5D lattice. No growth, no backtracking, no invalid configuration reachable. The one condition is regularity (`Σγ ∉ ℤ`); the singular case (our current `Σγ = 0`) is where lines run concurrent, vertices degenerate, and the address collides. The correctness fix and the safety guarantee are the same fix.
+This is safe at any size because we never lay tiles locally. The de Bruijn pentagrid is global: each tile is a deterministic projection from a 5D lattice. No growth, no backtracking, no invalid configuration reachable. The line indices grow without bound as you pan (a 51-digit integer at 10^50 units out), which is why the address is BigInt and the explorer keeps a BigInt anchor with a small Float64 render offset. Regularity (`Σγ ∉ ℤ` vs the singular symmetric case) is a separate matter, not the address fix; an empirical probe demoted it from this spec's first draft (see centerpiece 2).
 
 ## Goal
 
 Ship `/x/penrose` as a teaching experiment: a guided, explorable introduction whose centerpiece is an infinite explorer that always knows the exact tile under your cursor, taught by small playable sketches on the hierarchy spine.
 
-1. **Correct address.** `Tile.coord` injective per rhombus, test-gated.
+1. **Correct address.** The tile's address is the crossing `(j, k, kj, kk)` (`kj`/`kk` BigInt), proven unique per rhombus and test-gated. The old `cell_UR` 5-tuple collided and is dropped.
 2. **Explorer, focused.** Keep the built interaction; add a seed input, click-to-pin, the B1 palette, and the small UX fixes. No overlays bolted on.
 3. **Share by tile-address.** seed + pinned tile + zoom in the URL; the pin doubles as the camera origin. Client-side state, no `useSearchParams`.
 4. **A Sketch harness** and the figures it powers.
@@ -48,7 +53,7 @@ Single-column scroll, prose and sketches alternating, ending in the explorer.
 1. **Meet the two tiles** (static + hover). Thick and thin rhombus, φ in their angles, the edge marks.
 2. **The dead-end** (play). Lay tiles by local rules until the patch paints into a corner. Penrose's lawn, playable. Non-locality.
 3. **Five grids, one tiling** (play). Draw the five line families, morph each crossing into its dual rhombus. How de Bruijn builds it.
-4. **Regular vs singular** (slider on `Σγ`). Watch a tiling degenerate where lines go concurrent. Why regularity keeps the address exact.
+4. **Regular vs singular** (slider on `Σγ`). Watch the symmetric pinwheel (`Σγ ∈ ℤ`, lines concurrent) relax into a generic tiling. What regularity means in the pentagrid.
 5. **The golden ratio appears** (play). thick:thin count converging to φ.
 6. **Zoom the hierarchy** (inflation overlay, gated by the spike). A bounded patch with its φ-supertiling overlaid; step between depths.
 7. **The explorer** (hero). Go anywhere; the exact address always under your cursor.
@@ -59,11 +64,13 @@ Single-column scroll, prose and sketches alternating, ending in the explorer.
 
 `lib/pentagrid.ts` is the single source the explorer, all six sketches, the tests, and the v2 demos draw from. Invest in one correct, well-tested engine; keep every consumer small. Move the lib up to `src/app/x/penrose/lib/` (out of `explore/`), since the teaching page shares it too.
 
-### 2. The correctness fix: regularity, test-gated
+### 2. The correctness fix: the crossing identity, test-gated
 
-Make the pentagrid regular. `gammaFromSeed` forces `Σγ = 0` by subtracting `sum/5`; change it to force `Σγ` to a fixed non-integer so no point lies on more than two lines. The requirement is an invariant, not an implementation: **`Tile.coord` is injective over any viewport, for any seed**, enforced by a test.
+The exported `cell_UR` 5-tuple is the wrong *kind* of label. A 5-tuple names a region of the plane; a tile is a *crossing* of two grid lines. An empirical probe settled it: across five seeds, `cell_UR` collapses ~50% (324 tiles → 135 distinct), and making the pentagrid regular does not help, it collides regardless. The reason is structural: the 5-tuple records which gap you sit in for each family but forgets which two families actually crossed, and that is exactly what tells two adjacent tiles apart.
 
-Preferred outcome: regularity restores the bijection and the 5-tuple stays the address, keeping the "unique 5-tuple" promise. Fallback if the test disagrees: adopt the proven-unique `(j, k, kj, kk)` as the canonical address. The test decides; we do not ship a guess.
+So the address is the crossing the enumerator already computes and discards: `(j, k, kj, kk)`. `j, k ∈ {0..4}` are which two grids meet (small ints); `kj, kk` are which line in each, unbounded, so BigInt. The absolute address is `(j, k, anchor.nProj[j] + kj, anchor.nProj[k] + kk)`. This is unique 324/324 in the probe, already computed, and legible ("grids 0 and 1, lines 7000000000000 and -4"). The invariant, enforced by a test: **every tile's `(j, k, kj, kk)` is distinct over any viewport, for any seed.**
+
+Regularity is decoupled and demoted to a teaching topic (sketch 4). The current singular seed renders fine and addresses uniquely, so v1 leaves `gammaFromSeed` as is.
 
 ### 3. The explorer, focused
 
@@ -84,7 +91,7 @@ A tile's address doubles as the camera position, so a link is one address plus z
 ```
 
 - `s` = seed (absent = default).
-- `t` = pinned tile's canonical address, base62 (optional; present = pin and center on it).
+- `t` = pinned tile's address `(j, k, kj, kk)`: the two small family indices plus `kj`/`kk` as base62 BigInt (optional; present = pin and center on it).
 - `z` = zoom, short fixed-precision float (absent = default).
 
 Two modules, mirroring Prime Moments' `encoding.ts` + `share.ts`:
@@ -129,7 +136,7 @@ Two conscious amendments, scoped as the constellation ring is scoped:
 
 Table-driven `bun:test` where the shape fits.
 
-- `lib/pentagrid.test.ts`: address injectivity over a sampled viewport across seeds (the headline guard); coverage / no-overlap on sampled points; thick:thin → φ; anchored vs exact agreement at anchor 0 and near the 1e8 boundary; enumerate → `tileContains` round-trip.
+- `lib/pentagrid.test.ts`: address uniqueness, every tile's `(j, k, kj, kk)` distinct over a sampled viewport across seeds (the headline guard); coverage / no-overlap on sampled points; thick:thin → φ; anchored vs exact agreement at anchor 0 and near the 1e8 boundary; enumerate → `tileContains` round-trip.
 - `lib/encoding.test.ts`: round-trip seed / tile-address / zoom, including large BigInt addresses.
 - `lib/inflation.test.ts` (after the spike): inflated vertices coincide with supertile vertices.
 - Playwright: `/x/penrose` loads and sketches mount; `/x/penrose/explore` mounts the canvas; a `?s=&t=&z=` URL loads and centers on the pin.
@@ -169,7 +176,7 @@ src/app/x/page.tsx                         refresh the Penrose blurb
 
 Each slice is independently reviewable and lands with its tests.
 
-1. **Engine + address fix + tests.** Move lib up; make the pentagrid regular; prove `Tile.coord` injective. Nothing proceeds until injectivity is green.
+1. **Engine + address fix + tests.** Move lib up; expose the crossing `(j, k, kj, kk)` as the `Tile` address (`kj`/`kk` BigInt), drop `cell_UR`; prove uniqueness over a sampled viewport. Nothing proceeds until that test is green.
 2. **Encoding + share + explorer wiring.** The codec and its tests; seed input (with the effect fix), click-to-pin, URL read-on-mount and debounced write; share round-trip E2E.
 3. **Explorer polish + palette.** B1, the `--color-penrose-*` tokens, the color amendment, the UX fixes, dead-export cleanup.
 4. **Sketch harness + core sketches.** `Sketch.tsx` with the reduced-motion contract, the animation amendment, then the intro and four sketches.
@@ -178,7 +185,7 @@ Each slice is independently reviewable and lands with its tests.
 
 ## Open risks
 
-- **Injectivity under arbitrary seeds** (slice 1) and **the inflation transform** (slice 5) are the two unproven pieces. Both are test-gated: injectivity falls back to `(j,k,kj,kk)`, inflation slips to v2. Resolve empirically, do not assert.
+- **The inflation transform** (slice 5) is the one unproven piece, test-gated against the exact oracle; it slips to v2 if it does not validate. (The address question is resolved: a probe across five seeds confirmed `cell_UR` collides ~50% regardless of regularity, while `(j, k, kj, kk)` is unique 324/324.)
 - **The dead-end sketch** (slice 4) is a bounded, deterministic scripted sequence, not a live solver, so it always reaches the same teachable conflict.
 
 ## v2

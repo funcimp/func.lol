@@ -1,5 +1,12 @@
 # Penrose — Substitution, Z⁵ coordinates, and the engine pivot
 
+> **Correction (2026-06-23).** The novelty assessment below is wrong. After reading
+> de Bruijn 1990 ("Updown generation") and D'Andrea 2023 (*A Guide to Penrose
+> Tilings*), the results are classical and standard — not a publishable contribution.
+> The fold is D'Andrea **Theorem 5.16**; the window is **Prop 5.15**. See `STATUS.md`
+> → "Provenance" for the line-by-line correspondence. The reasoning here is kept as a
+> record of how the work proceeded.
+
 Research note. Captures the investigation that moved the explorer's engine from
 "de Bruijn pentagrid + BigInt viewport anchor" to "substitution / deflation with
 exact arithmetic, addressed by de Bruijn Z⁵ coordinates." Includes the literature
