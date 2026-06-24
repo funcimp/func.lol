@@ -10,16 +10,30 @@ A persistent vertex's de Bruijn coordinate transforms between consecutive deflat
 levels by a single deterministic recursion:
 
 ```
-coord⁽ᴺ⁺¹⁾ = −A·coord⁽ᴺ⁾ + carry·[1,1,1,1,1]
-carry = 1  iff  index(coord⁽ᴺ⁾) is in the upper half of its 4-value band
+coord' = −A·coord + m·[1,1,1,1,1]
+m = ⌈(1 + 2·index)/5⌉        (canonical frame, index ∈ {1,2,3,4} ⇒ m ∈ {1,2})
 ```
 
-`A` is the integer inflation circulant. This is a **base-(−A) numeration system on
-ℤ⁵ with a single binary digit** — and `det A = 2` is exactly why there is one bit.
-The digit is the **de Bruijn index carry**: `A`'s eigenvalue on the index direction
-is 2, so the index would double out of range; the all-ones vector (a +5 to the index)
-pulls it back. That conditional all-ones vector is the additive index correction the
-literature leaves unstated.
+(Frame-relative form, for a band starting at `bandMin`: `m = ⌈(bandMin + 2·index)/5⌉`.)
+
+Nothing here is fitted — every term is forced:
+
+- **`−A`** is the inflation operator (eigenvalues `−φ, 1/φ, 2`).
+- **`[1,1,1,1,1]` is forced, not chosen.** It is `A`'s eigenvector for eigenvalue 2
+  (`A·𝟙 = 2𝟙`), and it is the **kernel of both projections**: `π(𝟙) = π'(𝟙) = 0`
+  (the five 5th-roots of unity sum to zero). So adding it shifts the de Bruijn index
+  by exactly 5 and moves the tile not at all. It is the *unique* index-gauge
+  direction, and `det A = 2` is why a single such digit suffices.
+- **`m` is the forced carry.** `index' = −2·index + 5m`, and `m` is the only integer
+  putting `index'` back in `{1,2,3,4}`. Since `−2` is invertible mod 5,
+  `index' = (−2·index) mod 5` permutes `{1,2,3,4}` bijectively (`1→3→4→2→1`).
+
+This is a base-`(−A)` numeration on ℤ⁵; the digit is the de Bruijn index carry —
+the additive index correction the literature leaves unstated.
+
+(History: a first version keyed the carry off the *source* band and held at only two
+of four level pairs — a frame coincidence. Keying it off the target/canonical index
+makes it universal; it now holds at every level pair under test.)
 
 ## Why it matters
 
@@ -50,8 +64,6 @@ exactly half the vertices; the residual takes exactly two values, `0` and
   on each edge); their ℤ⁵ offset is one finer-lattice edge (`±e_l`), sketched but not
   yet formalized/tested. The recursion + this rule give the complete tile-enumeration
   with coordinates.
-- **Canonical index band.** `bandMin` here comes from the lift's reference vertex; pin
-  the offset that fixes the band to the canonical `{1,2,3,4}` so `carry` is absolute.
 - **T6: face extraction** (for rendering rhombi and the thick:thin = φ proof).
 
 ## The full tested chain

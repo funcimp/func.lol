@@ -1,41 +1,70 @@
 import { describe, expect, test } from "bun:test";
 
 import { lift } from "./bridge";
-import { nextCoord } from "./fold";
-import type { Vec5 } from "./cap";
+import { nextCoord, nextCoordCanonical } from "./fold";
+import { A, physical, internal, type Vec5 } from "./cap";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
+const ONES: Vec5 = [1, 1, 1, 1, 1];
 const wheelKey = (pos: readonly [number, number], level: number): string => {
   const w = PHI ** level;
   return `${(pos[0] / w).toFixed(4)},${(pos[1] / w).toFixed(4)}`;
 };
 
-describe("closed-form coordinate recursion matches the edge-integration lift", () => {
-  test("coord' = −A·coord + index-carry reproduces every persistent vertex exactly", () => {
-    const N = 5;
-    const LN = lift(N);
-    const LM = lift(N + 1);
-    const bandMin = Math.min(...LN.verts.map((v) => v.coord.reduce((s, x) => s + x, 0)));
-    const mapM = new Map(LM.verts.map((v) => [wheelKey(v.pos, N + 1), v.coord]));
+describe("[1,1,1,1,1] is the forced index-gauge direction (not a fitted constant)", () => {
+  test("it is A's eigenvector for eigenvalue 2 (the index axis)", () => {
+    expect([...A(ONES)]).toEqual([2, 2, 2, 2, 2]);
+  });
+  test("it is the kernel of both projections — adding it moves no geometry", () => {
+    const [px, py] = physical(ONES);
+    const [ix, iy] = internal(ONES);
+    expect(Math.hypot(px, py)).toBeLessThan(1e-12);
+    expect(Math.hypot(ix, iy)).toBeLessThan(1e-12);
+  });
+});
 
-    let matched = 0, exact = 0;
-    for (const v of LN.verts) {
-      const cM = mapM.get(wheelKey(v.pos, N));
-      if (!cM) continue;
-      matched++;
-      const pred = nextCoord(v.coord as Vec5, bandMin);
-      if (pred.every((x, i) => x === cM[i])) exact++;
+describe("the closed-form recursion holds at every level pair", () => {
+  // Earlier the carry keyed off the source band and failed at half the pairs.
+  // The forced rule keys off the target band; it must be exact everywhere.
+  for (const N of [3, 4, 5, 6]) {
+    test(`coord' = −A·coord + carry·ones reproduces every persistent vertex, level ${N}→${N + 1}`, () => {
+      const LN = lift(N);
+      const LM = lift(N + 1);
+      const targetBandMin = Math.min(...LM.verts.map((v) => v.coord.reduce((s, x) => s + x, 0)));
+      const mapM = new Map(LM.verts.map((v) => [wheelKey(v.pos, N + 1), v.coord]));
+
+      let matched = 0, exact = 0;
+      for (const v of LN.verts) {
+        const cM = mapM.get(wheelKey(v.pos, N));
+        if (!cM) continue;
+        matched++;
+        const pred = nextCoord(v.coord as Vec5, targetBandMin);
+        if (pred.every((x, i) => x === cM[i])) exact++;
+      }
+      expect(matched).toBeGreaterThan(50);
+      expect(exact).toBe(matched);
+    });
+  }
+});
+
+describe("canonical-frame rule and exactness", () => {
+  test("canonical carry m = ⌈(1+2·index)/5⌉ maps {1,2,3,4} → {1,2,3,4} bijectively", () => {
+    // index' = −2·index mod 5 is a permutation of {1,2,3,4}
+    const out = new Set<number>();
+    for (let index = 1; index <= 4; index++) {
+      const m = Math.ceil((1 + 2 * index) / 5);
+      const idxPrime = -2 * index + 5 * m;
+      expect(idxPrime).toBeGreaterThanOrEqual(1);
+      expect(idxPrime).toBeLessThanOrEqual(4);
+      out.add(idxPrime);
     }
-
-    expect(matched).toBeGreaterThan(400);
-    expect(exact).toBe(matched); // every persistent vertex, closed-form = ground truth
+    expect(out.size).toBe(4); // a bijection, every target index hit once
   });
 
-  test("the recursion is exact integer arithmetic (no floating drift, any depth)", () => {
-    // a hand seed through several levels stays integer and well-formed
+  test("the recursion stays exact integer to any depth", () => {
     let c: Vec5 = [1, 0, 0, 0, 0];
-    for (let i = 0; i < 30; i++) {
-      c = nextCoord(c, 0);
+    for (let i = 0; i < 40; i++) {
+      c = nextCoordCanonical(c);
       for (const x of c) expect(Number.isInteger(x)).toBe(true);
     }
   });
