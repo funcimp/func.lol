@@ -86,8 +86,6 @@ describe("the window generates a correct Penrose tiling", () => {
     expect(big / small).toBeLessThan(2.9);
   });
 
-  // NOTE: the thick:thin → φ ratio needs correct FACE extraction. Treating every
-  // 4-corner cycle as a face over-counts (spurious rhombi at high-coordination
-  // vertices), so that check is deferred — see task: correct face extraction.
-  test.todo("thick:thin rhombus ratio approaches φ (needs correct face extraction)");
+  // thick:thin → φ is proven exact in faces.test.ts: the corner-acceptance face
+  // condition matches the substitution tile-for-tile (no phantoms) on a large patch.
 });
