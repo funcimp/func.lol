@@ -1,35 +1,42 @@
 import { describe, expect, test } from "bun:test";
 
-import { encodeAddress, decodeAddress, parseSeed, parseZoom } from "./codec";
+import { encodeTile, decodeTile, type TileAddress, parseSeed, parseZoom } from "./codec";
 
-describe("address codec round-trips ℤ⁵ coordinates", () => {
-  const cases: number[][] = [
-    [0, 0, 0, 0, 0],
-    [3, -1, 0, 2, -4],
-    [10, 11, -12, 13, -14],
-    [-1, -1, -1, -1, -1],
+describe("tile codec round-trips the full [n; j, k] address", () => {
+  const cases: TileAddress[] = [
+    { coord: [0, 0, 0, 0, 0], j: 0, k: 1 },
+    { coord: [3, -1, 0, 2, -4], j: 1, k: 4 },
+    { coord: [10, 11, -12, 13, -14], j: 2, k: 3 },
+    { coord: [-1, -1, -1, -1, -1], j: 3, k: 4 },
+    { coord: [100000, -100000, 0, 7, -7], j: 0, k: 4 },
   ];
-  for (const coord of cases) {
-    test(`round-trips [${coord}]`, () => {
-      expect(decodeAddress(encodeAddress(coord))).toEqual(coord);
+  for (const t of cases) {
+    test(`round-trips ${encodeTile(t)}`, () => {
+      expect(decodeTile(encodeTile(t))).toEqual(t);
     });
   }
 });
 
-describe("decodeAddress rejects bad input", () => {
+describe("decodeTile rejects bad input", () => {
   const bad: (string | string[] | undefined)[] = [
     undefined,
-    ["3.0.0.0.0"],
-    "",
-    "1.2.3", // too few
-    "1.2.3.4.5.6", // too many
-    "1.2.x.4.5", // non-integer
-    "1.2.3.4.5.5", // too many
-    "1.2.3.4.999999", // component out of range (|n| > 100000)
+    ["0.0.0.0.0.0.1"], // array, not a string
+    "", // empty
+    "0.0.0.0.0.0", // too few (6 parts)
+    "0.0.0.0.0.0.1.2", // too many (8 parts)
+    "1.2.3.4.5", // old 5-int form, too few
+    "1.2.x.4.5.0.1", // non-integer coord
+    "1.2.3.4.5.1.", // empty trailing part
+    "1.2.3.4.5..1", // empty interior part
+    "999999.0.0.0.0.0.1", // coord out of range (|n| > 100000)
+    "0.0.0.0.0.2.1", // bad axes: j >= k
+    "0.0.0.0.0.1.1", // bad axes: j == k
+    "0.0.0.0.0.0.5", // bad axes: k > 4
+    "0.0.0.0.0.-1.2", // bad axes: negative j
   ];
   for (const raw of bad) {
     test(`rejects ${JSON.stringify(raw)}`, () => {
-      expect(decodeAddress(raw)).toBeNull();
+      expect(decodeTile(raw)).toBeNull();
     });
   }
 });

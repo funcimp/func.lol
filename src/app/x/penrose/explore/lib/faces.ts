@@ -10,6 +10,9 @@ import { lift, type LiftedVertex } from "./bridge";
 
 const SCALE_FOR = (levels: number) => PHI ** levels;
 
+// key has the format "n0,n1,n2,n3,n4|jk", parsed by lib/patch.ts to recover the
+// base corner n and the two axes j,k. That split is a contract dependency: if
+// this format changes, patch.ts must change with it.
 export type Face = { key: string; type: "thick" | "thin" };
 
 const bump = (n: readonly number[], l: number): number[] => {

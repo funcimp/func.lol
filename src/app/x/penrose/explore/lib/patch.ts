@@ -9,8 +9,10 @@ import { substitutionFaces } from "./faces";
 export type Pt = readonly [number, number];
 
 export type RenderFace = {
-  key: string;                  // the engine Face.key, "n0,n1,n2,n3,n4|jk", the ℤ⁵ address
-  coord: readonly number[];     // base corner n (length 5), the address anchor
+  key: string;                  // the engine Face.key, "n0,n1,n2,n3,n4|jk", the full tile identity
+  coord: readonly number[];     // base-corner vertex n (length 5)
+  j: number;                    // first varying axis of the rhombus (0..4)
+  k: number;                    // second varying axis (j < k <= 4)
   type: "thick" | "thin";
   corners: readonly [Pt, Pt, Pt, Pt]; // cyclic: n, n+e_j, n+e_j+e_k, n+e_k
   centroid: Pt;
@@ -66,8 +68,28 @@ export function buildPatch(level: number): Patch {
       if (x > maxX) maxX = x;
       if (y > maxY) maxY = y;
     }
-    out.push({ key: f.key, coord: n, type: f.type, corners, centroid });
+    out.push({ key: f.key, coord: n, j, k, type: f.type, corners, centroid });
   }
 
   return { level, faces: out, bounds: { minX, minY, maxX, maxY } };
+}
+
+// Find a face by its full tile identity. A tile is the rhombus [n; j, k], not
+// just its base corner n: many rhombi share an n, so matching on coord alone can
+// return a neighbor. This matches every coord component and both axes. Returns
+// null when no face matches (engine change or hand-edited URL), which the caller
+// treats as "fall back to the seed center."
+export function findFaceByTile(
+  patch: Patch,
+  addr: { coord: readonly number[]; j: number; k: number },
+): RenderFace | null {
+  return (
+    patch.faces.find(
+      (f) =>
+        f.j === addr.j &&
+        f.k === addr.k &&
+        f.coord.length === addr.coord.length &&
+        f.coord.every((v, i) => v === addr.coord[i]),
+    ) ?? null
+  );
 }

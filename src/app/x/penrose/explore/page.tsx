@@ -7,7 +7,7 @@ import PenroseExplorer from "./PenroseExplorer";
 
 export const metadata: Metadata = {
   title: "Penrose Explorer — func.lol",
-  description: "Interactive de Bruijn pentagrid Penrose tiling.",
+  description: "A bounded, exactly-addressed Penrose patch from a cut-and-project / substitution engine.",
 };
 
 export default function PenroseExplorePage() {

@@ -22,7 +22,7 @@ const labs: Lab[] = [
     slug: "penrose",
     title: "Penrose",
     blurb:
-      "An infinite Penrose tiling, addressed exactly at any size via the de Bruijn pentagrid construction.",
+      "A bounded patch of the Penrose tiling, every tile carrying its exact integer address.",
     publishedAt: "2026-05-11",
     links: {
       github:

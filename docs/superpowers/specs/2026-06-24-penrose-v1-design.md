@@ -121,8 +121,10 @@ the spec is approved.
 
 Three origin-centered frames, all in the tested engine:
 
-- **ℤ⁵ coord** `n = (n₀..n₄)`, the address. `index = Σ nₗ ∈ {1,2,3,4}` for valid vertices.
-  Integer, exact, deep-zoom-safe. The tile identity for hit-testing and the URL.
+- **ℤ⁵ coord** `n = (n₀..n₄)`, the base-corner vertex coordinate. `index = Σ nₗ ∈ {1,2,3,4}`
+  for valid vertices. Integer, exact, deep-zoom-safe. A vertex coord is not a tile: a tile is
+  the rhombus `[n; j, k]` (the `Face.key`), and many rhombi share an `n`. The full `[n; j, k]`
+  is the tile identity for hit-testing and the URL, and is what the HUD shows.
 - **Physical** `physical(n) = Σ nₗ·(cos 2πl/5, sin 2πl/5)`, edge length 1. The explorer
   renders in the closely related `LiftedVertex.pos` frame, a fixed rotation of this (see
   "One frame, pinned" below). Do not mix the two.
