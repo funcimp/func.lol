@@ -796,7 +796,7 @@ describe("decodeAddress rejects bad input", () => {
     "1.2.3.4.5.6",  // too many
     "1.2.x.4.5",    // non-integer
     "1.2.3.4.5.5",  // too many
-    "1.5.0.0.0",    // non-integer (decimal)
+    "1.2.3.4.999999", // component out of range (|n| > 100000)
   ];
   for (const raw of bad) {
     test(`rejects ${JSON.stringify(raw)}`, () => {
