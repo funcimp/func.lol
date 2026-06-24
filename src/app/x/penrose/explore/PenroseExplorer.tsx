@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { buildPatch, type Patch } from "./lib/patch";
 import { buildHitIndex, hitFace, type HitIndex } from "./lib/hitTest";
+import { encodeAddress, decodeAddress, parseSeed, parseZoom } from "./lib/codec";
 
 const PATCH_LEVEL = 10; // ~55k faces, world radius ~123 unit edges, ~350ms one-time build
 const DEFAULT_ZOOM = 40; // px per unit edge
@@ -33,6 +34,17 @@ function seedToCenter(seed: string, patch: Patch): readonly [number, number] {
   return pool[(h >>> 0) % pool.length].centroid;
 }
 
+// Find a face by its ℤ⁵ address. A shared URL carries the address; loading it
+// recenters on this face. Returns null when the address is absent (engine change
+// or hand-edited URL), which the caller treats as "fall back to the seed center."
+function findFaceByCoord(patch: Patch, coord: readonly number[]) {
+  return (
+    patch.faces.find(
+      (f) => f.coord.length === coord.length && f.coord.every((v, i) => v === coord[i]),
+    ) ?? null
+  );
+}
+
 export default function PenroseExplorer({ seed = "funclol" }: { seed?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,18 +57,39 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const dirtyRef = useRef<boolean>(true);
   const rafRef = useRef<number | null>(null);
+  const pinnedRef = useRef<readonly number[] | null>(null);
 
   const [hoverAddress, setHoverAddress] = useState<readonly number[] | null>(null);
+  const [pinnedAddress, setPinnedAddress] = useState<readonly number[] | null>(null);
   const [ready, setReady] = useState(false);
 
   // Build the patch once for this seed (synchronous; the overlay paints first).
+  // Then read the share URL once: a pinned address and zoom override the
+  // seed-derived center, so a shared link reopens on the exact tile.
   useEffect(() => {
     const patch = buildPatch(PATCH_LEVEL);
     patchRef.current = patch;
     hitRef.current = buildHitIndex(patch.faces);
-    const c = seedToCenter(seed, patch);
-    offsetRef.current = [c[0], c[1]];
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Deliberate mount gate: the patch is built synchronously here, then ready flips so the canvas-wiring effect runs and the "building tiling" overlay clears.
+
+    const params =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
+    const tAddr = decodeAddress(params.get("t") ?? undefined);
+    const z = parseZoom(params.get("z") ?? undefined);
+    if (z !== null) zoomRef.current = z;
+
+    const pinned = tAddr ? findFaceByCoord(patch, tAddr) : null;
+    if (pinned) {
+      pinnedRef.current = pinned.coord;
+      setPinnedAddress(pinned.coord);
+      offsetRef.current = [pinned.centroid[0], pinned.centroid[1]];
+    } else {
+      const c = seedToCenter(seed, patch);
+      offsetRef.current = [c[0], c[1]];
+    }
+    // Deliberate mount gate: the patch is built synchronously here, then ready
+    // flips so the canvas-wiring effect runs and the "building tiling" overlay clears.
     setReady(true);
   }, [seed]);
 
@@ -71,6 +104,21 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     const requestRender = () => {
       dirtyRef.current = true;
       if (rafRef.current === null) rafRef.current = requestAnimationFrame(render);
+    };
+
+    // Debounced share-URL writer. Reads the live camera refs and the seed prop,
+    // then replaces the query string in place. No history entry, no navigation.
+    let writeTimer: ReturnType<typeof setTimeout> | null = null;
+    const writeUrl = () => {
+      if (writeTimer) clearTimeout(writeTimer);
+      writeTimer = setTimeout(() => {
+        const params = new URLSearchParams();
+        const s = parseSeed(seed);
+        if (s) params.set("s", s);
+        if (pinnedRef.current) params.set("t", encodeAddress(pinnedRef.current));
+        params.set("z", String(Math.round(zoomRef.current)));
+        window.history.replaceState(null, "", `?${params.toString()}`);
+      }, 250);
     };
 
     const resize = () => {
@@ -128,6 +176,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
           offsetRef.current[0] -= dx / zoomRef.current;
           offsetRef.current[1] -= dy / zoomRef.current;
           requestRender();
+          writeUrl();
         } else if (pointers.size >= 2 && gesture !== null) {
           const pts = [...pointers.values()];
           const midX = (pts[0][0] + pts[1][0]) / 2, midY = (pts[0][1] + pts[1][1]) / 2;
@@ -145,6 +194,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
             offsetRef.current[0] -= (midX - gesture.midX) / newZoom;
             offsetRef.current[1] -= (midY - gesture.midY) / newZoom;
             requestRender();
+            writeUrl();
           }
           gesture = { midX, midY, dist };
         }
@@ -170,6 +220,32 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       offsetRef.current[0] = worldX - cx / newZoom;
       offsetRef.current[1] = worldY - cy / newZoom;
       requestRender();
+      writeUrl();
+    };
+
+    // Click to pin. The pinned tile becomes the camera origin and the share
+    // address. A small movement threshold separates a click from a pan.
+    let downAt: { x: number; y: number } | null = null;
+    const onClickDown = (e: PointerEvent) => {
+      downAt = { x: e.clientX, y: e.clientY };
+    };
+    const onClickUp = (e: PointerEvent) => {
+      if (!downAt) return;
+      const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+      downAt = null;
+      if (moved > 6) return; // a drag, not a click
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left - sizeRef.current.w / 2;
+      const cy = e.clientY - rect.top - sizeRef.current.h / 2;
+      const wx = cx / zoomRef.current + offsetRef.current[0];
+      const wy = cy / zoomRef.current + offsetRef.current[1];
+      const f = hitRef.current ? hitFace(hitRef.current, wx, wy) : null;
+      if (!f) return;
+      pinnedRef.current = f.coord;
+      setPinnedAddress(f.coord);
+      offsetRef.current = [f.centroid[0], f.centroid[1]];
+      requestRender();
+      writeUrl();
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -177,6 +253,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("pointerdown", onClickDown);
+    canvas.addEventListener("pointerup", onClickUp);
 
     function render() {
       rafRef.current = null;
@@ -227,8 +305,12 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("pointerdown", onClickDown);
+      canvas.removeEventListener("pointerup", onClickUp);
+      if (writeTimer) clearTimeout(writeTimer);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- writeUrl reads `seed`, but seed is a stable prop in v1 (a seed change rebuilds the patch in the other effect, which flips `ready` and rewires this one). Keep the deps as [ready].
   }, [ready]);
 
   return (
@@ -245,6 +327,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       >
         <div>seed&nbsp;&nbsp;{seed}</div>
         {hoverAddress && <div className="mt-1">address&nbsp;[{hoverAddress.join(",")}]</div>}
+        {pinnedAddress && <div className="mt-1">pinned&nbsp;[{pinnedAddress.join(",")}]</div>}
       </div>
       {!ready && (
         <div className="absolute inset-0 grid place-items-center font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 pointer-events-none">
