@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { lift } from "./bridge";
-import { nextCoord, nextCoordCanonical } from "./fold";
+import { nextCoord, nextCoordCanonical, goldenPoint } from "./fold";
 import { A, physical, internal, type Vec5 } from "./cap";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -67,5 +67,41 @@ describe("canonical-frame rule and exactness", () => {
       c = nextCoordCanonical(c);
       for (const x of c) expect(Number.isInteger(x)).toBe(true);
     }
+  });
+});
+
+describe("the golden-point rule completes coordinate-space deflation", () => {
+  test("every deflation-created vertex equals goldenPoint(A, l) = fold(A) + e_l", () => {
+    const N = 5;
+    const LN = lift(N);
+    const LM = lift(N + 1);
+    const targetBandMin = Math.min(...LM.verts.map((v) => v.coord.reduce((s, x) => s + x, 0)));
+    const key = (r: readonly [number, number]) => `${r[0].toFixed(5)},${r[1].toFixed(5)}`;
+    const rawOf = (p: readonly [number, number], level: number): [number, number] => [p[0] / PHI ** level, p[1] / PHI ** level];
+    const coordM = new Map(LM.verts.map((v) => [key(rawOf(v.pos, N + 1)), v.coord]));
+    const vN = LN.verts.map((v) => ({ raw: rawOf(v.pos, N), coord: v.coord }));
+    const edgeLen = 1 / PHI ** N;
+
+    let checked = 0, exact = 0;
+    for (let a = 0; a < vN.length; a++) {
+      for (let b = a + 1; b < vN.length; b++) {
+        const dx = vN[b].raw[0] - vN[a].raw[0], dy = vN[b].raw[1] - vN[a].raw[1];
+        if (Math.abs(Math.hypot(dx, dy) - edgeLen) > edgeLen * 1e-4) continue;
+        const diff = vN[b].coord.map((v, i) => v - vN[a].coord[i]);
+        const nz = diff.map((v, i) => [v, i] as [number, number]).filter(([v]) => v !== 0);
+        if (nz.length !== 1 || Math.abs(nz[0][0]) !== 1) continue;
+        const l = nz[0][1], sign = nz[0][0];
+        const A0 = sign > 0 ? vN[a] : vN[b];
+        const B0 = sign > 0 ? vN[b] : vN[a];
+        const P: [number, number] = [A0.raw[0] + (B0.raw[0] - A0.raw[0]) / PHI, A0.raw[1] + (B0.raw[1] - A0.raw[1]) / PHI];
+        const actual = coordM.get(key(P));
+        if (!actual) continue;
+        checked++;
+        const expected = goldenPoint(A0.coord as Vec5, l, targetBandMin);
+        if (expected.every((x, i) => x === actual[i])) exact++;
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+    expect(exact).toBe(checked);
   });
 });

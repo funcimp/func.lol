@@ -35,3 +35,13 @@ export function nextCoord(coord: Vec5, targetBandMin: number): Vec5 {
   const index = coord[0] + coord[1] + coord[2] + coord[3] + coord[4];
   return apply(coord, Math.ceil((targetBandMin + 2 * index) / 5));
 }
+
+// Deflation also creates a NEW vertex on each coarse edge: the golden-section point
+// at the lower (A) end of an edge in direction l. Its finer coordinate is the fold
+// of A plus one step in the edge direction — a single basis vector. Together,
+// nextCoord (existing vertices) and this (new vertices) deflate the tiling entirely
+// in coordinate space, no geometry required.
+export function goldenPoint(coordA: Vec5, l: number, targetBandMin: number): Vec5 {
+  const c = nextCoord(coordA, targetBandMin) as number[];
+  return [c[0] + (l === 0 ? 1 : 0), c[1] + (l === 1 ? 1 : 0), c[2] + (l === 2 ? 1 : 0), c[3] + (l === 3 ? 1 : 0), c[4] + (l === 4 ? 1 : 0)];
+}
