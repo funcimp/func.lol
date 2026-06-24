@@ -2,51 +2,66 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import {
-  enumerateTiles,
-  gammaFromSeed,
-  makeAnchor,
-  tileContains,
-  type Anchor,
-  type Coord,
-  type Tile,
-} from "./lib/pentagrid";
+import { buildPatch, type Patch } from "./lib/patch";
+import { buildHitIndex, hitFace, type HitIndex } from "./lib/hitTest";
 
-const RE_ANCHOR_THRESHOLD = 1e8;
-
-type Theme = "light" | "dark";
-
-function readTheme(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-}
+const PATCH_LEVEL = 10; // ~55k faces, world radius ~123 unit edges, ~350ms one-time build
+const DEFAULT_ZOOM = 40; // px per unit edge
 
 function readCssVar(name: string): string {
   if (typeof document === "undefined") return "#000";
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// Deterministic seed to camera center: hash the seed, pick a face centroid in a
+// mid-radius band so the default view is generic. Off the singular sun center
+// at the origin, in from the patch boundary.
+function seedToCenter(seed: string, patch: Patch): readonly [number, number] {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const { minX, minY, maxX, maxY } = patch.bounds;
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const rMax = Math.min(maxX - cx, maxY - cy);
+  const band = patch.faces.filter((f) => {
+    const r = Math.hypot(f.centroid[0] - cx, f.centroid[1] - cy);
+    return r > rMax * 0.25 && r < rMax * 0.6;
+  });
+  const pool = band.length > 0 ? band : patch.faces;
+  return pool[(h >>> 0) % pool.length].centroid;
+}
+
 export default function PenroseExplorer({ seed = "funclol" }: { seed?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Pan / zoom state in refs (no re-renders on each frame).
-  const gammaRef = useRef(gammaFromSeed(seed));
-  const anchorRef = useRef<Anchor>(makeAnchor(0n, 0n, gammaRef.current.exact));
+  const patchRef = useRef<Patch | null>(null);
+  const hitRef = useRef<HitIndex | null>(null);
   const offsetRef = useRef<[number, number]>([0, 0]);
-  const zoomRef = useRef<number>(40);
+  const zoomRef = useRef<number>(DEFAULT_ZOOM);
   const dprRef = useRef<number>(1);
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const dirtyRef = useRef<boolean>(true);
   const rafRef = useRef<number | null>(null);
-  const tilesRef = useRef<Tile[]>([]);
 
-  // Hover readout state. Updates on pointermove via the readout ref to
-  // avoid React re-render on every cursor pixel.
-  const [hoverCoord, setHoverCoord] = useState<Coord | null>(null);
-  const [tileCount, setTileCount] = useState(0);
+  const [hoverAddress, setHoverAddress] = useState<readonly number[] | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // Build the patch once for this seed (synchronous; the overlay paints first).
+  useEffect(() => {
+    const patch = buildPatch(PATCH_LEVEL);
+    patchRef.current = patch;
+    hitRef.current = buildHitIndex(patch.faces);
+    const c = seedToCenter(seed, patch);
+    offsetRef.current = [c[0], c[1]];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Deliberate mount gate: the patch is built synchronously here, then ready flips so the canvas-wiring effect runs and the "building tiling" overlay clears.
+    setReady(true);
+  }, [seed]);
 
   useEffect(() => {
+    if (!ready) return;
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -55,9 +70,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
 
     const requestRender = () => {
       dirtyRef.current = true;
-      if (rafRef.current === null) {
-        rafRef.current = requestAnimationFrame(render);
-      }
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(render);
     };
 
     const resize = () => {
@@ -76,16 +89,9 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     ro.observe(container);
     resize();
 
-    // Theme changes trigger a re-render (canvas reads --color-* fresh).
     const themeObserver = new MutationObserver(requestRender);
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-    // Pan + pinch via pointer events. One Map of active pointers handles
-    // mouse, pen, and 1-or-more touches uniformly. Pinch fires when 2+
-    // pointers are active (touch only — mouse/pen never have 2).
     const pointers = new Map<number, [number, number]>();
     let gesture: { midX: number; midY: number; dist: number } | null = null;
 
@@ -93,26 +99,16 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const rect = canvas.getBoundingClientRect();
       const cx = clientX - rect.left - sizeRef.current.w / 2;
       const cy = clientY - rect.top - sizeRef.current.h / 2;
-      const worldX = cx / zoomRef.current + offsetRef.current[0];
-      const worldY = cy / zoomRef.current + offsetRef.current[1];
-      let found: Tile | null = null;
-      for (const tile of tilesRef.current) {
-        if (tileContains(tile, worldX, worldY)) {
-          found = tile;
-          break;
-        }
-      }
-      setHoverCoord(found ? found.coord : null);
+      const wx = cx / zoomRef.current + offsetRef.current[0];
+      const wy = cy / zoomRef.current + offsetRef.current[1];
+      const f = hitRef.current ? hitFace(hitRef.current, wx, wy) : null;
+      setHoverAddress(f ? f.coord : null);
     };
 
     const refreshGesture = () => {
-      if (pointers.size < 2) {
-        gesture = null;
-        return;
-      }
+      if (pointers.size < 2) { gesture = null; return; }
       const pts = [...pointers.values()];
-      const midX = (pts[0][0] + pts[1][0]) / 2;
-      const midY = (pts[0][1] + pts[1][1]) / 2;
+      const midX = (pts[0][0] + pts[1][0]) / 2, midY = (pts[0][1] + pts[1][1]) / 2;
       const dist = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
       gesture = { midX, midY, dist };
     };
@@ -126,21 +122,15 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     const onPointerMove = (e: PointerEvent) => {
       const prev = pointers.get(e.pointerId);
       if (prev) {
-        const dx = e.clientX - prev[0];
-        const dy = e.clientY - prev[1];
+        const dx = e.clientX - prev[0], dy = e.clientY - prev[1];
         pointers.set(e.pointerId, [e.clientX, e.clientY]);
-
         if (pointers.size === 1) {
-          // Single-pointer pan.
           offsetRef.current[0] -= dx / zoomRef.current;
           offsetRef.current[1] -= dy / zoomRef.current;
-          maybeReAnchor();
           requestRender();
         } else if (pointers.size >= 2 && gesture !== null) {
-          // Pinch zoom + two-finger pan.
           const pts = [...pointers.values()];
-          const midX = (pts[0][0] + pts[1][0]) / 2;
-          const midY = (pts[0][1] + pts[1][1]) / 2;
+          const midX = (pts[0][0] + pts[1][0]) / 2, midY = (pts[0][1] + pts[1][1]) / 2;
           const dist = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
           if (dist > 0 && gesture.dist > 0) {
             const rect = canvas.getBoundingClientRect();
@@ -150,34 +140,24 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
             const worldY = py / zoomRef.current + offsetRef.current[1];
             const newZoom = clamp(zoomRef.current * (dist / gesture.dist), 4, 800);
             zoomRef.current = newZoom;
-            // Anchor zoom on the midpoint.
             offsetRef.current[0] = worldX - px / newZoom;
             offsetRef.current[1] = worldY - py / newZoom;
-            // Pan from midpoint shift (two-finger drag).
             offsetRef.current[0] -= (midX - gesture.midX) / newZoom;
             offsetRef.current[1] -= (midY - gesture.midY) / newZoom;
-            maybeReAnchor();
             requestRender();
           }
           gesture = { midX, midY, dist };
         }
       }
-      // Hover readout. For touch, only meaningful at pointermove with
-      // capture (one finger), but harmless to update always.
       updateHover(e.clientX, e.clientY);
     };
 
     const onPointerUp = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
-      try {
-        canvas.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
       refreshGesture();
     };
 
-    // Zoom: wheel pivots on cursor.
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
@@ -189,24 +169,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       zoomRef.current = newZoom;
       offsetRef.current[0] = worldX - cx / newZoom;
       offsetRef.current[1] = worldY - cy / newZoom;
-      maybeReAnchor();
       requestRender();
-    };
-
-    const maybeReAnchor = () => {
-      const [ox, oy] = offsetRef.current;
-      if (Math.abs(ox) > RE_ANCHOR_THRESHOLD || Math.abs(oy) > RE_ANCHOR_THRESHOLD) {
-        // Snap the anchor by the integer-rounded offset; preserve the
-        // fractional part as the new offset so the view doesn't jump.
-        const stepX = BigInt(Math.trunc(ox));
-        const stepY = BigInt(Math.trunc(oy));
-        const SCALE_BIG = 10n ** 50n;
-        const newX = anchorRef.current.x + stepX * SCALE_BIG;
-        const newY = anchorRef.current.y + stepY * SCALE_BIG;
-        anchorRef.current = makeAnchor(newX, newY, gammaRef.current.exact);
-        offsetRef.current[0] = ox - Number(stepX);
-        offsetRef.current[1] = oy - Number(stepY);
-      }
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -219,35 +182,42 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       rafRef.current = null;
       if (!dirtyRef.current) return;
       dirtyRef.current = false;
+      const patch = patchRef.current;
+      if (!patch) return;
       const { w, h } = sizeRef.current;
       const dpr = dprRef.current;
-      const outlineThick = readCssVar("--color-moment-4") || "#161616";
-      const outlineThin = readCssVar("--color-moment-1") || "#161616";
-      const paper = readCssVar("--color-paper") || "#f5f3ec";
-      const decoration = readCssVar("--color-moment-3") || outlineThick;
+      const thick = readCssVar("--color-moment-1") || "#C89B3C";
+      const thin = readCssVar("--color-moment-4") || "#3E6B7C";
+      const grout = readCssVar("--color-paper") || "#0f0e0c";
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx!.fillStyle = paper;
+      ctx!.fillStyle = grout;
       ctx!.fillRect(0, 0, w, h);
 
-      // Viewport rect in offset coords.
-      const halfW = w / 2 / zoomRef.current;
-      const halfH = h / 2 / zoomRef.current;
-      const margin = 2;
-      const rect = {
-        x0: offsetRef.current[0] - halfW - margin,
-        y0: offsetRef.current[1] - halfH - margin,
-        x1: offsetRef.current[0] + halfW + margin,
-        y1: offsetRef.current[1] + halfH + margin,
-      };
-      const tiles = enumerateTiles(anchorRef.current, rect);
-      tilesRef.current = tiles;
-      drawTiles(ctx!, tiles, w, h, offsetRef.current, zoomRef.current, {
-        outlineThick,
-        outlineThin,
-        decoration,
-      });
-      setTileCount(tiles.length);
+      const zoom = zoomRef.current;
+      const [ox, oy] = offsetRef.current;
+      const cx = w / 2, cy = h / 2;
+      const halfW = w / 2 / zoom + 2, halfH = h / 2 / zoom + 2;
+      const x0 = ox - halfW, x1 = ox + halfW, y0 = oy - halfH, y1 = oy + halfH;
+
+      ctx!.lineJoin = "round";
+      ctx!.lineWidth = 1;
+      ctx!.strokeStyle = grout;
+      for (const f of patch.faces) {
+        if (f.centroid[0] < x0 || f.centroid[0] > x1 || f.centroid[1] < y0 || f.centroid[1] > y1) continue;
+        const [a, b, c, d] = f.corners;
+        ctx!.beginPath();
+        ctx!.moveTo((a[0] - ox) * zoom + cx, (a[1] - oy) * zoom + cy);
+        ctx!.lineTo((b[0] - ox) * zoom + cx, (b[1] - oy) * zoom + cy);
+        ctx!.lineTo((c[0] - ox) * zoom + cx, (c[1] - oy) * zoom + cy);
+        ctx!.lineTo((d[0] - ox) * zoom + cx, (d[1] - oy) * zoom + cy);
+        ctx!.closePath();
+        ctx!.fillStyle = f.type === "thick" ? thick : thin;
+        ctx!.fill();
+        ctx!.stroke();
+      }
     }
+
+    requestRender();
 
     return () => {
       ro.disconnect();
@@ -259,7 +229,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       canvas.removeEventListener("wheel", onWheel);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [ready]);
 
   return (
     <div className="relative w-full h-full" ref={containerRef}>
@@ -267,92 +237,24 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         ref={canvasRef}
         className="block w-full h-full touch-none cursor-grab active:cursor-grabbing"
         aria-label="Penrose tiling explorer canvas"
+        tabIndex={0}
       />
       <div
         aria-live="polite"
         className="absolute top-3 left-3 font-mono text-[10px] uppercase tracking-[0.12em] opacity-55 select-none pointer-events-none"
       >
         <div>seed&nbsp;&nbsp;{seed}</div>
-        <div>tiles&nbsp;{tileCount}</div>
-        {hoverCoord && (
-          <div className="mt-1">
-            coord&nbsp;[{hoverCoord.map((c) => c.toString()).join(",")}]
-          </div>
-        )}
+        {hoverAddress && <div className="mt-1">address&nbsp;[{hoverAddress.join(",")}]</div>}
       </div>
+      {!ready && (
+        <div className="absolute inset-0 grid place-items-center font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 pointer-events-none">
+          building tiling
+        </div>
+      )}
     </div>
   );
 }
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.min(Math.max(x, lo), hi);
-}
-
-type Palette = { outlineThick: string; outlineThin: string; decoration: string };
-
-function drawTiles(
-  ctx: CanvasRenderingContext2D,
-  tiles: readonly Tile[],
-  w: number,
-  h: number,
-  offset: readonly [number, number],
-  zoom: number,
-  palette: Palette,
-) {
-  const cx = w / 2;
-  const cy = h / 2;
-  const project = (v: readonly [number, number]): [number, number] => [
-    (v[0] - offset[0]) * zoom + cx,
-    (v[1] - offset[1]) * zoom + cy,
-  ];
-
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-
-  // 1. Outlines, per-tile, clipped to the rhombus interior. The clip
-  //    means the stroke band sits inside the shape rather than centered
-  //    on the edge, so adjacent rhombi of different types meet cleanly
-  //    at shared edges (no muddy color mixing on the boundary).
-  //    Stroke width is doubled because the outer half is clipped away.
-  ctx.globalAlpha = 0.9;
-  ctx.lineWidth = 4; // half clipped → visible width ≈ 2px
-  for (const tile of tiles) {
-    const [v0, v1, v2, v3] = tile.vertices;
-    const p0 = project(v0), p1 = project(v1), p2 = project(v2), p3 = project(v3);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(p0[0], p0[1]);
-    ctx.lineTo(p1[0], p1[1]);
-    ctx.lineTo(p2[0], p2[1]);
-    ctx.lineTo(p3[0], p3[1]);
-    ctx.closePath();
-    ctx.clip();
-    // Rebuild the path for stroking (clip is allowed to consume it).
-    ctx.beginPath();
-    ctx.moveTo(p0[0], p0[1]);
-    ctx.lineTo(p1[0], p1[1]);
-    ctx.lineTo(p2[0], p2[1]);
-    ctx.lineTo(p3[0], p3[1]);
-    ctx.closePath();
-    ctx.strokeStyle = tile.type === "thick" ? palette.outlineThick : palette.outlineThin;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // 2. Long-diagonal decoration — connects acute vertices of each rhombus.
-  //    Thin line, ~1/3 the outline weight, lets the borders dominate.
-  ctx.beginPath();
-  for (const tile of tiles) {
-    const [v0, v1, v2, v3] = tile.vertices;
-    const a = tile.type === "thick" ? project(v0) : project(v1);
-    const b = tile.type === "thick" ? project(v2) : project(v3);
-    ctx.moveTo(a[0], a[1]);
-    ctx.lineTo(b[0], b[1]);
-  }
-  ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 0.75;
-  ctx.strokeStyle = palette.decoration;
-  ctx.stroke();
-
-  ctx.globalAlpha = 1;
 }

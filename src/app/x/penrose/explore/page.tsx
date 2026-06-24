@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function PenroseExplorePage() {
   return (
-    <main className="h-screen flex flex-col">
+    <main className="h-dvh flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-ink/15">
         <Link
           href="/x/penrose"
