@@ -5,7 +5,7 @@ address↔coordinate work stand. Separates what is **proven (by runnable test)**
 what is **still open**. The numbered notes (`05`–`09`) carry the detail; the tested
 code is in `research/penrose/cap/`.
 
-Run the proofs: `bun test ./research/penrose/cap/` → **30 pass, 1 todo, 0 fail**.
+Run the proofs: `bun test ./research/penrose/cap/` → **34 pass, 0 fail**.
 
 ## Verified (tested)
 
@@ -28,6 +28,13 @@ Run the proofs: `bun test ./research/penrose/cap/` → **30 pass, 1 todo, 0 fail
   forced: `A`'s eigenvalue-2 eigenvector and the kernel of both projections (the
   unique index gauge). Holds at every level pair (3→4 … 6→7), not a fit. (`fold.ts`,
   `09`.)
+- **Face extraction is exact.** A 2-face `[n;j,k]` is a tile iff all four corners are
+  accepted vertices — validated tile-for-tile against the substitution (no phantoms,
+  none missing, types agree, thick:thin → φ). (`faces.ts`.)
+- **The golden-point rule completes coordinate-space deflation.** A deflation-created
+  vertex on edge `(A,B)` in direction `l` is exactly `goldenPoint(A,l) = fold(A) + eₗ`,
+  proven against the lift. So deflation runs entirely in ℤ⁵: existing vertices by the
+  fold, new vertices by `fold(A)+eₗ`, faces by corner-acceptance. (`fold.ts`.)
 
 What this amounts to: an explicit, validated **substitution-address → de-Bruijn-
 coordinate map**, the case Pardo-Guerra/Washburn/Allahyarov (arXiv:2603.13553) leave
@@ -36,11 +43,6 @@ as their main open problem. Local, O(log)-per-tile, exact integer.
 ## Open / unsolved (still working on)
 
 ### Math / the map
-- **The golden-point (new-vertex) rule** (task #7). The recursion transforms
-  *persistent* vertices between scales. Deflation also creates new golden-section
-  vertices; their offset is one finer-lattice edge (`±eₗ`), sketched but not yet
-  formalized or tested. The recursion + this rule = complete tile-enumeration with
-  coordinates.
 - **Self-contained canonical frame.** The fold currently reads the target band's min
   from the lift. A fully self-contained absolute frame (solve the reference vertex's
   de Bruijn coordinate once, so the band is always `{1,2,3,4}` without a lift) would
@@ -61,10 +63,6 @@ as their main open problem. Local, O(log)-per-tile, exact integer.
   to source paywalled material.)
 
 ### Rendering / engineering
-- **Correct face extraction** (task #6, the one `todo`). Naively counting 4-corner
-  cycles over-counts faces (spurious cycles at dense vertices → ratio 1.5–2.0, not φ).
-  Needs the acceptance-domain condition for a `(j,k)` tile. Required for rendering
-  rhombi and for proving thick:thin = φ from a bare vertex set.
 - **BigInt deep-zoom path.** The recursion is exact integer; wiring it to BigInt for
   unbounded distance (and the pruned-deflation viewport generation) is unbuilt.
 
@@ -87,5 +85,7 @@ as their main open problem. Local, O(log)-per-tile, exact integer.
 ## Map of the work
 - Notes: `05`-substitution-and-z5, `06`-addressing-and-applications, `07`-cut-and-
   project-window, `08`-the-bridge, `09`-the-fold.
-- Code: `cap/{cap,deflate,bridge,fold}.ts` (+ `.test.ts`).
-- Tasks: #6 face extraction, #7 golden-point rule (both open).
+- Code: `cap/{cap,deflate,bridge,fold,faces}.ts` (+ `.test.ts`). 34 tests pass.
+- Tasks #6 (face extraction) and #7 (golden-point rule) are now done; the math/engine
+  is complete and tested. What remains is bookkeeping (canonical frame, path
+  composition) and engineering (BigInt deep-zoom, explorer integration, the writeup).
