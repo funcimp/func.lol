@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
 
+import { experimentNumber } from "../page";
 import DeadEnd from "./_components/DeadEnd";
+import DeeperProblem from "./_components/DeeperProblem";
 import MeetTheTiles from "./_components/MeetTheTiles";
 
 export const metadata: Metadata = {
@@ -23,6 +25,10 @@ const PROSE =
   "prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]";
 
 export default function PenrosePage() {
+  // The badge number is derived from publication order, not hand-set: penrose is
+  // the third experiment by date, so this reads "experiment 03" and stays correct
+  // if the catalogue grows or reorders.
+  const number = String(experimentNumber("penrose")).padStart(2, "0");
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
       <div className="mx-auto max-w-[720px]">
@@ -47,7 +53,7 @@ export default function PenrosePage() {
         </header>
 
         <div className="font-mono text-[11px] uppercase tracking-[0.12em] opacity-55 flex gap-5 mb-9">
-          <span>experiment 02</span>
+          <span>experiment {number}</span>
           <span>2026-05-11</span>
         </div>
 
@@ -148,6 +154,18 @@ export default function PenrosePage() {
             where the bad tile sat. In the middle, far away, where nothing looked
             wrong at all. Local correctness does not promise global success, and
             when it fails, it fails somewhere else.
+          </p>
+        </div>
+
+        <DeeperProblem />
+
+        <div className={PROSE}>
+          <p className="text-[14px] leading-[1.6] opacity-70">
+            Watch the patch grow from the seed, every tile clean, and then break
+            out at the rim where you never touched. Local rules can be obeyed
+            everywhere and still doom the whole, and the gap they force can land
+            arbitrarily far from any choice you made. So you stop tiling by hand
+            and compute the plane instead.
           </p>
         </div>
 

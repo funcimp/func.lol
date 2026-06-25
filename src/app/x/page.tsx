@@ -53,6 +53,18 @@ const labs: Lab[] = [
   },
 ];
 
+// The experiment's number is its position in publication order: oldest is 01. It is
+// derived from the labs data, never hand-numbered, so adding or reordering an
+// experiment renumbers the rest automatically. Returns the 1-based index of `slug`,
+// or 0 if the slug is unknown (no experiment should render a zero, so a caller that
+// sees one has a bad slug).
+export function experimentNumber(slug: string): number {
+  const ordered = [...labs].sort((a, b) =>
+    a.publishedAt.localeCompare(b.publishedAt),
+  );
+  return ordered.findIndex((lab) => lab.slug === slug) + 1;
+}
+
 export default function LabsIndexPage() {
   return (
     <main className="min-h-screen px-6 py-12 sm:px-16 sm:py-16">
