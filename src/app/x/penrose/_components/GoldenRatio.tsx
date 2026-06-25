@@ -46,27 +46,30 @@ function readVar(name: string, fallback: string): string {
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
 
-// Map normalised t in [0,1] to a discrete level. Quantised so each slider region
-// lands on exactly one level (a clean step, not a blur between two).
-const levelForT = (t: number): number =>
-  Math.min(MAX_LEVEL, MIN_LEVEL + Math.round(t * (MAX_LEVEL - MIN_LEVEL)));
+// Smoothstep for crossfading between adjacent levels: hold each level steady across
+// most of its slider segment and blend only through the middle, so a step reads as a
+// dissolve, not a jolt.
+const smooth = (e0: number, e1: number, x: number): number => {
+  const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+  return u * u * (3 - 2 * u);
+};
 
-function paint(
+// Draw one level's rhombi at a shared scale and a given opacity. No clear, so two
+// adjacent levels can be composited into a single crossfade frame.
+function drawPatch(
   ctx: CanvasRenderingContext2D,
   rhombi: readonly Rhombus[],
   half: number,
   colors: Colors,
+  alpha: number,
 ) {
-  const { thick, thin, paper, ink } = colors;
+  if (alpha <= 0.01 || rhombi.length === 0) return;
+  const { thick, thin, ink } = colors;
   const s = (VB - 2 * MARGIN) / (2 * half);
   const toPx = (p: Pt): [number, number] => [VB / 2 + p[0] * s, VB / 2 - p[1] * s];
-
-  ctx.clearRect(0, 0, VB, VB);
-  ctx.fillStyle = paper;
-  ctx.fillRect(0, 0, VB, VB);
-
-  // Edges thin out as the tiles shrink, so the grout never swallows the fills.
   const edge = Math.max(0.3, Math.min(1, 18 / Math.sqrt(rhombi.length)));
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.lineJoin = "round";
   for (const r of rhombi) {
     ctx.beginPath();
@@ -83,6 +86,7 @@ function paint(
     ctx.lineWidth = edge;
     ctx.stroke();
   }
+  ctx.restore();
 }
 
 export default function GoldenRatio() {
@@ -116,8 +120,11 @@ export default function GoldenRatio() {
     };
   }, []);
 
-  const drawLevel = useCallback(
-    (level: number) => {
+  const lastTRef = useRef(1);
+
+  const render = useCallback(
+    (t: number) => {
+      lastTRef.current = t;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
@@ -130,35 +137,45 @@ export default function GoldenRatio() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      paint(ctx, patches[level], halves[level], colorsRef.current);
-    },
-    [patches, halves, refreshColors],
-  );
 
-  const render = useCallback(
-    (t: number) => {
-      const level = levelForT(t);
-      drawLevel(level);
-      if (level !== levelRef.current) {
-        levelRef.current = level;
-        setCounts(series[level - 1]);
+      // Continuous position in level space, the two bracketing levels, and a fade
+      // that blends them only through the middle of each slider segment.
+      const f = t * (MAX_LEVEL - MIN_LEVEL);
+      const lo = MIN_LEVEL + Math.floor(f);
+      const hi = Math.min(MAX_LEVEL, lo + 1);
+      const frac = f - Math.floor(f);
+      const fade = lo === hi ? 0 : smooth(0.35, 0.65, frac);
+      const commonHalf = Math.max(halves[lo], halves[hi]);
+
+      const colors = colorsRef.current;
+      ctx.clearRect(0, 0, VB, VB);
+      ctx.fillStyle = colors.paper;
+      ctx.fillRect(0, 0, VB, VB);
+      drawPatch(ctx, patches[lo], commonHalf, colors, 1 - fade);
+      drawPatch(ctx, patches[hi], commonHalf, colors, fade);
+
+      // The readout snaps to whichever level is the more present one.
+      const shown = frac < 0.5 ? lo : hi;
+      if (shown !== levelRef.current) {
+        levelRef.current = shown;
+        setCounts(series[shown - 1]);
       }
     },
-    [drawLevel, series],
+    [patches, halves, refreshColors, series],
   );
 
   // Repaint on theme flip so the stationary frame inverts with the toggle.
   useEffect(() => {
     const observer = new MutationObserver(() => {
       refreshColors();
-      drawLevel(levelRef.current);
+      render(lastTRef.current);
     });
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme"],
     });
     return () => observer.disconnect();
-  }, [refreshColors, drawLevel]);
+  }, [refreshColors, render]);
 
   const gap = Math.abs(counts.ratio - PHI);
 

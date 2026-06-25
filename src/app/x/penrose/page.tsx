@@ -312,8 +312,9 @@ export default function PenrosePage() {
             smaller tiles are not just finer, they group back into larger tiles of
             the very same two shapes. Below, the filled rhombi are a real deflated
             patch and the bold outlines are the genuine level up, the supertiles
-            the small ones compose into, the same two shapes scaled by φ. Step the
-            depth and more small tiles pack inside the same big ones.
+            the small ones compose into, the same two shapes scaled by φ. Scrub the
+            depth and watch a level dissolve into the next: the supertiles fill in
+            and become the pattern, while a fresh level up appears in outline.
           </p>
           <p>
             Inflate or deflate as far as you like and you always land on another
