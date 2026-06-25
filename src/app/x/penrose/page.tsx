@@ -5,8 +5,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
 import DeadEnd from "./_components/DeadEnd";
-import DeeperProblem from "./_components/DeeperProblem";
 import MeetTheTiles from "./_components/MeetTheTiles";
+import StopTilingByHand from "./_components/StopTilingByHand";
 
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
@@ -137,35 +137,38 @@ export default function PenrosePage() {
 
         <DeadEnd />
 
-        {/* 5. But the problem is deeper. (Prose now; sketch later.) */}
-        <h2 className={H2}>It is deeper than one bad corner</h2>
+        {/* 5. So a naive solver strands itself. */}
+        <h2 className={H2}>A solver that only obeys the rule gets stuck</h2>
         <div className={PROSE}>
           <p>
-            You might think: fine, just look for the conflict and back up. But
-            the real trouble hides further out. You can lay a whole region
-            perfectly, every single tile obeying the marks, and still be doomed.
-            The contradiction gets forced into a tile far from anything you would
-            call a mistake.
+            The matching rule is local. It looks at one vertex and asks whether
+            the corners around it can still grow into a legal arrangement. It is
+            necessary: break it anywhere and the tiling is dead. But it is not
+            sufficient. A solver that lays the next tile by the rule alone, never
+            looking ahead, paints itself into a corner fast.
           </p>
           <p>
-            Penrose told the story himself. He once saw a university floor whose
-            edge tile broke the rule, and he knew at a glance the pattern would
-            go wrong somewhere out in the middle of the lawn. Not at the edge
-            where the bad tile sat. In the middle, far away, where nothing looked
-            wrong at all. Local correctness does not promise global success, and
-            when it fails, it fails somewhere else.
+            The sketch below runs exactly that solver. It seeds one tile and
+            keeps placing the first legal rhombus the rule allows. Watch it lay
+            ten clean tiles, every join honest, and then strand. At the marked
+            vertex three fat corners leave a 36-degree wedge. A thin tile fits
+            that wedge exactly, so it is drawn and struck. It fits the gap. But
+            seating it would close the vertex to an arrangement no Penrose tiling
+            allows, so the rule forbids it. Every other tile overlaps. No legal
+            move is left, and the solver is barely two tiles from where it
+            started.
           </p>
         </div>
 
-        <DeeperProblem />
+        <StopTilingByHand />
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            Watch the patch grow from the seed, every tile clean, and then break
-            out at the rim where you never touched. Local rules can be obeyed
-            everywhere and still doom the whole, and the gap they force can land
-            arbitrarily far from any choice you made. So you stop tiling by hand
-            and compute the plane instead.
+            This is not a staged conflict. It is the computed output of a naive
+            greedy solver, the same code that draws the sketch. Obey the local
+            rule and nothing else, and you strand quickly, here after about ten
+            tiles. The fix is not a smarter local move. It is to stop tiling by
+            hand and compute the plane instead.
           </p>
         </div>
 

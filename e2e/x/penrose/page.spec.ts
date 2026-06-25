@@ -34,11 +34,11 @@ const deadEndFigure = (page: import("@playwright/test").Page) =>
     .locator("figure")
     .filter({ has: page.getByRole("img", { name: /fan of Penrose rhombi/i }) });
 
-const deeperFigure = (page: import("@playwright/test").Page) =>
+const solverFigure = (page: import("@playwright/test").Page) =>
   page
     .locator("figure")
     .filter({
-      has: page.getByRole("img", { name: /Penrose patch grows outward/i }),
+      has: page.getByRole("img", { name: /naive greedy solver lays Penrose rhombi/i }),
     });
 
 test("the dead-end sketch mounts its animated canvas and controls", async ({
@@ -76,13 +76,13 @@ test("the dead-end sketch loads at its stationary end state", async ({
   await expect(reset).toBeDisabled();
 });
 
-test("the deeper-problem sketch mounts and honours the reduced-motion contract", async ({
+test("the naive-solver sketch mounts and honours the reduced-motion contract", async ({
   page,
 }) => {
   await page.goto("/x/penrose");
-  const figure = deeperFigure(page);
+  const figure = solverFigure(page);
   await expect(
-    figure.getByRole("img", { name: /Penrose patch grows outward from a seed/i }),
+    figure.getByRole("img", { name: /naive greedy solver lays Penrose rhombi/i }),
   ).toBeVisible();
   // Same harness contract as the dead-end: mounts at the stationary end state, so
   // reset is enabled and step is disabled until the viewer rewinds.
