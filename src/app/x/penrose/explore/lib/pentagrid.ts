@@ -14,7 +14,7 @@
 // Verified key-for-key against cap.generate() (the tested cut-and-project oracle) and
 // adversarially confirmed to drop zero tiles in far-from-origin viewports.
 
-import { PCOS, PSIN, ICOS, ISIN, physical, type Vec5 } from "./cap";
+import { PCOS, PSIN, ICOS, ISIN, physical, inWindow, type Vec5 } from "./cap";
 import type { Pt, RenderFace } from "./patch";
 
 export type Rect = { minX: number; minY: number; maxX: number; maxY: number };
@@ -65,6 +65,25 @@ export function tileCentroid(coord: readonly number[], j: number, k: number): Pt
   const p0 = physical(c0), p1 = physical(c1 as unknown as Vec5);
   const p2 = physical(c2 as unknown as Vec5), p3 = physical(c3 as unknown as Vec5);
   return [(p0[0] + p1[0] + p2[0] + p3[0]) / 4, (p0[1] + p1[1] + p2[1] + p3[1]) / 4];
+}
+
+// Is the rhombus [n; j,k] a real tile? It exists iff all four corners
+// n, n+e_j, n+e_k, n+e_j+e_k are accepted vertices, the corner-acceptance
+// condition faces.ts uses, evaluated against this tiling's window center.
+// A shared URL decodes to a shape-valid address; only this confirms it names a
+// tile the plane actually emits, so the camera does not pin empty space.
+export function tileExists(coord: readonly number[], j: number, k: number): boolean {
+  const [vx, vy] = WINDOW_CENTER;
+  const n = coord as unknown as Vec5;
+  const nj = [...coord]; nj[j]++;
+  const nk = [...coord]; nk[k]++;
+  const njk = [...nj]; njk[k]++;
+  return (
+    inWindow(n, vx, vy) &&
+    inWindow(nj as unknown as Vec5, vx, vy) &&
+    inWindow(nk as unknown as Vec5, vx, vy) &&
+    inWindow(njk as unknown as Vec5, vx, vy)
+  );
 }
 
 export function facesInViewport(view: Rect, gamma: readonly number[], physicalMargin = 1.5): RenderFace[] {

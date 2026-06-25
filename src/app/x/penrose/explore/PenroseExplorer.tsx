@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ChunkCache } from "./lib/chunks";
-import { GAMMA, tileCentroid } from "./lib/pentagrid";
+import { GAMMA, tileCentroid, tileExists } from "./lib/pentagrid";
 import { buildHitIndex, hitFace, type HitIndex } from "./lib/hitTest";
 import { encodeTile, decodeTile, parseSeed, parseZoom, type TileAddress } from "./lib/codec";
+import type { RenderFace } from "./lib/patch";
 
 const DEFAULT_ZOOM = 40; // px per unit edge
 
@@ -35,6 +36,12 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
 
   const cacheRef = useRef<ChunkCache | null>(null);
   const hitRef = useRef<HitIndex | null>(null);
+  const facesRef = useRef<RenderFace[]>([]);
+  const colorsRef = useRef<{ thick: string; thin: string; grout: string }>({
+    thick: "#C89B3C",
+    thin: "#3E6B7C",
+    grout: "#0f0e0c",
+  });
   const offsetRef = useRef<[number, number]>([0, 0]);
   const zoomRef = useRef<number>(DEFAULT_ZOOM);
   const dprRef = useRef<number>(1);
@@ -63,7 +70,11 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     const z = parseZoom(params.get("z") ?? undefined);
     if (z !== null) zoomRef.current = z;
 
-    if (tAddr) {
+    // decodeTile only range-checks shape, so a hand-edited or stale ?t= can name a
+    // rhombus the plane never emits. Pin it only when tileExists confirms all four
+    // corners are accepted vertices; otherwise fall through to the seed center and
+    // leave nothing pinned, so the HUD never shows a phantom pin over empty space.
+    if (tAddr && tileExists(tAddr.coord, tAddr.j, tAddr.k)) {
       const addr: TileAddress = { coord: tAddr.coord, j: tAddr.j, k: tAddr.k };
       pinnedRef.current = addr;
       setPinnedAddress(addr);
@@ -90,6 +101,27 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       if (rafRef.current === null) rafRef.current = requestAnimationFrame(render);
     };
 
+    // getComputedStyle is a layout read, so cache the three theme colors and refresh
+    // them only when the theme flips or the element resizes, not on every frame.
+    const readColors = () => {
+      colorsRef.current = {
+        thick: readCssVar("--color-moment-1") || "#C89B3C",
+        thin: readCssVar("--color-moment-4") || "#3E6B7C",
+        grout: readCssVar("--color-paper") || "#0f0e0c",
+      };
+    };
+
+    // The hit index is rebuilt lazily from the last rendered faces. render()
+    // invalidates it; the first hover or click after a frame pays to build it once.
+    // This also fixes a click landing before the first frame: facesRef is empty,
+    // so the build is skipped rather than reading a stale or null index.
+    const getHitIndex = (): HitIndex | null => {
+      if (!hitRef.current && facesRef.current.length) {
+        hitRef.current = buildHitIndex(facesRef.current);
+      }
+      return hitRef.current;
+    };
+
     // Debounced share-URL writer. Reads the live camera refs and the seed prop,
     // then replaces the query string in place. No history entry, no navigation.
     let writeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -114,14 +146,19 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       canvas.height = Math.round(rect.height * dpr);
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
+      readColors();
       requestRender();
     };
 
     const ro = new ResizeObserver(resize);
     ro.observe(container);
+    readColors();
     resize();
 
-    const themeObserver = new MutationObserver(requestRender);
+    const themeObserver = new MutationObserver(() => {
+      readColors();
+      requestRender();
+    });
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const pointers = new Map<number, [number, number]>();
@@ -133,7 +170,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const cy = clientY - rect.top - sizeRef.current.h / 2;
       const wx = cx / zoomRef.current + offsetRef.current[0];
       const wy = cy / zoomRef.current + offsetRef.current[1];
-      const f = hitRef.current ? hitFace(hitRef.current, wx, wy) : null;
+      const idx = getHitIndex();
+      const f = idx ? hitFace(idx, wx, wy) : null;
       setHoverAddress(f ? { coord: f.coord, j: f.j, k: f.k } : null);
     };
 
@@ -182,8 +220,12 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
           }
           gesture = { midX, midY, dist };
         }
+      } else {
+        // Pure hover: no captured pointer for this id, so no button is held. Only here
+        // do we update the address. A drag or pinch (the if branch) must not run a
+        // setState per move, which would re-render the HUD on every frame of the gesture.
+        updateHover(e.clientX, e.clientY);
       }
-      updateHover(e.clientX, e.clientY);
     };
 
     const onPointerUp = (e: PointerEvent) => {
@@ -236,7 +278,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const cy = e.clientY - rect.top - sizeRef.current.h / 2;
       const wx = cx / zoomRef.current + offsetRef.current[0];
       const wy = cy / zoomRef.current + offsetRef.current[1];
-      const f = hitRef.current ? hitFace(hitRef.current, wx, wy) : null;
+      const idx = getHitIndex();
+      const f = idx ? hitFace(idx, wx, wy) : null;
       if (!f) return;
       const addr: TileAddress = { coord: f.coord, j: f.j, k: f.k };
       pinnedRef.current = addr;
@@ -263,9 +306,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       if (!cache) return;
       const { w, h } = sizeRef.current;
       const dpr = dprRef.current;
-      const thick = readCssVar("--color-moment-1") || "#C89B3C";
-      const thin = readCssVar("--color-moment-4") || "#3E6B7C";
-      const grout = readCssVar("--color-paper") || "#0f0e0c";
+      const { thick, thin, grout } = colorsRef.current;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = grout;
       ctx!.fillRect(0, 0, w, h);
@@ -276,13 +317,14 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const halfW = w / 2 / zoom + 2, halfH = h / 2 / zoom + 2;
       const x0 = ox - halfW, x1 = ox + halfW, y0 = oy - halfH, y1 = oy + halfH;
 
-      // Generate exactly the tiles the viewport touches, then rebuild the hit
-      // index over that same visible set so hover and click-to-pin test against
-      // what is drawn. The cache returns only in-view faces, so there is no
-      // centroid cull here. A viewport holds a few hundred to low-thousands of
-      // faces, so rebuilding the index each frame is cheap.
+      // Generate exactly the tiles the viewport touches. The cache returns only
+      // in-view faces, so there is no centroid cull here. Stash the faces and
+      // invalidate the hit index instead of rebuilding it every frame; the next
+      // hover or click rebuilds it once via getHitIndex, so a frame that nothing
+      // interacts with never pays for the index.
       const faces = cache.facesInView({ minX: x0, minY: y0, maxX: x1, maxY: y1 });
-      hitRef.current = buildHitIndex(faces);
+      facesRef.current = faces;
+      hitRef.current = null;
 
       ctx!.lineJoin = "round";
       ctx!.lineWidth = 1;
@@ -332,7 +374,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         aria-live="polite"
         className="absolute top-3 left-3 select-none pointer-events-none"
       >
-        <div className="rounded-md bg-paper/75 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink/85">
+        <div className="bg-paper/75 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink/85">
           <div>seed&nbsp;&nbsp;{seed}</div>
           {hoverAddress && (
             <div className="mt-1">

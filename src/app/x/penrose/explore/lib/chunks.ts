@@ -1,20 +1,20 @@
 // Physical-space chunk cache over the pentagrid enumerator. Cells are squares of side
 // CELL in the physical (render) frame. A cell owns tiles whose physical(K) centroid is
 // in its half-open [min,max) bounds, so the union over cells is seam-free (each tile in
-// exactly one cell). Cells are generated on demand and LRU-evicted when far from the view.
+// exactly one cell). Cells are generated on demand and evicted once they fall outside the
+// viewport plus a margin, so the cache stays bounded to what the view can reach.
 
 import { facesInViewport, type Rect } from "./pentagrid";
 import type { RenderFace } from "./patch";
 
 export const CELL = 8;
 const KEEP_RING = 1; // generate one ring of cells beyond the viewport
-const MAX_CELLS = 4096; // evict beyond this many cached cells
+const EVICT_MARGIN = 4; // keep cells within this many of the viewport; must be > KEEP_RING
 
 const cellKey = (cx: number, cy: number) => `${cx},${cy}`;
 
 export class ChunkCache {
   private cells = new Map<string, RenderFace[]>();
-  private order: string[] = []; // simple LRU queue of cell keys
 
   constructor(private gamma: readonly number[]) {}
 
@@ -41,11 +41,6 @@ export class ChunkCache {
         f.centroid[1] < maxY,
     );
     this.cells.set(key, faces);
-    this.order.push(key);
-    if (this.cells.size > MAX_CELLS) {
-      const evict = this.order.shift();
-      if (evict && evict !== key) this.cells.delete(evict);
-    }
     return faces;
   }
 
@@ -57,6 +52,17 @@ export class ChunkCache {
     const out: RenderFace[] = [];
     for (let cx = cx0; cx <= cx1; cx++) {
       for (let cy = cy0; cy <= cy1; cy++) out.push(...this.cellFaces(cx, cy));
+    }
+    // Evict everything past the viewport plus EVICT_MARGIN. The cache is bounded to the
+    // visible window plus a ring, and no visible cell is ever evicted because EVICT_MARGIN
+    // exceeds KEEP_RING. The min zoom on a large display no longer thrashes a fixed cap.
+    const keepX0 = cx0 - EVICT_MARGIN, keepX1 = cx1 + EVICT_MARGIN;
+    const keepY0 = cy0 - EVICT_MARGIN, keepY1 = cy1 + EVICT_MARGIN;
+    for (const key of this.cells.keys()) {
+      const comma = key.indexOf(",");
+      const cx = Number(key.slice(0, comma));
+      const cy = Number(key.slice(comma + 1));
+      if (cx < keepX0 || cx > keepX1 || cy < keepY0 || cy > keepY1) this.cells.delete(key);
     }
     return out;
   }

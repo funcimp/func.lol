@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { generate, physical, type Vec5 } from "./cap";
 import { extractFaces } from "./faces";
-import { facesInViewport, gammaFromWindowCenter, GAMMA, tileCentroid, WINDOW_CENTER, type Rect } from "./pentagrid";
+import { facesInViewport, gammaFromWindowCenter, GAMMA, tileCentroid, tileExists, WINDOW_CENTER, type Rect } from "./pentagrid";
 
 // Oracle: the tested cut-and-project generate(), as faces, for the same tiling.
 // generate() yields Vertex{n,p}; extractFaces wants LiftedVertex{pos,coord}.
@@ -116,6 +116,20 @@ describe("tileCentroid agrees with the enumerator's centroid", () => {
     const c = tileCentroid(f.coord, f.j, f.k);
     expect(c[0]).toBeCloseTo(f.centroid[0], 12);
     expect(c[1]).toBeCloseTo(f.centroid[1], 12);
+  });
+});
+
+describe("tileExists validates a shared address against the real tiling", () => {
+  test("every face the enumerator emits passes tileExists", () => {
+    const faces = facesInViewport({ minX: -12, minY: -12, maxX: 12, maxY: 12 }, GAMMA);
+    expect(faces.length).toBeGreaterThan(50);
+    for (const f of faces) {
+      expect(tileExists(f.coord, f.j, f.k)).toBe(true);
+    }
+  });
+  test("a fabricated address names empty space, so tileExists is false", () => {
+    // shape-valid (decodeTile would accept it) but no such tile exists
+    expect(tileExists([7, 7, 7, 7, 7], 0, 1)).toBe(false);
   });
 });
 
