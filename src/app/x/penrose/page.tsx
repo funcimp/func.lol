@@ -4,9 +4,9 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
-import DeadEnd from "./_components/DeadEnd";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import StopTilingByHand from "./_components/StopTilingByHand";
+import UnsolvableFuture from "./_components/UnsolvableFuture";
 
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
@@ -117,28 +117,8 @@ export default function PenrosePage() {
 
         <MeetTheTiles />
 
-        {/* 4. A local dead-end. */}
-        <h2 className={H2}>You can paint into a corner</h2>
-        <div className={PROSE}>
-          <p>
-            Two tiles is not the whole rule. Each edge carries a mark, a single
-            or double arrow. Two tiles may touch only where their marks agree.
-            Obey it and a tile fits its neighbor. So you lay one, then the next,
-            then the next, around a shared corner, every join clean.
-          </p>
-          <p>
-            Watch what happens. The fan below grows one tile at a time, every
-            placement legal. The last wedge is a perfect 72 degrees, exactly a
-            thick rhombus&apos;s sharp corner. The angle is fine. But the two
-            marks flanking it demand opposite things, so no tile can seat there.
-            The patch is stuck.
-          </p>
-        </div>
-
-        <DeadEnd />
-
-        {/* 5. So a naive solver strands itself. */}
-        <h2 className={H2}>A solver that only obeys the rule gets stuck</h2>
+        {/* 4. A local dead-end: a greedy hand strands itself. */}
+        <h2 className={H2}>A local dead-end</h2>
         <div className={PROSE}>
           <p>
             The matching rule is local. It looks at one vertex and asks whether
@@ -167,8 +147,38 @@ export default function PenrosePage() {
             This is not a staged conflict. It is the computed output of a naive
             greedy solver, the same code that draws the sketch. Obey the local
             rule and nothing else, and you strand quickly, here after about ten
-            tiles. The fix is not a smarter local move. It is to stop tiling by
-            hand and compute the plane instead.
+            tiles.
+          </p>
+        </div>
+
+        {/* 5. But it is deeper: a wrong legal move dooms the tiling. */}
+        <h2 className={H2}>And worse, a wrong move dooms the tiling</h2>
+        <div className={PROSE}>
+          <p>
+            Stranding the hand is the gentle version. Here is the hard one. Take
+            a real legal patch and carve a single closed hole in it. The hole
+            below has exactly one legal completion. One. The sketch replays an
+            exhaustive search of every way to fill it.
+          </p>
+          <p>
+            Watch the wrong branches. Each begins with a move that is perfectly
+            legal, places a few more tiles that are all perfectly legal, and
+            looks fine. Then one edge along its frontier turns. The only tile
+            that fits that edge would close an illegal vertex, so the rule
+            forbids it, and the edge can never close. You can keep laying tiles
+            elsewhere. The hole can never finish. Five legal first moves end this
+            way; only one survives to the full completion.
+          </p>
+        </div>
+
+        <UnsolvableFuture />
+
+        <div className={PROSE}>
+          <p className="text-[14px] leading-[1.6] opacity-70">
+            The rules are local, but whether a move dooms you is not. Only one
+            continuation survives, and nothing local tells you which. The fix is
+            not a smarter local move. It is to stop tiling by hand and compute
+            the plane globally.
           </p>
         </div>
 

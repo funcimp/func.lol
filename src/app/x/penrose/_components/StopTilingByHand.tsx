@@ -5,12 +5,13 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import Sketch from "./Sketch";
 import { solveToDeadEnd, type Pt, type Solution, type Tile } from "./lib/naiveSolver";
 
-// "Stop tiling by hand": the spine's section-5 sketch. The dead-end sketch
-// before it staged one conflict to teach that local fit is necessary, not
-// sufficient. This one PROVES the consequence with a solver, not a hand. It runs
-// the real naive greedy algorithm from lib/naiveSolver: lay unit rhombi one at a
-// time, obey only the matching rule, never look ahead. The build looks clean for
-// ten tiles, then strands itself about two and a half tile-widths from the seed.
+// "The naive solver strands": the spine's section-4 sketch, "a local dead-end".
+// It PROVES, with a solver rather than a hand, that local fit is necessary but
+// not sufficient. It runs the real naive greedy algorithm from lib/naiveSolver:
+// lay unit rhombi one at a time, obey only the matching rule, never look ahead.
+// The build looks clean for ten tiles, then strands itself about two and a half
+// tile-widths from the seed. Section 5 (UnsolvableFuture) goes deeper: a wrong
+// but legal move dooms the whole tiling, not just one greedy hand.
 //
 // The honest beat is the wedge. At the stranded vertex three fat corners are
 // committed, 108 + 108 + 108, leaving a 36-degree gap. A thin acute corner is
@@ -316,7 +317,7 @@ export default function StopTilingByHand() {
 
   return (
     <Sketch
-      label="sketch 03 · the naive solver strands"
+      label="sketch 02 · the naive solver strands"
       animation={{ duration: 6400, render, slider: { label: "lay" } }}
     >
       <canvas

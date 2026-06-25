@@ -203,11 +203,15 @@ function ccw4(pts: [Pt, Pt, Pt, Pt]): [Pt, Pt, Pt, Pt] {
 // Geometry helpers shared by the board.
 // ---------------------------------------------------------------------------
 
-const EPS = 1e-7;
-function keyPt(p: Pt): string {
+export const EPS = 1e-7;
+// Quantise a point to an integer grid key. Two points that snap to the same key
+// are the same lattice vertex. Exported so modules built on this board (the
+// unsolvable-future search) share one canonical vertex identity.
+export function keyPt(p: Pt): string {
   return `${Math.round(p[0] / EPS)},${Math.round(p[1] / EPS)}`;
 }
-function edgeKey(p: Pt, q: Pt): string {
+// Canonical key for an undirected edge between two lattice points.
+export function edgeKey(p: Pt, q: Pt): string {
   const kp = keyPt(p);
   const kq = keyPt(q);
   return kp < kq ? `${kp}|${kq}` : `${kq}|${kp}`;
@@ -293,7 +297,12 @@ function overlap(A: readonly Pt[], B: readonly Pt[]): boolean {
 
 type Corner = { angle: number; ccwStart: number };
 
-class Board {
+// The board is the deep module the whole spine stands on: place a tile, ask the
+// open frontier, ask whether the next tile overlaps or breaks a vertex. The
+// naive solver drives it greedily; the unsolvable-future search drives it
+// exhaustively. Same verified legality oracle, two callers. Exported so the
+// search reuses it rather than duplicating the matching rule.
+export class Board {
   readonly tiles: Tile[] = [];
   private edgeOwners = new Map<string, number>();
   private vfan = new Map<string, Corner[]>();
