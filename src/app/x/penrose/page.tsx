@@ -5,10 +5,12 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
 import CutAndProject from "./_components/CutAndProject";
+import GoldenRatio from "./_components/GoldenRatio";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
+import ZoomHierarchy from "./_components/ZoomHierarchy";
 
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
@@ -260,7 +262,7 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 9. More magic: scaling. (Prose now; sketches later.) */}
+        {/* 9. More magic: scaling. */}
         <h2 className={H2}>It folds into itself</h2>
         <div className={PROSE}>
           <p>
@@ -271,12 +273,32 @@ export default function PenrosePage() {
             φ. You can do this forever in either direction.
           </p>
           <p>
-            Count the tiles as you go and a number falls out. The ratio of thick
-            tiles to thin tiles drifts toward φ, the same golden ratio that set
-            the angles in the first place. The pattern that never repeats is, at
-            every scale, a copy of itself.
+            Count the tiles as you go and a number falls out. Step the level
+            deeper below and watch the running count of thick tiles to thin
+            tiles. It homes in on φ, the same golden ratio that set the angles in
+            the first place.
           </p>
         </div>
+
+        <GoldenRatio />
+
+        <div className={PROSE}>
+          <p>
+            The reason is the same self-similarity, seen the other way. Those
+            smaller tiles are not just finer, they group back into larger tiles of
+            the very same two shapes. Below, the filled rhombi are a real deflated
+            patch and the bold outlines are the genuine level up, the supertiles
+            the small ones compose into, the same two shapes scaled by φ. Step the
+            depth and more small tiles pack inside the same big ones.
+          </p>
+          <p>
+            Inflate or deflate as far as you like and you always land on another
+            valid Penrose tiling, scaled by φ. The pattern that never repeats is,
+            at every scale, a copy of itself.
+          </p>
+        </div>
+
+        <ZoomHierarchy />
 
         {/* 10. The explorer. */}
         <h2 className={H2}>Now walk it</h2>

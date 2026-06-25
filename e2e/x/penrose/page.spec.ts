@@ -170,3 +170,87 @@ test("the cut-and-project sketch renders and links its two panels on hover", asy
     figure.getByText(/four corners.*shadows all land inside the window/i),
   ).toBeVisible();
 });
+
+const goldenFigure = (page: import("@playwright/test").Page) =>
+  page.locator("figure").filter({
+    has: page.getByRole("img", {
+      name: /running count of thick to thin tiles/i,
+    }),
+  });
+
+test("the golden-ratio sketch mounts its animated canvas, level slider, and count readout", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  const figure = goldenFigure(page);
+  await expect(
+    figure.getByRole("img", { name: /running count of thick to thin tiles/i }),
+  ).toBeVisible();
+  await expect(
+    figure.getByRole("button", { name: "play", exact: true }),
+  ).toBeVisible();
+  await expect(figure.getByRole("button", { name: "step" })).toBeVisible();
+  await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
+  // The level is the slider; the readout shows the running thick/thin ratio.
+  await expect(figure.getByRole("slider", { name: "level" })).toBeVisible();
+  await expect(figure.getByText(/thick ÷ thin/i)).toBeVisible();
+});
+
+test("the golden-ratio sketch loads at its stationary deepest level", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  // Same harness contract: mounts at t = 1 (the deepest level, ratio nearest phi),
+  // so reset is enabled and step is disabled until the viewer rewinds.
+  const figure = goldenFigure(page);
+  const reset = figure.getByRole("button", { name: "reset" });
+  const step = figure.getByRole("button", { name: "step" });
+  await reset.scrollIntoViewIfNeeded();
+  await expect(reset).toBeEnabled();
+  await expect(step).toBeDisabled();
+  await reset.click();
+  await expect(step).toBeEnabled();
+  await expect(reset).toBeDisabled();
+});
+
+const hierarchyFigure = (page: import("@playwright/test").Page) =>
+  page.locator("figure").filter({
+    has: page.getByRole("img", {
+      name: /supertiles the small rhombi compose into/i,
+    }),
+  });
+
+test("the zoom-hierarchy sketch mounts its animated canvas and depth slider", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  const figure = hierarchyFigure(page);
+  await expect(
+    figure.getByRole("img", { name: /supertiles the small rhombi compose into/i }),
+  ).toBeVisible();
+  await expect(
+    figure.getByRole("button", { name: "play", exact: true }),
+  ).toBeVisible();
+  await expect(figure.getByRole("button", { name: "step" })).toBeVisible();
+  await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
+  // The depth is the slider; the readout names the supertiles.
+  await expect(figure.getByRole("slider", { name: "depth" })).toBeVisible();
+  await expect(figure.getByText(/supertiles/i).first()).toBeVisible();
+});
+
+test("the zoom-hierarchy sketch loads at its stationary deepest depth", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  // Same harness contract: mounts at t = 1 (the deepest depth, where the self-
+  // similarity reads hardest), so reset is enabled and step is disabled.
+  const figure = hierarchyFigure(page);
+  const reset = figure.getByRole("button", { name: "reset" });
+  const step = figure.getByRole("button", { name: "step" });
+  await reset.scrollIntoViewIfNeeded();
+  await expect(reset).toBeEnabled();
+  await expect(step).toBeDisabled();
+  await reset.click();
+  await expect(step).toBeEnabled();
+  await expect(reset).toBeDisabled();
+});
