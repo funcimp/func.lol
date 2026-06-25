@@ -9,11 +9,18 @@ import MeetTheTiles from "./_components/MeetTheTiles";
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
   description:
-    "An endless Penrose tiling you can pan forever, generated per viewport, with every tile carrying its exact de Bruijn coordinate.",
+    "How two tiles cover the infinite plane and never repeat, told in order, ending at an explorer you can pan forever where every tile names its exact coordinate.",
 };
 
 const RESEARCH_URL =
   "https://github.com/funcimp/func.lol/tree/main/research/penrose";
+
+// Shared classes for the section headings and the prose blocks, kept to the
+// DESIGN.md scale (h2 28/32, body 16/1.65, prose max-width ~60ch).
+const H2 =
+  "text-[24px] sm:text-[32px] font-bold leading-[1.05] tracking-[-0.03em] mb-5 mt-16";
+const PROSE =
+  "prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]";
 
 export default function PenrosePage() {
   return (
@@ -29,18 +36,209 @@ export default function PenrosePage() {
           <ThemeToggle />
         </div>
 
-        <header className="mb-9">
+        <header className="mb-7">
           <h1 className="text-[40px] sm:text-[56px] font-bold leading-[0.95] tracking-[-0.04em]">
             penrose
           </h1>
-          <p className="text-[18px] leading-[1.45] opacity-85 max-w-[42ch] mt-3">
-            A Penrose tiling you can pan forever, every tile carrying its exact coordinate.
+          <p className="text-[18px] leading-[1.45] opacity-85 max-w-[44ch] mt-3">
+            Two tiles cover the infinite plane and never repeat. Here is how, in
+            order, ending at a plane you can walk.
           </p>
         </header>
 
-        <p className="text-[16px] leading-[1.65] mb-4">
-          Penrose&apos;s P3 tiles the plane aperiodically using two rhombi. There is no edge to reach. The explorer generates whatever patch you are looking at on the fly, so you can pan in any direction forever. Every tile carries its exact de Bruijn coordinate, shown under the cursor, and any view is a link you can share.
-        </p>
+        <div className="font-mono text-[11px] uppercase tracking-[0.12em] opacity-55 flex gap-5 mb-9">
+          <span>experiment 02</span>
+          <span>2026-05-11</span>
+        </div>
+
+        {/* 1. The question. */}
+        <div className={PROSE}>
+          <p>
+            Take a bag of tiles. Lay them edge to edge across a floor that runs
+            on forever, no gaps, no overlaps. Most tiles you can think of fall
+            into a march: shift the pattern over by some fixed amount and it
+            lands on itself, exact. Square tiles do it. Hexagons do it. The
+            wallpaper in your hallway does it.
+          </p>
+          <p>
+            So here is the question. Is there a set of tiles that covers the
+            whole plane but <em>never</em> falls into that march? A pattern that
+            keeps going forever and never once repeats itself? For a long time
+            nobody knew.
+          </p>
+        </div>
+
+        {/* 2. The history. */}
+        <h2 className={H2}>Two tiles, after a long climb down</h2>
+        <div className={PROSE}>
+          <p>
+            In 1961 Hao Wang asked a sharper version. He worked with square
+            tiles whose edges carry colors, joined only where colors match. His
+            conjecture: any such set that can tile the plane at all can also tile
+            it periodically. If true, a tiling that never repeats was impossible.
+          </p>
+          <p>
+            Wang was wrong. In 1966 his student Robert Berger built a set that
+            tiles the plane and only ever aperiodically. The catch was the size.
+            His first set used <strong>20,426</strong> tiles. Over the years that
+            number fell. Berger himself trimmed it, Donald Knuth got it lower,
+            Raphael Robinson reached <strong>six</strong> in 1971.
+          </p>
+          <p>
+            Then in 1974 Roger Penrose reached <strong>two</strong>. Two simple
+            rhombi, plus a rule about how their edges may meet. That is the floor
+            this whole page stands on, and it is the one the explorer paints.
+          </p>
+        </div>
+
+        {/* 3. How the two tiles work. */}
+        <h2 className={H2}>The two tiles</h2>
+        <div className={PROSE}>
+          <p>
+            Here they are. A <strong>thick</strong> rhombus, wide and squat, and
+            a <strong>thin</strong> one, long and narrow. Same edge length,
+            different angles. Every tile in the explorer is one of these two,
+            rotated and dropped into place.
+          </p>
+          <p>
+            The angles are not arbitrary. They come from fifths of a turn: 36,
+            72, 108, 144. That family is the golden ratio φ in disguise. Draw the
+            long diagonal of the thick rhombus and its length is exactly φ. Draw
+            the short diagonal of the thin one and it is exactly 1/φ. φ is why
+            these two shapes fit the plane with no repeat.
+          </p>
+        </div>
+
+        <MeetTheTiles />
+
+        {/* 4. A local dead-end. */}
+        <h2 className={H2}>You can paint into a corner</h2>
+        <div className={PROSE}>
+          <p>
+            Two tiles is not the whole rule. Each edge carries a mark, a single
+            or double arrow. Two tiles may touch only where their marks agree.
+            Obey it and a tile fits its neighbor. So you lay one, then the next,
+            then the next, around a shared corner, every join clean.
+          </p>
+          <p>
+            Watch what happens. The fan below grows one tile at a time, every
+            placement legal. The last wedge is a perfect 72 degrees, exactly a
+            thick rhombus&apos;s sharp corner. The angle is fine. But the two
+            marks flanking it demand opposite things, so no tile can seat there.
+            The patch is stuck.
+          </p>
+        </div>
+
+        <DeadEnd />
+
+        {/* 5. But the problem is deeper. (Prose now; sketch later.) */}
+        <h2 className={H2}>It is deeper than one bad corner</h2>
+        <div className={PROSE}>
+          <p>
+            You might think: fine, just look for the conflict and back up. But
+            the real trouble hides further out. You can lay a whole region
+            perfectly, every single tile obeying the marks, and still be doomed.
+            The contradiction gets forced into a tile far from anything you would
+            call a mistake.
+          </p>
+          <p>
+            Penrose told the story himself. He once saw a university floor whose
+            edge tile broke the rule, and he knew at a glance the pattern would
+            go wrong somewhere out in the middle of the lawn. Not at the edge
+            where the bad tile sat. In the middle, far away, where nothing looked
+            wrong at all. Local correctness does not promise global success, and
+            when it fails, it fails somewhere else.
+          </p>
+        </div>
+
+        {/* 6. So you solve it globally. (Prose now; sketch later.) */}
+        <h2 className={H2}>So you stop tiling by hand</h2>
+        <div className={PROSE}>
+          <p>
+            If laying tiles one at a time can dead-end, do not lay them one at a
+            time. Solve the whole plane at once. Picture a perfect grid of points
+            in five dimensions, the integer lattice ℤ⁵. Slice a thin two
+            dimensional sheet through it at an irrational angle, keep only the
+            lattice points near the sheet, and let each one cast a shadow down
+            onto the plane. Those shadows are the tiles.
+          </p>
+          <p>
+            This is the cut-and-project method, and it changes everything. A tile
+            exists if and only if its 5D point lands in the slice, a test you can
+            run on that point alone. No walking out from an origin, no
+            backtracking, no choices that can go wrong later. The plane is{" "}
+            <em>computed</em>, never assembled. It can never dead-end. This is
+            what the explorer runs.
+          </p>
+        </div>
+
+        {/* 7. The overlay. (Prose now; sketch later.) */}
+        <h2 className={H2}>Slide one over another</h2>
+        <div className={PROSE}>
+          <p>
+            Penrose noticed something when he laid two of these tilings over each
+            other and slid one across the other. Large regions snap into
+            agreement, the two patterns locking tile for tile. Between those
+            islands run shifting veins where they disagree, and the whole map of
+            islands and veins is organized by the same five-fold symmetry that
+            built the tiles.
+          </p>
+          <p>
+            Here is the strange part. Any two Penrose tilings share every finite
+            patch you could name. Whatever stretch you see in one, you will find
+            an exact copy somewhere in the other. Yet slide and rotate all you
+            like, the two never line up everywhere at once. Infinitely alike up
+            close, never the same as a whole.
+          </p>
+        </div>
+
+        {/* 8. A coordinate system. (Prose now; may merge with 6 later.) */}
+        <h2 className={H2}>Every tile knows its address</h2>
+        <div className={PROSE}>
+          <p>
+            Because every tile is the shadow of one lattice point, every tile
+            carries that point as a name. Five integers, exact, no two tiles
+            alike. It is a full coordinate system for a floor with no edges and
+            no origin you ever had to choose.
+          </p>
+          <p>
+            That is the trick that makes the explorer possible. Move anywhere,
+            zoom anywhere, and the tile under your cursor can tell you precisely
+            where you are, by reading its own address off the lattice. A shared
+            link is just a coordinate. It drops the next person on the exact same
+            tile.
+          </p>
+        </div>
+
+        {/* 9. More magic: scaling. (Prose now; sketches later.) */}
+        <h2 className={H2}>It folds into itself</h2>
+        <div className={PROSE}>
+          <p>
+            One more piece of magic. Take any valid Penrose tiling and cut each
+            tile into smaller rhombi by a fixed rule. What you get is another
+            valid Penrose tiling, finer, scaled down by φ. Run the rule backward
+            and tiles fuse into bigger ones, a coarser valid tiling scaled up by
+            φ. You can do this forever in either direction.
+          </p>
+          <p>
+            Count the tiles as you go and a number falls out. The ratio of thick
+            tiles to thin tiles drifts toward φ, the same golden ratio that set
+            the angles in the first place. The pattern that never repeats is, at
+            every scale, a copy of itself.
+          </p>
+        </div>
+
+        {/* 10. The explorer. */}
+        <h2 className={H2}>Now walk it</h2>
+        <div className={PROSE}>
+          <p>
+            The explorer generates whatever patch you are looking at on the fly,
+            from the cut-and-project method, so you can pan in any direction
+            forever. There is no edge to reach. Every tile carries its exact
+            coordinate, shown under the cursor, and any view is a link you can
+            share.
+          </p>
+        </div>
 
         <div className="my-8">
           <Link
@@ -51,71 +249,42 @@ export default function PenrosePage() {
           </Link>
         </div>
 
-        <h2 className="text-[24px] sm:text-[32px] font-bold leading-[1] tracking-[-0.03em] mb-6 mt-14">
-          Two tiles, one rule
-        </h2>
-
-        <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
-          <p>
-            The whole tiling is built from two shapes. A <strong>thick</strong>{" "}
-            rhombus, wide and squat, and a <strong>thin</strong> one, long and
-            narrow. Same edge length, different angles. Every tile in the
-            explorer is one of these two, rotated and placed.
-          </p>
-          <p>
-            The angles are not arbitrary. They come from fifths of a turn: 36,
-            72, 108, 144. That family is the golden ratio φ in disguise. Draw the
-            long diagonal of the thick rhombus and its length is exactly φ;
-            draw the short diagonal of the thin one and it is exactly 1/φ. φ is
-            why these two tiles fit the plane with no repeat.
-          </p>
+        <div className="mt-16 pt-7 border-t border-ink">
+          <h2 className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-4">
+            research
+          </h2>
+          <div className={PROSE}>
+            <p>
+              Five substrate questions decided before any explorer code landed:
+              precision drift of Float64 vs BigInt, URL share-link encoding,
+              enumeration throughput, the BigInt-truth / Float64-view
+              viewport-anchor pattern, and a Go comparison. The findings inform
+              the engine and its addressing.
+            </p>
+            <p>
+              <a
+                href={RESEARCH_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                research on github →
+              </a>
+            </p>
+          </div>
         </div>
 
-        <MeetTheTiles />
-
-        <h2 className="text-[24px] sm:text-[32px] font-bold leading-[1] tracking-[-0.03em] mb-6 mt-14">
-          The dead-end
-        </h2>
-
-        <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
-          <p>
-            Each edge carries a mark, a single or double arrow. The rule is local:
-            two tiles may touch only where their marks agree. Obey it and a tile
-            fits its neighbor. So you lay one, then the next, then the next, around
-            a shared corner, every join clean.
-          </p>
-          <p>
-            Penrose once spotted a university floor whose edge tile broke the rule.
-            He knew at a glance the pattern would go wrong somewhere in the middle
-            of the lawn. Here is that wrongness up close. The last wedge is a
-            perfect 72 degrees, exactly a thick rhombus&apos;s sharp corner. The
-            angle is fine. But the two marks flanking it demand opposite things, so
-            no tile can seat there. The patch is stuck.
-          </p>
-          <p>
-            The rules are local. Local is not enough. Somewhere far from where you
-            started, it can become impossible. That is why the explorer never lays
-            tiles by these marks at all. It projects each patch from a 5D lattice,
-            where the whole tiling is one shadow and a dead-end cannot exist.
-          </p>
-        </div>
-
-        <DeadEnd />
-
-        <h2 className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-4 mt-12">
-          research
-        </h2>
-        <p className="text-[16px] leading-[1.65] mb-4">
-          Five substrate questions decided before any explorer code landed: precision drift of Float64 vs BigInt, URL share-link encoding, enumeration throughput, the BigInt-truth / Float64-view viewport-anchor pattern, and a Go comparison. The findings inform the engine and its addressing.
-        </p>
-        <a
-          href={RESEARCH_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono text-[12px] uppercase tracking-[0.14em] underline"
-        >
-          research on github →
-        </a>
+        <footer className="mt-10 pt-5 border-t border-ink font-mono text-[11px] opacity-55 text-center">
+          an experiment by{" "}
+          <a
+            href="https://n.2p5.xyz"
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            nathan toups
+          </a>
+        </footer>
       </div>
     </main>
   );
