@@ -132,6 +132,14 @@ The visual signature. Three roles, strict territories, strict density.
 - **Active.** Fill at ink `0.1`.
 - **Disabled.** Opacity `0.4`, `cursor: not-allowed`.
 
+## Teaching animation (scoped)
+
+Animation is otherwise not in the language. Teaching experiments are the one exception, under a hard contract.
+
+- **User-initiated only.** Motion happens on an explicit play, step, or slider drag. Never on load, never ambient, never on scroll.
+- **Reduced-motion is honored.** Under `prefers-reduced-motion`, play is disabled and the sketch renders its representative end state, stationary. The query is read live, so a mid-session change takes effect.
+- **Confined to teaching sketches.** This applies to the framed sketch primitive inside a teaching experiment (the Penrose spine's `Sketch` harness). It does not relax the no-animation rule for site chrome, forms, or data viz.
+
 ## Light/dark toggle
 
 - **State.** Cookie `theme` = `"light"` | `"dark"`. Absent = `"dark"`.
@@ -152,7 +160,7 @@ The visual signature. Three roles, strict territories, strict density.
 - A second accent color (relaxed: an experiment may bind an existing constellation hue to a named role through a scoped token, as the Penrose explorer does; no new hue)
 - Custom icon set beyond toggle and row-delete `×`
 - Photography or non-dithered illustration
-- Animation beyond focus and hover
+- Animation beyond focus and hover (relaxed: user-initiated motion inside a teaching sketch, under the "Teaching animation" contract above)
 - A second typeface family
 - Per-experiment custom styling (relaxed: scoped tokens that reuse existing constellation hues are allowed)
 - Multi-column layouts, dashboards, dense tables

@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
 
+import MeetTheTiles from "./_components/MeetTheTiles";
+
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
   description:
@@ -47,6 +49,28 @@ export default function PenrosePage() {
             open explorer →
           </Link>
         </div>
+
+        <h2 className="text-[24px] sm:text-[32px] font-bold leading-[1] tracking-[-0.03em] mb-6 mt-14">
+          Two tiles, one rule
+        </h2>
+
+        <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
+          <p>
+            The whole tiling is built from two shapes. A <strong>thick</strong>{" "}
+            rhombus, wide and squat, and a <strong>thin</strong> one, long and
+            narrow. Same edge length, different angles. Every tile in the
+            explorer is one of these two, rotated and placed.
+          </p>
+          <p>
+            The angles are not arbitrary. They come from fifths of a turn: 36,
+            72, 108, 144. That family is the golden ratio φ in disguise. Draw the
+            long diagonal of the thick rhombus and its length is exactly φ;
+            draw the short diagonal of the thin one and it is exactly 1/φ. φ is
+            why these two tiles fit the plane with no repeat.
+          </p>
+        </div>
+
+        <MeetTheTiles />
 
         <h2 className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-4 mt-12">
           research
