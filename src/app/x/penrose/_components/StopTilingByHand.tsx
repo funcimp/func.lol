@@ -3,33 +3,38 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
-import { solveToDeadEnd, type Pt, type Solution, type Tile } from "./lib/naiveSolver";
+import type { Gap, SceneA, Tile } from "./lib/geomWall";
+import walls from "./lib/geomWalls.json";
+import { overlapPolygon, type Pt } from "./lib/overlap";
 
-// "The naive solver strands": the spine's section-4 sketch, "a local dead-end".
-// It PROVES, with a solver rather than a hand, that local fit is necessary but
-// not sufficient. It runs the real naive greedy algorithm from lib/naiveSolver:
-// lay unit rhombi one at a time, obey only the matching rule, never look ahead.
-// The build looks clean for ten tiles, then strands itself about two and a half
-// tile-widths from the seed. Section 5 (UnsolvableFuture) goes deeper: a wrong
-// but legal move dooms the whole tiling, not just one greedy hand.
+// "A piece fits, and still strands you": the spine's section-4 sketch, recast as
+// PURE GEOMETRY. The earlier version rejected the tempting move by the matching
+// rule (a thin fits the wedge, but the rule forbids closing that vertex). A
+// Penrose expert can dispute that: the shape fits, you have only asserted a rule.
 //
-// The honest beat is the wedge. At the stranded vertex three fat corners are
-// committed, 108 + 108 + 108, leaving a 36-degree gap. A thin acute corner is
-// exactly 36 degrees, so it FITS the gap. We draw it greyed and struck. But it
-// would close the vertex to [108,108,108,36], which is not one of the seven
-// admissible Penrose vertex stars, so the matching rule forbids it. Every other
-// candidate overlaps a placed tile. The rules leave no legal move. The claim is
-// never "no tile fits": a tile fits, and the rules still forbid it. The whole
-// sketch is computed by the same code naiveSolver.test.ts verifies, so it cannot
-// drift into a fake.
+// So this version never invokes the rule. It renders the rigid hexagon scene from
+// geomWalls.json (computed by lib/geomWall.ts, bound to the proof by
+// geomWall.test.ts). The hole has exactly ONE geometry-only filling. The
+// constrained edge admits two rhombi by bare geometry; one completes, the other
+// (the tempting fat-108 move) seats cleanly and then STRANDS. After it, every
+// candidate on the next gap overlaps a committed tile by real area, which we
+// SHADE. The wall is geometry, not a label. No one can dispute a tile sitting on
+// top of another tile.
+//
+// On the open plane the bare shapes never trap you (they would tile boringly),
+// which is exactly why Penrose added the matching marks. Here the bounded region
+// lets the geometry speak.
 //
 // Canvas, like the other animated sketches: the harness drives render(t)
 // imperatively, theme colours are read live via getComputedStyle so the patch
 // inverts with the light/dark toggle.
 
+const scene = walls.sceneA_rigidHexagon as unknown as SceneA;
+
 const VB_W = 520;
-const VB_H = 440;
-const MARGIN = 34;
+const VB_H = 460;
+const MARGIN = 40;
+const WALL_RING = 1.9; // draw wall tiles whose centroid is within this of the hole
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -46,19 +51,46 @@ const smooth = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-// The solver runs once; its result is deterministic. We fit the placed patch and
-// the illegal ghost into the viewBox, then convert tile coordinates (y up) to
-// canvas pixels (y down).
+// ---------------------------------------------------------------------------
+// Viewport: fit the hole, its completion, the wrong move and gaps, and a tight
+// ring of wall tiles for context. Computed once; the scene is static data.
+// ---------------------------------------------------------------------------
+
 type View = {
-  solution: Solution;
-  toPx: (p: Pt) => Pt;
-  wedge: Pt; // the stranded vertex in canvas px
+  toPx: (p: Pt) => [number, number];
+  wall: Tile[];
+  gap: Gap; // the single most-constrained unfillable gap we showcase
 };
 
-function buildView(solution: Solution): View {
-  const pts: Pt[] = [];
-  for (const s of solution.steps) for (const p of s.tile.v) pts.push(p);
-  for (const p of solution.deadEnd.ghost.v) pts.push(p);
+function centroid(v: readonly Pt[]): Pt {
+  let x = 0;
+  let y = 0;
+  for (const p of v) {
+    x += p[0];
+    y += p[1];
+  }
+  return [x / v.length, y / v.length];
+}
+
+function buildView(): View {
+  const c = scene.holeCenter;
+  const wall = scene.wall.filter((t) => {
+    const [cx, cy] = centroid(t.v);
+    return Math.hypot(cx - c[0], cy - c[1]) <= WALL_RING;
+  });
+  // The most-constrained gap: the one with the fewest candidates (then leftmost),
+  // so the showcase is deterministic and tidy.
+  const gap = [...scene.unfillableGaps].sort(
+    (a, b) =>
+      a.candidates.length - b.candidates.length ||
+      a.edge[0][0] - b.edge[0][0],
+  )[0];
+
+  const pts: Pt[] = [...scene.holePolygon];
+  for (const t of scene.uniqueCompletion) for (const p of t.v) pts.push(p);
+  for (const p of scene.wrongMove.v) pts.push(p);
+  for (const t of wall) for (const p of t.v) pts.push(p);
+  for (const cand of gap.candidates) for (const p of cand.v) pts.push(p);
 
   let minx = Infinity;
   let maxx = -Infinity;
@@ -73,23 +105,23 @@ function buildView(solution: Solution): View {
   const w = maxx - minx;
   const h = maxy - miny;
   const scale = Math.min((VB_W - 2 * MARGIN) / w, (VB_H - 2 * MARGIN) / h);
-  // Centre the content in the viewBox. Canvas y grows downward, so flip y.
   const cx = (minx + maxx) / 2;
   const cy = (miny + maxy) / 2;
-  const toPx = (p: Pt): Pt => [
+  const toPx = (p: Pt): [number, number] => [
     VB_W / 2 + (p[0] - cx) * scale,
-    VB_H / 2 - (p[1] - cy) * scale,
+    VB_H / 2 - (p[1] - cy) * scale, // canvas y grows downward
   ];
-  return { solution, toPx, wedge: toPx(solution.deadEnd.vertex) };
+  return { toPx, wall, gap };
 }
 
-function strokeTile(
+// ---------------------------------------------------------------------------
+// Drawing primitives.
+// ---------------------------------------------------------------------------
+
+function pathPoly(
   ctx: CanvasRenderingContext2D,
   v: readonly Pt[],
-  toPx: (p: Pt) => Pt,
-  ink: string,
-  width: number,
-  dash: number[] | null,
+  toPx: (p: Pt) => [number, number],
 ) {
   ctx.beginPath();
   const [x0, y0] = toPx(v[0]);
@@ -99,47 +131,100 @@ function strokeTile(
     ctx.lineTo(x, y);
   }
   ctx.closePath();
-  ctx.setLineDash(dash ?? []);
-  ctx.lineWidth = width;
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = ink;
-  ctx.stroke();
-  ctx.setLineDash([]);
 }
 
 function fillTile(
   ctx: CanvasRenderingContext2D,
   v: readonly Pt[],
-  toPx: (p: Pt) => Pt,
+  toPx: (p: Pt) => [number, number],
   fill: string,
   ink: string,
   alpha: number,
+  lineWidth = 1.1,
 ) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  const [x0, y0] = toPx(v[0]);
-  ctx.moveTo(x0, y0);
-  for (let i = 1; i < v.length; i++) {
-    const [x, y] = toPx(v[i]);
-    ctx.lineTo(x, y);
-  }
-  ctx.closePath();
+  pathPoly(ctx, v, toPx);
   ctx.fillStyle = fill;
   ctx.fill();
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = lineWidth;
   ctx.lineJoin = "round";
   ctx.strokeStyle = ink;
   ctx.stroke();
   ctx.restore();
 }
 
-// Reveal stages over t:
-//   [0, LAY_END]      lay the solver's tiles one at a time, all clean and legal.
-//   [LAY_END, MARK]   reveal the stranded wedge and the tempting illegal ghost.
-//   [MARK, 1]         strike the ghost and label the wedge honestly. End at t=1.
-const LAY_END = 0.72;
-const MARK_END = 0.86;
+function strokeLoop(
+  ctx: CanvasRenderingContext2D,
+  loop: readonly Pt[],
+  toPx: (p: Pt) => [number, number],
+  color: string,
+  width: number,
+  alpha: number,
+  dash: number[] = [],
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  pathPoly(ctx, loop, toPx);
+  ctx.setLineDash(dash);
+  ctx.lineWidth = width;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// Shade the real intersection of two polygons in solid ink (the wall the viewer
+// sees IS the overlap area, not a label). A small hatch reads even where the fill
+// is faint.
+function shadeOverlap(
+  ctx: CanvasRenderingContext2D,
+  poly: Pt[],
+  toPx: (p: Pt) => [number, number],
+  ink: string,
+  alpha: number,
+) {
+  if (poly.length < 3) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  pathPoly(ctx, poly, toPx);
+  ctx.fillStyle = ink;
+  ctx.fill();
+  ctx.restore();
+}
+
+function caption(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  ink: string,
+  alpha: number,
+  align: CanvasTextAlign = "center",
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = ink;
+  ctx.font =
+    "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
+  ctx.textAlign = align;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Timeline. Outline the hole, seat the tempting fat-108 move (it fits), then the
+// next gap glows and every candidate shades its overlap, then the one correct
+// fat-72 filling completes and holds. The order is fixed, so the slider scrubs it.
+// ---------------------------------------------------------------------------
+
+const HOLE_IN = 0.12; // [0, HOLE_IN] wall ring + hole outline appear
+const SEAT_FROM = 0.16; // the tempting move seats cleanly
+const SEAT_TO = 0.4;
+const WALL_FROM = 0.46; // the gap glows; candidates shade their overlap
+const WALL_TO = 0.72;
 
 function paint(
   ctx: CanvasRenderingContext2D,
@@ -148,116 +233,205 @@ function paint(
   colors: Colors,
 ) {
   const { thick, thin, grout, ink } = colors;
-  const { solution, toPx, wedge } = view;
-  const { steps, deadEnd } = solution;
+  const { toPx, wall, gap } = view;
 
   ctx.clearRect(0, 0, VB_W, VB_H);
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
-  // Lay the tiles one at a time. Each tile fades in over its own slice of the
-  // laying window, so the patch grows in the solver's actual placement order.
-  const per = LAY_END / steps.length;
-  steps.forEach(({ index, tile }: { index: number; tile: Tile }) => {
-    const appear = smooth(index * per, (index + 1) * per, t);
-    if (appear <= 0) return;
-    fillTile(
-      ctx,
-      tile.v,
-      toPx,
-      tile.type === "fat" ? thick : thin,
-      ink,
-      appear,
-    );
-  });
-
-  // The tempting illegal ghost: a thin tile that fits the 36-degree wedge
-  // geometrically. Drawn muted, dashed, struck. It fits; the rules forbid it.
-  const ghostReveal = smooth(LAY_END, MARK_END, t);
-  if (ghostReveal > 0) {
-    ctx.save();
-    ctx.globalAlpha = ghostReveal * 0.5;
-    // a faint muted fill so the eye reads "a tile would sit here"
-    ctx.beginPath();
-    const g = deadEnd.ghost.v;
-    const [gx0, gy0] = toPx(g[0]);
-    ctx.moveTo(gx0, gy0);
-    for (let i = 1; i < g.length; i++) {
-      const [x, y] = toPx(g[i]);
-      ctx.lineTo(x, y);
+  // 1. The committed wall ring, muted so the hole and the action read above it.
+  const wallIn = smooth(0, HOLE_IN, t);
+  if (wallIn > 0) {
+    for (const tile of wall) {
+      fillTile(
+        ctx,
+        tile.v,
+        toPx,
+        tile.type === "fat" ? thick : thin,
+        ink,
+        wallIn * 0.34,
+        0.8,
+      );
     }
-    ctx.closePath();
-    ctx.fillStyle = ink;
-    ctx.globalAlpha = ghostReveal * 0.1;
-    ctx.fill();
-    ctx.restore();
-
-    // its outline, dashed in ink: present but provisional
-    ctx.save();
-    ctx.globalAlpha = ghostReveal * 0.6;
-    strokeTile(ctx, deadEnd.ghost.v, toPx, ink, 1.4, [4, 3]);
-    ctx.restore();
-
-    // a small ring at the stranded vertex so the wedge reads
-    ctx.save();
-    ctx.globalAlpha = ghostReveal;
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(wedge[0], wedge[1], 5, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn, [5, 4]);
+    caption(
+      ctx,
+      "one small hole, exactly one filling",
+      VB_W / 2,
+      20,
+      ink,
+      wallIn * 0.85,
+    );
   }
 
-  // Strike the ghost and label the wedge honestly. This is the end state at t=1.
-  const strike = smooth(MARK_END, 1, t);
-  if (strike > 0) {
-    // strike across the ghost's body centroid
-    const g = deadEnd.ghost.v;
-    let sx = 0;
-    let sy = 0;
-    for (const p of g) {
-      const [px, py] = toPx(p);
-      sx += px;
-      sy += py;
-    }
-    sx /= g.length;
-    sy /= g.length;
+  const atEnd = t >= 1;
 
+  // END STATE (reduced motion / t = 1): the wrong move seated, the gap shaded with
+  // every overlapping candidate, and the correct filling completing. Static.
+  if (atEnd) {
+    // The tempting wrong move, ghosted (it seated, but it strands).
+    fillTile(ctx, scene.wrongMove.v, toPx, ink, ink, 0.14, 1);
+    strokeLoop(ctx, scene.wrongMove.v, toPx, ink, 1.4, 0.5, [4, 3]);
+    // Every candidate on the gap, each shading its real overlap with the board.
+    const board = [...scene.wall, scene.wrongMove].map((x) => x.v);
+    for (const cand of gap.candidates) {
+      strokeLoop(ctx, cand.v, toPx, ink, 1, 0.32, [2, 3]);
+      let worst: Pt[] = [];
+      let worstA = 0;
+      for (const bv of board) {
+        const ov = overlapPolygon(cand.v as Pt[], bv as Pt[]);
+        if (ov.length >= 3) {
+          let a = 0;
+          for (let i = 0; i < ov.length; i++) {
+            const p = ov[i];
+            const q = ov[(i + 1) % ov.length];
+            a += p[0] * q[1] - q[0] * p[1];
+          }
+          a = Math.abs(a) / 2;
+          if (a > worstA) {
+            worstA = a;
+            worst = ov;
+          }
+        }
+      }
+      shadeOverlap(ctx, worst, toPx, ink, 0.4);
+    }
+    // The one correct filling, solid.
+    for (const tile of scene.uniqueCompletion) {
+      fillTile(
+        ctx,
+        tile.v,
+        toPx,
+        tile.type === "fat" ? thick : thin,
+        ink,
+        0.9,
+        1.1,
+      );
+    }
+    caption(
+      ctx,
+      "the wrong piece fits, then strands; only one filling works",
+      VB_W / 2,
+      VB_H - 30,
+      ink,
+      0.8,
+    );
+    caption(
+      ctx,
+      "no rule invoked, the shapes alone decide",
+      VB_W / 2,
+      VB_H - 14,
+      ink,
+      0.62,
+    );
+    return;
+  }
+
+  // 2. The tempting wrong move (fat-108) seats cleanly on the constrained edge.
+  const seat = smooth(SEAT_FROM, SEAT_TO, t);
+  const fade = 1 - smooth(WALL_FROM, WALL_FROM + 0.06, t); // it fades as the gap glows
+  if (seat > 0 && fade > 0) {
+    fillTile(
+      ctx,
+      scene.wrongMove.v,
+      toPx,
+      scene.wrongMove.type === "fat" ? thick : thin,
+      ink,
+      seat * fade,
+      1.1,
+    );
+    if (t < WALL_FROM) {
+      caption(ctx, "this piece fits cleanly", VB_W / 2, VB_H - 20, ink, seat * 0.85);
+    }
+  }
+
+  // 3. The gap glows; every candidate shades its overlap with a committed tile.
+  const wallReveal = smooth(WALL_FROM, WALL_TO, t);
+  if (wallReveal > 0) {
+    // Keep the seated wrong move visible, faint, so the gap reads against it.
+    fillTile(ctx, scene.wrongMove.v, toPx, ink, ink, wallReveal * 0.14, 1);
+    strokeLoop(ctx, scene.wrongMove.v, toPx, ink, 1.4, wallReveal * 0.5, [4, 3]);
+
+    const board = [...scene.wall, scene.wrongMove].map((x) => x.v);
+    // Glow the gap edge.
+    const [ea, eb] = gap.edge;
     ctx.save();
-    ctx.globalAlpha = strike;
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    const span = 10;
+    ctx.globalAlpha = wallReveal;
+    const [ax, ay] = toPx(ea);
+    const [bx, by] = toPx(eb);
     ctx.beginPath();
-    ctx.moveTo(sx - span, sy - span);
-    ctx.lineTo(sx + span, sy + span);
-    ctx.moveTo(sx + span, sy - span);
-    ctx.lineTo(sx - span, sy + span);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = ink;
     ctx.stroke();
     ctx.restore();
 
-    // Honest two-line label, placed in the open canvas below the struck ghost so
-    // it never sits over a placed tile. The ghost points down into empty space;
-    // we find its lowest corner and write under it.
-    let maxYpx = -Infinity;
-    for (const p of g) {
-      const [, py] = toPx(p);
-      maxYpx = Math.max(maxYpx, py);
+    // Reveal candidates one at a time, each shading its worst real overlap.
+    const per = 1 / gap.candidates.length;
+    gap.candidates.forEach((cand, k) => {
+      const appear = smooth(k * per, (k + 1) * per, wallReveal);
+      if (appear <= 0) return;
+      strokeLoop(ctx, cand.v, toPx, ink, 1, appear * 0.3, [2, 3]);
+      let worst: Pt[] = [];
+      let worstA = 0;
+      for (const bv of board) {
+        const ov = overlapPolygon(cand.v as Pt[], bv as Pt[]);
+        if (ov.length >= 3) {
+          let a = 0;
+          for (let i = 0; i < ov.length; i++) {
+            const p = ov[i];
+            const q = ov[(i + 1) % ov.length];
+            a += p[0] * q[1] - q[0] * p[1];
+          }
+          a = Math.abs(a) / 2;
+          if (a > worstA) {
+            worstA = a;
+            worst = ov;
+          }
+        }
+      }
+      shadeOverlap(ctx, worst, toPx, ink, appear * 0.42);
+    });
+    if (t < 0.78) {
+      caption(
+        ctx,
+        "now nothing fits: every piece overlaps",
+        VB_W / 2,
+        VB_H - 20,
+        ink,
+        wallReveal * 0.85,
+      );
     }
-    const ly = Math.min(maxYpx + 18, VB_H - 22);
-    ctx.save();
-    ctx.globalAlpha = strike * 0.92;
-    ctx.fillStyle = ink;
-    ctx.font =
-      "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("FITS THE GAP", sx, ly);
-    ctx.globalAlpha = strike * 0.62;
-    ctx.fillText("forbidden by the rule", sx, ly + 16);
-    ctx.restore();
+  }
+
+  // 4. The one correct filling (fat-72) completes and holds solid.
+  const comp = smooth(0.78, 0.96, t);
+  if (comp > 0) {
+    // The gap shading fades as the correct filling takes over.
+    const per = 1 / scene.uniqueCompletion.length;
+    scene.uniqueCompletion.forEach((tile, k) => {
+      const appear = smooth(k * per, (k + 1) * per, comp);
+      if (appear <= 0) return;
+      fillTile(
+        ctx,
+        tile.v,
+        toPx,
+        tile.type === "fat" ? thick : thin,
+        ink,
+        appear * 0.92,
+        1.1,
+      );
+    });
+    caption(
+      ctx,
+      "the only filling that works",
+      VB_W / 2,
+      VB_H - 20,
+      ink,
+      comp * 0.85,
+    );
   }
 }
 
@@ -270,9 +444,7 @@ export default function StopTilingByHand() {
     ink: "#ede9d8",
   });
   const dprRef = useRef(0);
-
-  // The solver is deterministic; run it once for the lifetime of the component.
-  const view = useMemo(() => buildView(solveToDeadEnd()), []);
+  const view = useMemo(() => buildView(), []);
 
   const refreshColors = useCallback(() => {
     colorsRef.current = {
@@ -317,8 +489,8 @@ export default function StopTilingByHand() {
 
   return (
     <Sketch
-      label="sketch 02 · the naive solver strands"
-      animation={{ duration: 6400, render, slider: { label: "lay" } }}
+      label="sketch 02 · a piece fits, and still strands you"
+      animation={{ duration: 7000, render, slider: { label: "build" } }}
     >
       <canvas
         ref={canvasRef}
@@ -329,7 +501,7 @@ export default function StopTilingByHand() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A naive greedy solver lays Penrose rhombi one at a time, obeying only the local matching rule. After about ten clean placements it strands itself near the seed: a vertex with three fat corners leaving a 36-degree wedge. A thin tile fits that wedge exactly and is drawn greyed and struck through, because seating it would close the vertex to an arrangement no Penrose tiling allows, so the rule forbids it. A tile fits the gap and is still illegal."
+        aria-label="A small six-edge hole carved from a real Penrose patch has exactly one filling by pure geometry. The constrained edge admits two rhombi that both fit; one is the tempting wrong move, a fat rhombus, which seats cleanly. Following it through, the next gap glows and every candidate rhombus is shown overlapping a committed tile, with the real overlap area shaded. Then the one correct filling completes the hole. A piece can fit and still strand you; only one filling works, and the shapes show it, with no matching rule invoked."
       />
     </Sketch>
   );

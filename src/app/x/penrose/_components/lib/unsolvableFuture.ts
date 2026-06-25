@@ -53,11 +53,14 @@ const SIN36 = Math.sin((36 * Math.PI) / 180);
 // Unit-edge tiles. deflatedRhombi(levels, radius) divides the wheel by phi each
 // deflation, so seeding the wheel at phi^levels yields unit edges, matching the
 // verified spike's unitTiling exactly (byte-for-byte identical geometry).
-function unitTiling(levels = LEVELS): Tile[] {
+//
+// Exported so the geometry-only follow-through (geomWall.ts) carves its own rigid
+// hexagon scene from the same tiling rather than duplicating the deflation.
+export function unitTiling(levels = LEVELS): Tile[] {
   return deflatedRhombi(levels, Math.pow(PHI, levels)) as Tile[];
 }
 
-function centroid(t: Tile): Pt {
+export function centroid(t: Tile): Pt {
   let x = 0;
   let y = 0;
   for (const p of t.v) {
@@ -83,7 +86,8 @@ function tileId(t: Tile): string {
 
 // Remove every tile whose centroid is within RHOLE of `center`; the rest is the
 // wall. A clean disk carved from a real tiling leaves a single enclosed hole.
-function carve(
+// Exported so geomWall.ts carves its rigid-hexagon scene with the same routine.
+export function carve(
   tiles: Tile[],
   center: Pt,
   rhole: number,
@@ -102,7 +106,8 @@ function carve(
 // removed tile. We assemble them into one ordered loop, accepting only a single
 // simple closed loop (every vertex degree 2). Returns null otherwise: we only
 // keep clean holes, so a messy carve is rejected rather than silently fudged.
-function holePolygon(kept: Tile[], removed: Tile[]): Pt[] | null {
+// Exported so geomWall.ts extracts its hexagon boundary with the same routine.
+export function holePolygon(kept: Tile[], removed: Tile[]): Pt[] | null {
   const removedEdges = new Set<string>();
   for (const t of removed) {
     for (let i = 0; i < 4; i++) {
@@ -143,7 +148,7 @@ function holePolygon(kept: Tile[], removed: Tile[]): Pt[] | null {
   return loop;
 }
 
-function inPoly(p: Pt, poly: Pt[]): boolean {
+export function inPoly(p: Pt, poly: Pt[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const xi = poly[i][0];
@@ -158,7 +163,7 @@ function inPoly(p: Pt, poly: Pt[]): boolean {
   return inside;
 }
 
-function polyArea(poly: Pt[]): number {
+export function polyArea(poly: Pt[]): number {
   let a = 0;
   for (let i = 0; i < poly.length; i++) {
     const p = poly[i];

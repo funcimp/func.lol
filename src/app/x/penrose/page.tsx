@@ -117,26 +117,23 @@ export default function PenrosePage() {
 
         <MeetTheTiles />
 
-        {/* 4. A local dead-end: a greedy hand strands itself. */}
-        <h2 className={H2}>A local dead-end</h2>
+        {/* 4. A geometric dead-end: a piece fits, then strands you. */}
+        <h2 className={H2}>A piece fits, and still strands you</h2>
         <div className={PROSE}>
           <p>
-            The matching rule is local. It looks at one vertex and asks whether
-            the corners around it can still grow into a legal arrangement. It is
-            necessary: break it anywhere and the tiling is dead. But it is not
-            sufficient. A solver that lays the next tile by the rule alone, never
-            looking ahead, paints itself into a corner fast.
+            Start with the gentle version, and make it airtight. Carve a small
+            hole out of a real patch, six edges, and try to fill it back. This
+            hole has exactly one filling. One. Watch the constrained edge: two
+            different rhombi fit it with no overlap at all, so both look fine.
           </p>
           <p>
-            The sketch below runs exactly that solver. It seeds one tile and
-            keeps placing the first legal rhombus the rule allows. Watch it lay
-            ten clean tiles, every join honest, and then strand. At the marked
-            vertex three fat corners leave a 36-degree wedge. A thin tile fits
-            that wedge exactly, so it is drawn and struck. It fits the gap. But
-            seating it would close the vertex to an arrangement no Penrose tiling
-            allows, so the rule forbids it. Every other tile overlaps. No legal
-            move is left, and the solver is barely two tiles from where it
-            started.
+            The sketch below takes the tempting one and seats it cleanly. It
+            fits. Then it follows that move through. The next gap lights up, and
+            every rhombus you could put there lands on top of a tile already
+            placed. The shaded patches are the real overlap, one shape pushed
+            into another. Nothing fits, and no rule was invoked to say so. Only
+            the other first move completes the hole, and the shapes alone tell
+            you which.
           </p>
         </div>
 
@@ -144,30 +141,31 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            This is not a staged conflict. It is the computed output of a naive
-            greedy solver, the same code that draws the sketch. Obey the local
-            rule and nothing else, and you strand quickly, here after about ten
-            tiles.
+            On the open plane the bare shapes never trap you like this; they would
+            tile, boringly, forever. That is exactly why Penrose added the
+            matching marks. Inside a bounded hole the geometry can speak for
+            itself, and here it does: the wall is overlap you can see, not a rule
+            you have to take on faith.
           </p>
         </div>
 
-        {/* 5. But it is deeper: a wrong legal move dooms the tiling. */}
-        <h2 className={H2}>And worse, a wrong move dooms the tiling</h2>
+        {/* 5. Deeper: the move an expert says fits, followed through. */}
+        <h2 className={H2}>The thin fits. Place it. Now nothing fits.</h2>
         <div className={PROSE}>
           <p>
-            Stranding the hand is the gentle version. Here is the hard one. Take
-            a real legal patch and carve a single closed hole in it. The hole
-            below has exactly one legal completion. One. The sketch replays an
-            exhaustive search of every way to fill it.
+            Here is the hard one, and it answers the obvious objection. Take a
+            bigger hole, sixteen edges, carved from a real patch. A Penrose
+            expert looks at one edge and says, rightly, a thin rhombus fits
+            there. It does. Zero overlap. The piece sits in the gap.
           </p>
           <p>
-            Watch the wrong branches. Each begins with a move that is perfectly
-            legal, places a few more tiles that are all perfectly legal, and
-            looks fine. Then one edge along its frontier turns. The only tile
-            that fits that edge would close an illegal vertex, so the rule
-            forbids it, and the edge can never close. You can keep laying tiles
-            elsewhere. The hole can never finish. Five legal first moves end this
-            way; only one survives to the full completion.
+            So place it. Lay a few more legal tiles, all fine, and keep going.
+            Then the next gap turns. Every rhombus that could sit there lands on
+            top of a tile already down, the shaded patches showing exactly where
+            one shape pushes into another. The thin fit, you placed it, you kept
+            building, and now nothing fits. Not because a rule says no. Because
+            the shapes collide. Out of all the ways to start, only one survives
+            to finish the hole.
           </p>
         </div>
 
@@ -175,10 +173,11 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            The rules are local, but whether a move dooms you is not. Only one
-            continuation survives, and nothing local tells you which. The fix is
-            not a smarter local move. It is to stop tiling by hand and compute
-            the plane globally.
+            A move can fit and still doom you, and whether it does is not
+            something the edge in front of you can tell. Only one continuation
+            survives, and nothing local points to it. The fix is not a smarter
+            local move. It is to stop tiling by hand and compute the plane
+            globally.
           </p>
         </div>
 

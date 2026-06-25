@@ -33,7 +33,9 @@ const solverFigure = (page: import("@playwright/test").Page) =>
   page
     .locator("figure")
     .filter({
-      has: page.getByRole("img", { name: /naive greedy solver lays Penrose rhombi/i }),
+      has: page.getByRole("img", {
+        name: /small six-edge hole carved from a real Penrose patch/i,
+      }),
     });
 
 const unsolvableFigure = (page: import("@playwright/test").Page) =>
@@ -41,17 +43,19 @@ const unsolvableFigure = (page: import("@playwright/test").Page) =>
     .locator("figure")
     .filter({
       has: page.getByRole("img", {
-        name: /surrounds a single closed hole that has exactly one legal completion/i,
+        name: /single closed sixteen-edge hole with exactly one surviving completion/i,
       }),
     });
 
-test("the naive-solver sketch mounts and honours the reduced-motion contract", async ({
+test("the geometry-only dead-end sketch mounts and honours the reduced-motion contract", async ({
   page,
 }) => {
   await page.goto("/x/penrose");
   const figure = solverFigure(page);
   await expect(
-    figure.getByRole("img", { name: /naive greedy solver lays Penrose rhombi/i }),
+    figure.getByRole("img", {
+      name: /small six-edge hole carved from a real Penrose patch/i,
+    }),
   ).toBeVisible();
   // The harness mounts at the stationary end state, so reset is enabled and step
   // is disabled until the viewer rewinds. This is the reduced-motion contract
@@ -73,7 +77,7 @@ test("the unsolvable-future sketch mounts its animated canvas and controls", asy
   const figure = unsolvableFigure(page);
   await expect(
     figure.getByRole("img", {
-      name: /surrounds a single closed hole that has exactly one legal completion/i,
+      name: /single closed sixteen-edge hole with exactly one surviving completion/i,
     }),
   ).toBeVisible();
   await expect(

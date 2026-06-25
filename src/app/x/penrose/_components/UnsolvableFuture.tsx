@@ -3,34 +3,33 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
-import sceneData from "./lib/scene.json";
-import type { Pt, Scene, Tile } from "./lib/unsolvableFuture";
+import type { Gap, SceneB, Tile } from "./lib/geomWall";
+import walls from "./lib/geomWalls.json";
+import { overlapPolygon, type Pt } from "./lib/overlap";
 
-// "An unsolvable future": the spine's section-5 sketch. The dead-end before it
-// showed a local greedy hand stranding. This one is deeper and proven. A real
-// legal patch surrounds a single closed hole. The hole has exactly ONE legal
-// completion. Every other legal first move dooms the tiling: you can keep placing
-// tiles, but one frontier edge can never close, so the hole can never finish.
+// "The thin fits, place it, and now nothing fits": the spine's section-5 sketch,
+// recast as PURE GEOMETRY. A Penrose expert objected to the old framing: "you
+// reject a move but a tile visibly fits there." The old sketch marked a frontier
+// edge doomed because its only fill would close an illegal vertex. The shape fit;
+// we only asserted a rule.
 //
-// The sketch renders scene.json, the committed output of an EXHAUSTIVE search
-// (lib/unsolvableFuture.ts). unsolvableFuture.test.ts re-runs that search and
-// asserts the committed data matches it and that every dead-end is genuinely
-// doomed (no candidate on the doomed edge is both legal and non-overlapping). So
-// the drawing cannot drift from the proof. Nothing here is staged.
-//
-// THE HONEST FRAMING. We never say "no moves left" or "no tile fits". We say: a
-// wrong but legal move permanently dooms one edge. For the sharp dead-ends a tile
-// DOES fit the doomed edge; seating it would close an illegal vertex, so the rule
-// forbids it, and that edge can never close. The tiling can never be completed,
-// even though you can still place tiles elsewhere.
+// This version follows the tempting move THROUGH. It renders the thin-refuted
+// scene from geomWalls.json (computed by lib/geomWall.ts, bound to the proof by
+// geomWall.test.ts), the SAME rich 16-edge hole as before. The hole has one
+// surviving completion. On one frontier edge a THIN rhombus fits with zero
+// overlap, the exact move the expert pointed at. We place it, keep building the
+// locally legal prefix, and reach a gap where every candidate rhombus OVERLAPS a
+// committed tile by real area, which we SHADE. The claim is now "the thin fits,
+// place it, keep going, and now nothing fits", not "this vertex is an illegal
+// star". Then the one surviving completion finishes the hole.
 //
 // Canvas, like the other animated sketches: the harness drives render(t)
 // imperatively, theme colours are read live so the patch inverts with the toggle.
 
-const scene = sceneData as unknown as Scene;
+const scene = walls.sceneB_thinRefuted as unknown as SceneB;
 
 const VB_W = 560;
-const VB_H = 520;
+const VB_H = 540;
 const MARGIN = 30;
 const WALL_RING = 3.4; // draw wall tiles whose centroid is within this of the hole
 
@@ -50,31 +49,44 @@ const smooth = (e0: number, e1: number, x: number) => {
 };
 
 // ---------------------------------------------------------------------------
-// Viewport: fit the hole, its completion, every dead-end fill, and a ring of
-// nearby wall tiles for context. Computed once; the scene is static data.
+// Viewport: fit the hole, its completion, the forced prefix, the tempting thin,
+// and the gaps, plus a ring of nearby wall tiles for context. Computed once.
 // ---------------------------------------------------------------------------
 
 type View = {
   toPx: (p: Pt) => [number, number];
-  wall: Tile[]; // only the context ring, not all 410 tiles
+  wall: Tile[];
+  gap: Gap; // the single most-constrained unfillable gap we showcase
 };
 
-function buildView(): View {
-  const c = scene.meta.holeCenter;
-  const wall = scene.wall.filter((t) => {
-    let cx = 0;
-    let cy = 0;
-    for (const p of t.v) {
-      cx += p[0];
-      cy += p[1];
-    }
-    return Math.hypot(cx / 4 - c[0], cy / 4 - c[1]) <= WALL_RING;
-  });
+function centroid(v: readonly Pt[]): Pt {
+  let x = 0;
+  let y = 0;
+  for (const p of v) {
+    x += p[0];
+    y += p[1];
+  }
+  return [x / v.length, y / v.length];
+}
 
-  const pts: Pt[] = [...scene.hole];
+function buildView(): View {
+  const c = scene.holeCenter;
+  const wall = scene.wall.filter((t) => {
+    const [cx, cy] = centroid(t.v);
+    return Math.hypot(cx - c[0], cy - c[1]) <= WALL_RING;
+  });
+  const gap = [...scene.unfillableGaps].sort(
+    (a, b) =>
+      a.candidates.length - b.candidates.length ||
+      a.edge[0][0] - b.edge[0][0],
+  )[0];
+
+  const pts: Pt[] = [...scene.holePolygon];
   for (const t of scene.completion) for (const p of t.v) pts.push(p);
-  for (const d of scene.deadEnds) for (const t of d.fill) for (const p of t.v) pts.push(p);
+  for (const t of scene.forcedPrefix) for (const p of t.v) pts.push(p);
+  for (const p of scene.temptingThin.v) pts.push(p);
   for (const t of wall) for (const p of t.v) pts.push(p);
+  for (const cand of gap.candidates) for (const p of cand.v) pts.push(p);
 
   let minx = Infinity;
   let maxx = -Infinity;
@@ -91,17 +103,31 @@ function buildView(): View {
   const scale = Math.min((VB_W - 2 * MARGIN) / w, (VB_H - 2 * MARGIN) / h);
   const cx = (minx + maxx) / 2;
   const cy = (miny + maxy) / 2;
-  // Canvas y grows downward, so flip y.
   const toPx = (p: Pt): [number, number] => [
     VB_W / 2 + (p[0] - cx) * scale,
-    VB_H / 2 - (p[1] - cy) * scale,
+    VB_H / 2 - (p[1] - cy) * scale, // canvas y grows downward
   ];
-  return { toPx, wall };
+  return { toPx, wall, gap };
 }
 
 // ---------------------------------------------------------------------------
 // Drawing primitives.
 // ---------------------------------------------------------------------------
+
+function pathPoly(
+  ctx: CanvasRenderingContext2D,
+  v: readonly Pt[],
+  toPx: (p: Pt) => [number, number],
+) {
+  ctx.beginPath();
+  const [x0, y0] = toPx(v[0]);
+  ctx.moveTo(x0, y0);
+  for (let i = 1; i < v.length; i++) {
+    const [x, y] = toPx(v[i]);
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
 
 function fillTile(
   ctx: CanvasRenderingContext2D,
@@ -114,14 +140,7 @@ function fillTile(
 ) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  const [x0, y0] = toPx(v[0]);
-  ctx.moveTo(x0, y0);
-  for (let i = 1; i < v.length; i++) {
-    const [x, y] = toPx(v[i]);
-    ctx.lineTo(x, y);
-  }
-  ctx.closePath();
+  pathPoly(ctx, v, toPx);
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = lineWidth;
@@ -142,20 +161,50 @@ function strokeLoop(
 ) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  const [x0, y0] = toPx(loop[0]);
-  ctx.moveTo(x0, y0);
-  for (let i = 1; i < loop.length; i++) {
-    const [x, y] = toPx(loop[i]);
-    ctx.lineTo(x, y);
-  }
-  ctx.closePath();
+  pathPoly(ctx, loop, toPx);
   ctx.setLineDash(dash);
   ctx.lineWidth = width;
   ctx.lineJoin = "round";
   ctx.strokeStyle = color;
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// Shade the real intersection of a candidate with the board: the wall the viewer
+// sees IS the overlap area. We compute the candidate's worst overlap over the
+// whole board and fill that polygon in solid ink.
+function shadeWorstOverlap(
+  ctx: CanvasRenderingContext2D,
+  cand: readonly Pt[],
+  board: readonly (readonly Pt[])[],
+  toPx: (p: Pt) => [number, number],
+  ink: string,
+  alpha: number,
+) {
+  let worst: Pt[] = [];
+  let worstA = 0;
+  for (const bv of board) {
+    const ov = overlapPolygon(cand as Pt[], bv as Pt[]);
+    if (ov.length < 3) continue;
+    let a = 0;
+    for (let i = 0; i < ov.length; i++) {
+      const p = ov[i];
+      const q = ov[(i + 1) % ov.length];
+      a += p[0] * q[1] - q[0] * p[1];
+    }
+    a = Math.abs(a) / 2;
+    if (a > worstA) {
+      worstA = a;
+      worst = ov;
+    }
+  }
+  if (worst.length < 3) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  pathPoly(ctx, worst, toPx);
+  ctx.fillStyle = ink;
+  ctx.fill();
   ctx.restore();
 }
 
@@ -181,12 +230,6 @@ function strokeEdge(
   ctx.restore();
 }
 
-function edgeMid(edge: readonly [Pt, Pt], toPx: (p: Pt) => [number, number]) {
-  const [ax, ay] = toPx(edge[0]);
-  const [bx, by] = toPx(edge[1]);
-  return [(ax + bx) / 2, (ay + by) / 2] as [number, number];
-}
-
 function caption(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -208,23 +251,17 @@ function caption(
 }
 
 // ---------------------------------------------------------------------------
-// Timeline. The wall ring fades in, the hole is outlined, then each WRONG branch
-// grows a few tiles (all locally legal), flashes its doomed edge with the honest
-// reason, and fades. Last, the one forced branch grows to the full completion and
-// stays solid. The order is fixed (scene order), so the animation is
-// deterministic and the slider scrubs it.
+// Timeline. Wall ring + hole outline appear, the locally legal forced prefix
+// builds, the tempting thin seats (it fits!), then the gap glows and every
+// candidate shades its overlap. Last, the wrong path clears and the one surviving
+// completion grows and holds. Fixed order, so the slider scrubs it.
 // ---------------------------------------------------------------------------
 
 const WALL_IN = 0.1; // [0, WALL_IN] wall ring + hole outline appear
-const BRANCH_SPAN = 0.55; // the five wrong branches share this window
-const COMPLETE_FROM = WALL_IN + BRANCH_SPAN; // completion grows after the branches
-
-// One wrong branch occupies a slice of [WALL_IN, COMPLETE_FROM]. Within its slice
-// it grows its fill (grow), flashes the doomed edge (flash), then fades (fade).
-function branchSlice(i: number, n: number): [number, number] {
-  const each = BRANCH_SPAN / n;
-  return [WALL_IN + i * each, WALL_IN + (i + 1) * each];
-}
+const PREFIX_TO = 0.34; // the forced prefix builds, all locally legal
+const THIN_TO = 0.46; // the tempting thin seats cleanly
+const WALL_TO = 0.66; // the gap glows; candidates shade their overlap
+const COMP_FROM = 0.72; // the surviving completion grows after the wall
 
 function paint(
   ctx: CanvasRenderingContext2D,
@@ -233,7 +270,7 @@ function paint(
   colors: Colors,
 ) {
   const { thick, thin, grout, ink } = colors;
-  const { toPx, wall } = view;
+  const { toPx, wall, gap } = view;
 
   ctx.clearRect(0, 0, VB_W, VB_H);
   ctx.fillStyle = grout;
@@ -253,28 +290,39 @@ function paint(
         0.8,
       );
     }
-  }
-
-  // 2. The hole outline.
-  const holeIn = smooth(0, WALL_IN, t);
-  if (holeIn > 0) {
-    strokeLoop(ctx, scene.hole, toPx, ink, 2, holeIn, [5, 4]);
+    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn, [5, 4]);
     caption(
       ctx,
-      "one hole, exactly one legal completion",
+      "one hole, one surviving completion",
       VB_W / 2,
       18,
       ink,
-      holeIn * 0.85,
+      wallIn * 0.85,
     );
   }
 
-  const n = scene.deadEnds.length;
   const atEnd = t >= 1;
 
-  // 3a. END STATE (reduced motion / t = 1): completion solid, all five dead-ends
-  // as grey ghost stubs each marked on its doomed edge. Static, no motion to read.
+  // END STATE (reduced motion / t = 1): the wrong path placed (prefix + thin),
+  // ghosted; the gap shaded with every overlapping candidate; and the surviving
+  // completion solid. Static, the whole story in one frame.
   if (atEnd) {
+    const board = [...scene.wall, ...scene.forcedPrefix, scene.temptingThin].map(
+      (x) => x.v,
+    );
+    // The locally legal prefix and the tempting thin, ghosted (they placed, then
+    // stranded).
+    for (const tile of scene.forcedPrefix) {
+      fillTile(ctx, tile.v, toPx, ink, ink, 0.12, 0.8);
+    }
+    fillTile(ctx, scene.temptingThin.v, toPx, ink, ink, 0.16, 1);
+    strokeLoop(ctx, scene.temptingThin.v, toPx, ink, 1.4, 0.5, [4, 3]);
+    // Every candidate on the gap, each shading its real overlap with the board.
+    for (const cand of gap.candidates) {
+      strokeLoop(ctx, cand.v, toPx, ink, 1, 0.26, [2, 3]);
+      shadeWorstOverlap(ctx, cand.v, board, toPx, ink, 0.36);
+    }
+    // The one surviving completion, solid.
     for (const tile of scene.completion) {
       fillTile(
         ctx,
@@ -282,85 +330,121 @@ function paint(
         toPx,
         tile.type === "fat" ? thick : thin,
         ink,
-        1,
+        0.92,
         1.1,
       );
     }
-    // Draw the ghost stubs and doomed-edge marks first, then place the captions
-    // with a small collision avoidance so two nearby doomed edges do not stack
-    // their labels on top of each other.
-    const placed: [number, number][] = [];
-    scene.deadEnds.forEach((d) => {
-      for (const tile of d.fill) {
-        // grey ghost stub: muted fill, hairline outline
-        fillTile(ctx, tile.v, toPx, ink, ink, 0.12, 0.8);
-      }
-      strokeEdge(ctx, d.doomedEdge, toPx, ink, 2.6, 0.8);
-      const [mx, my] = edgeMid(d.doomedEdge, toPx);
-      crossMark(ctx, mx, my, ink, 0.85);
-      let ly = my - 12;
-      // nudge upward while another label sits within 13px of this spot
-      while (placed.some(([px, py]) => Math.abs(px - mx) < 60 && Math.abs(py - ly) < 13)) {
-        ly -= 13;
-      }
-      placed.push([mx, ly]);
-      caption(ctx, `doomed @ ${d.depth}`, mx, ly, ink, 0.7);
-    });
     caption(
       ctx,
-      "the one forced fill completes; five legal moves dooming an edge",
+      "the thin fits; place it, keep going, and now nothing fits",
       VB_W / 2,
-      VB_H - 16,
+      VB_H - 30,
       ink,
-      0.7,
+      0.8,
+    );
+    caption(
+      ctx,
+      "only one completion survives, by the shapes alone",
+      VB_W / 2,
+      VB_H - 14,
+      ink,
+      0.62,
     );
     return;
   }
 
-  // 3b. ANIMATED: replay the wrong branches in order, then grow the completion.
-  // Only the branch whose slice contains t is drawn (the rest have faded).
-  scene.deadEnds.forEach((d, i) => {
-    const [s0, s1] = branchSlice(i, n);
-    if (t < s0 || t >= s1) return;
-    const local = (t - s0) / (s1 - s0);
-    // grow [0, 0.5], hold+flash [0.5, 0.8], fade [0.8, 1]
-    const grow = smooth(0, 0.5, local);
-    const flash = smooth(0.5, 0.62, local);
-    const fade = 1 - smooth(0.82, 1, local);
+  // The fade that clears the wrong path once the completion takes over.
+  const clear = 1 - smooth(COMP_FROM, COMP_FROM + 0.06, t);
 
-    const per = 0.5 / Math.max(1, d.fill.length);
-    d.fill.forEach((tile, k) => {
-      const appear = smooth(k * per, (k + 1) * per, local) * fade;
+  // 2. The locally legal forced prefix builds, tile by tile.
+  const prefixReveal = smooth(WALL_IN, PREFIX_TO, t);
+  if (prefixReveal > 0 && clear > 0) {
+    const per = 1 / Math.max(1, scene.forcedPrefix.length);
+    scene.forcedPrefix.forEach((tile, k) => {
+      const appear = smooth(k * per, (k + 1) * per, prefixReveal) * clear;
       if (appear <= 0) return;
-      // wrong-branch tiles muted/ghosted: they look fine but read as provisional
+      // muted/ghosted: the build looks fine, but it is the doomed path
       fillTile(
         ctx,
         tile.v,
         toPx,
         tile.type === "fat" ? thick : thin,
         ink,
-        appear * 0.55,
+        appear * 0.5,
         1,
       );
     });
-
-    if (flash > 0 && fade > 0) {
-      // doomed edge in warning ink (here: ink, the only chrome colour), bolder
-      strokeEdge(ctx, d.doomedEdge, toPx, ink, 3, flash * fade);
-      const [mx, my] = edgeMid(d.doomedEdge, toPx);
-      crossMark(ctx, mx, my, ink, flash * fade);
-      // the honest reason, wrapped to fit the frame
-      wrapCaption(ctx, d.reason, VB_W / 2, VB_H - 30, ink, flash * fade * 0.9);
+    if (t < PREFIX_TO) {
+      caption(
+        ctx,
+        "a few locally legal tiles, all fine so far",
+        VB_W / 2,
+        VB_H - 20,
+        ink,
+        prefixReveal * 0.85,
+      );
     }
-    void grow;
-  });
+  }
 
-  // 4. The one forced branch: grow to the full completion, then hold solid.
-  const compReveal = smooth(COMPLETE_FROM, 0.96, t);
-  if (compReveal > 0) {
+  // 3. The tempting thin seats cleanly on the doomed edge (it fits!).
+  const thinReveal = smooth(PREFIX_TO, THIN_TO, t);
+  if (thinReveal > 0 && clear > 0) {
+    fillTile(
+      ctx,
+      scene.temptingThin.v,
+      toPx,
+      scene.temptingThin.type === "fat" ? thick : thin,
+      ink,
+      thinReveal * clear,
+      1.1,
+    );
+    strokeEdge(ctx, scene.doomedEdge, toPx, ink, 2.6, thinReveal * clear * 0.7);
+    // The thin caption holds only briefly after it seats, then hands the bottom
+    // line over to the wall caption so the two never stack.
+    if (t >= PREFIX_TO && t < THIN_TO + 0.06) {
+      caption(
+        ctx,
+        "the thin the expert pointed at fits here, zero overlap",
+        VB_W / 2,
+        VB_H - 20,
+        ink,
+        thinReveal * 0.85,
+      );
+    }
+  }
+
+  // 4. The gap glows; every candidate shades its overlap with a committed tile.
+  const wallReveal = smooth(THIN_TO, WALL_TO, t);
+  if (wallReveal > 0 && clear > 0) {
+    const board = [...scene.wall, ...scene.forcedPrefix, scene.temptingThin].map(
+      (x) => x.v,
+    );
+    strokeEdge(ctx, gap.edge, toPx, ink, 3, wallReveal * clear);
+    const per = 1 / gap.candidates.length;
+    gap.candidates.forEach((cand, k) => {
+      const appear = smooth(k * per, (k + 1) * per, wallReveal) * clear;
+      if (appear <= 0) return;
+      strokeLoop(ctx, cand.v, toPx, ink, 1, appear * 0.26, [2, 3]);
+      shadeWorstOverlap(ctx, cand.v, board, toPx, ink, appear * 0.4);
+    });
+    if (t >= THIN_TO + 0.06 && t < COMP_FROM) {
+      caption(
+        ctx,
+        "every piece for the next gap overlaps a placed tile",
+        VB_W / 2,
+        VB_H - 20,
+        ink,
+        wallReveal * 0.85,
+      );
+    }
+  }
+
+  // 5. The one surviving completion grows and holds solid.
+  const comp = smooth(COMP_FROM, 0.96, t);
+  if (comp > 0) {
     const per = 1 / scene.completion.length;
     scene.completion.forEach((tile, k) => {
-      const appear = smooth(k * per, (k + 1) * per, compReveal);
+      const appear = smooth(k * per, (k + 1) * per, comp);
       if (appear <= 0) return;
       fillTile(
         ctx,
@@ -368,74 +452,19 @@ function paint(
         toPx,
         tile.type === "fat" ? thick : thin,
         ink,
-        appear,
+        appear * 0.92,
         1.1,
       );
     });
     caption(
       ctx,
-      "only the forced fill survives",
+      "only one completion survives",
       VB_W / 2,
       VB_H - 16,
       ink,
-      compReveal * 0.85,
+      comp * 0.85,
     );
   }
-}
-
-function crossMark(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  ink: string,
-  alpha: number,
-) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  const s = 6;
-  ctx.beginPath();
-  ctx.moveTo(x - s, y - s);
-  ctx.lineTo(x + s, y + s);
-  ctx.moveTo(x + s, y - s);
-  ctx.lineTo(x - s, y + s);
-  ctx.stroke();
-  ctx.restore();
-}
-
-// Wrap a one-line reason into at most two centred mono lines so it fits the frame.
-function wrapCaption(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  ink: string,
-  alpha: number,
-) {
-  ctx.save();
-  ctx.font =
-    "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
-  const max = VB_W - 48;
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const next = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(next).width > max && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = next;
-    }
-  }
-  if (cur) lines.push(cur);
-  const shown = lines.slice(0, 2);
-  ctx.restore();
-  shown.forEach((line, i) =>
-    caption(ctx, line, x, y + i * 14, ink, alpha),
-  );
 }
 
 export default function UnsolvableFuture() {
@@ -491,7 +520,7 @@ export default function UnsolvableFuture() {
 
   return (
     <Sketch
-      label="sketch 03 · an unsolvable future"
+      label="sketch 03 · the thin fits, place it, now nothing fits"
       animation={{ duration: 9000, render, slider: { label: "search" } }}
     >
       <canvas
@@ -503,7 +532,7 @@ export default function UnsolvableFuture() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A legal Penrose patch surrounds a single closed hole that has exactly one legal completion. The exhaustive search is replayed: at each wrong but legal branch a few tiles are placed, then one frontier edge is marked doomed, because the only tile that fits it would close an illegal vertex, so that edge can never close and the hole can never finish. Each wrong branch fades. Only the one forced fill reaches the full completion. The static end state shows the completion solid with the five dead-ends as grey stubs, each marked on its doomed edge."
+        aria-label="A real Penrose patch surrounds a single closed sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build along one path, then on the doomed frontier edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. Following it through, the next gap glows and every candidate rhombus is shown overlapping a committed tile, with the real overlap area shaded. The thin fits, you place it, you keep going, and now nothing fits, by the shapes alone with no matching rule invoked. Then the one surviving completion finishes the hole. The static end state shows the placed wrong path ghosted, the gap with every candidate overlapping shaded, and the surviving completion solid."
       />
     </Sketch>
   );
