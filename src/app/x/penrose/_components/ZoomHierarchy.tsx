@@ -185,7 +185,7 @@ export default function ZoomHierarchy() {
 
   return (
     <Sketch
-      label="sketch 07 · zoom the hierarchy"
+      label="sketch 08 · zoom the hierarchy"
       animation={{ duration: 7000, render, slider: { label: "depth" } }}
     >
       <canvas

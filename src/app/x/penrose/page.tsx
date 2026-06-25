@@ -5,6 +5,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
 import CutAndProject from "./_components/CutAndProject";
+import FibonacciStrip from "./_components/FibonacciStrip";
 import GoldenRatio from "./_components/GoldenRatio";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
@@ -189,20 +190,33 @@ export default function PenrosePage() {
         <h2 className={H2}>So you stop tiling by hand</h2>
         <div className={PROSE}>
           <p>
-            If laying tiles one at a time can dead-end, do not lay them one at a
-            time. Solve the whole plane at once. Picture a perfect grid of points
-            in five dimensions, the integer lattice ℤ⁵. Each point casts two
-            shadows: one onto the plane, where the tile sits, and one into a
-            second, internal space. Keep the point only when its internal shadow
-            lands inside a small window. Those kept shadows are the tiles.
+            If laying tiles one at a time can dead-end, stop laying them one at a
+            time. Compute the whole plane at once, with a method called{" "}
+            <strong>cut and project</strong>. It is easiest to see one dimension
+            down, so start there. Take the integer grid in the plane. Draw a line
+            through it at the golden slope, and a thin strip along the line. Keep
+            only the points that fall inside the strip, and drop each one straight
+            down onto the line.
+          </p>
+        </div>
+
+        <FibonacciStrip />
+
+        <div className={PROSE}>
+          <p>
+            Those dropped points tile the line with just two gaps, long and short,
+            in the ratio φ, in an order that never repeats. <em>Cut</em> is the
+            strip. <em>Project</em> is the drop. That is the whole method, and the
+            two lengths are already a hint of the two tiles to come.
           </p>
           <p>
-            This is the cut-and-project method, and it changes everything. A tile
-            exists if and only if its internal shadow lands in the window, a test
-            you can run on that one point alone. No walking out from an origin, no
-            backtracking, no choices that can go wrong later. The plane is{" "}
-            <em>computed</em>, never assembled. It can never dead-end. This is
-            what the explorer runs.
+            Penrose is this same construction one stage up. The grid is the
+            integer lattice ℤ⁵, five dimensions. The line becomes our plane, and
+            the strip becomes a window shaped like four nested pentagons. A tile
+            exists exactly when its 5D shadow lands in that window, a test you run
+            on one point alone, with no walking out from an origin and no
+            backtracking. The plane is <em>computed</em>, never assembled, so it
+            can never dead-end. This is what the explorer runs.
           </p>
         </div>
 

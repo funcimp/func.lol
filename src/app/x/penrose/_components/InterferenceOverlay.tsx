@@ -176,7 +176,7 @@ export default function InterferenceOverlay() {
 
   return (
     <Sketch
-      label="sketch 05 · two tilings, one turned over the other"
+      label="sketch 06 · two tilings, one turned over the other"
       animation={{ duration: 9000, render, slider: { label: "turn" } }}
     >
       <canvas
