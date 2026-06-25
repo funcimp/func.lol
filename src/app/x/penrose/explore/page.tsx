@@ -7,7 +7,7 @@ import PenroseExplorer from "./PenroseExplorer";
 
 export const metadata: Metadata = {
   title: "Penrose Explorer — func.lol",
-  description: "A bounded, exactly-addressed Penrose patch from a cut-and-project / substitution engine.",
+  description: "An endless Penrose tiling, generated per viewport, every tile carrying its exact de Bruijn coordinate. Any view is a shareable link.",
 };
 
 export default function PenroseExplorePage() {

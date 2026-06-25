@@ -50,6 +50,17 @@ Two tokens per mode. No accent color. Ever.
 
 In `globals.css` the tokens carry the `--color-` prefix (`--color-paper` etc.) that Tailwind v4's `@theme` requires to generate `bg-paper` / `text-ink` utilities. Same tokens, two forms.
 
+### Scoped experiment hues
+
+An experiment may bind a constellation hue to a named role through a scoped token. No new hue enters the language. The Penrose explorer does this:
+
+| Token | Reuses | Role |
+| --- | --- | --- |
+| `--color-penrose-thick` | `--color-moment-1` (gold) | thick rhombus fill |
+| `--color-penrose-thin` | `--color-moment-4` (teal) | thin rhombus fill |
+
+Grout reuses `--color-paper`; the pin ring reuses `--color-ink`. The only new value is a dark teal (`#4f7d92`) that `--color-penrose-thin` takes in dark mode, nudged lighter for contrast on the dark paper. `thick` is identical in both modes.
+
 ## Dither
 
 The visual signature. Three roles, strict territories, strict density.
@@ -138,12 +149,12 @@ The visual signature. Three roles, strict territories, strict density.
 - MDX for experiment writeups
 - Open Graph / social cards
 - Tags, categories, search
-- A second accent color
+- A second accent color (relaxed: an experiment may bind an existing constellation hue to a named role through a scoped token, as the Penrose explorer does; no new hue)
 - Custom icon set beyond toggle and row-delete `×`
 - Photography or non-dithered illustration
 - Animation beyond focus and hover
 - A second typeface family
-- Per-experiment custom styling
+- Per-experiment custom styling (relaxed: scoped tokens that reuse existing constellation hues are allowed)
 - Multi-column layouts, dashboards, dense tables
 
 ## Adding a new experiment

@@ -22,7 +22,7 @@ const labs: Lab[] = [
     slug: "penrose",
     title: "Penrose",
     blurb:
-      "A bounded patch of the Penrose tiling, every tile carrying its exact integer address.",
+      "A Penrose tiling you can pan forever, generated on the fly for whatever you are looking at, every tile carrying its exact coordinate.",
     publishedAt: "2026-05-11",
     links: {
       github:

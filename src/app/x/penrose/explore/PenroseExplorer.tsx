@@ -37,10 +37,11 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
   const cacheRef = useRef<ChunkCache | null>(null);
   const hitRef = useRef<HitIndex | null>(null);
   const facesRef = useRef<RenderFace[]>([]);
-  const colorsRef = useRef<{ thick: string; thin: string; grout: string }>({
+  const colorsRef = useRef<{ thick: string; thin: string; grout: string; ink: string }>({
     thick: "#C89B3C",
     thin: "#3E6B7C",
     grout: "#0f0e0c",
+    ink: "#ede9d8",
   });
   const offsetRef = useRef<[number, number]>([0, 0]);
   const zoomRef = useRef<number>(DEFAULT_ZOOM);
@@ -105,9 +106,10 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     // them only when the theme flips or the element resizes, not on every frame.
     const readColors = () => {
       colorsRef.current = {
-        thick: readCssVar("--color-moment-1") || "#C89B3C",
-        thin: readCssVar("--color-moment-4") || "#3E6B7C",
+        thick: readCssVar("--color-penrose-thick") || "#C89B3C",
+        thin: readCssVar("--color-penrose-thin") || "#3E6B7C",
         grout: readCssVar("--color-paper") || "#0f0e0c",
+        ink: readCssVar("--color-ink") || "#ede9d8",
       };
     };
 
@@ -306,7 +308,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       if (!cache) return;
       const { w, h } = sizeRef.current;
       const dpr = dprRef.current;
-      const { thick, thin, grout } = colorsRef.current;
+      const { thick, thin, grout, ink } = colorsRef.current;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.fillStyle = grout;
       ctx!.fillRect(0, 0, w, h);
@@ -340,6 +342,27 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
         ctx!.fillStyle = f.type === "thick" ? thick : thin;
         ctx!.fill();
         ctx!.stroke();
+      }
+
+      // Mark the pinned tile. Match by the full tile identity (the engine
+      // Face.key) so a coord shared by several rhombi still rings the right
+      // one, and stroke its outline in ink at a heavier width.
+      const pin = pinnedRef.current;
+      if (pin) {
+        const pinKey = `${pin.coord.join(",")}|${pin.j}${pin.k}`;
+        const f = faces.find((face) => face.key === pinKey);
+        if (f) {
+          const [a, b, c, d] = f.corners;
+          ctx!.beginPath();
+          ctx!.moveTo((a[0] - ox) * zoom + cx, (a[1] - oy) * zoom + cy);
+          ctx!.lineTo((b[0] - ox) * zoom + cx, (b[1] - oy) * zoom + cy);
+          ctx!.lineTo((c[0] - ox) * zoom + cx, (c[1] - oy) * zoom + cy);
+          ctx!.lineTo((d[0] - ox) * zoom + cx, (d[1] - oy) * zoom + cy);
+          ctx!.closePath();
+          ctx!.strokeStyle = ink;
+          ctx!.lineWidth = 2;
+          ctx!.stroke();
+        }
       }
     }
 

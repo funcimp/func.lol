@@ -6,7 +6,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 export const metadata: Metadata = {
   title: "Penrose — func.lol",
   description:
-    "An interactive Penrose tiling explorer over a bounded, exactly-addressed patch from a cut-and-project / substitution engine.",
+    "An endless Penrose tiling you can pan forever, generated per viewport, with every tile carrying its exact de Bruijn coordinate.",
 };
 
 const RESEARCH_URL =
@@ -31,12 +31,12 @@ export default function PenrosePage() {
             penrose
           </h1>
           <p className="text-[18px] leading-[1.45] opacity-85 max-w-[42ch] mt-3">
-            A bounded patch of the Penrose tiling, every tile carrying its exact integer address.
+            A Penrose tiling you can pan forever, every tile carrying its exact coordinate.
           </p>
         </header>
 
         <p className="text-[16px] leading-[1.65] mb-4">
-          Penrose&apos;s P3 tiles the plane aperiodically using two rhombi. Every tile carries a unique integer address. The explorer renders one bounded patch generated from the origin, and the exact address of the tile under the cursor is always the right one.
+          Penrose&apos;s P3 tiles the plane aperiodically using two rhombi. There is no edge to reach. The explorer generates whatever patch you are looking at on the fly, so you can pan in any direction forever. Every tile carries its exact de Bruijn coordinate, shown under the cursor, and any view is a link you can share.
         </p>
 
         <div className="my-8">
