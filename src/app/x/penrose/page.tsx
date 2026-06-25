@@ -4,6 +4,7 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
+import CutAndProject from "./_components/CutAndProject";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
@@ -181,24 +182,34 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 6. So you solve it globally. (Prose now; sketch later.) */}
+        {/* 6. So you solve it globally. */}
         <h2 className={H2}>So you stop tiling by hand</h2>
         <div className={PROSE}>
           <p>
             If laying tiles one at a time can dead-end, do not lay them one at a
             time. Solve the whole plane at once. Picture a perfect grid of points
-            in five dimensions, the integer lattice ℤ⁵. Slice a thin two
-            dimensional sheet through it at an irrational angle, keep only the
-            lattice points near the sheet, and let each one cast a shadow down
-            onto the plane. Those shadows are the tiles.
+            in five dimensions, the integer lattice ℤ⁵. Each point casts two
+            shadows: one onto the plane, where the tile sits, and one into a
+            second, internal space. Keep the point only when its internal shadow
+            lands inside a small window. Those kept shadows are the tiles.
           </p>
           <p>
             This is the cut-and-project method, and it changes everything. A tile
-            exists if and only if its 5D point lands in the slice, a test you can
-            run on that point alone. No walking out from an origin, no
+            exists if and only if its internal shadow lands in the window, a test
+            you can run on that one point alone. No walking out from an origin, no
             backtracking, no choices that can go wrong later. The plane is{" "}
             <em>computed</em>, never assembled. It can never dead-end. This is
             what the explorer runs.
+          </p>
+        </div>
+
+        <CutAndProject />
+
+        <div className={PROSE}>
+          <p className="text-[14px] leading-[1.6] opacity-70">
+            The dead-ends came from deciding locally. Here every tile is decided
+            by where its 5D shadow falls, a test that never traps you, and that
+            same coordinate is the address the explorer reads under your cursor.
           </p>
         </div>
 

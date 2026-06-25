@@ -103,3 +103,29 @@ test("the unsolvable-future sketch loads at its stationary end state", async ({
   await expect(step).toBeEnabled();
   await expect(reset).toBeDisabled();
 });
+
+test("the cut-and-project sketch renders and links its two panels on hover", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  // The two-panel cut-and-project figure: a real patch in physical space and the
+  // bounded shadow window in internal space. It is static (no clock), so it has no
+  // control bar; the teaching link is hover.
+  const figure = page
+    .locator("figure")
+    .filter({ has: page.getByRole("img", { name: /two linked panels/i }) });
+  const svg = figure.getByRole("img", { name: /two linked panels/i });
+  await svg.scrollIntoViewIfNeeded();
+  await expect(svg).toBeVisible();
+
+  // The static frame already names a seed tile's address. Hovering a different
+  // tile updates the live caption to its ℤ⁵ coordinate.
+  await expect(
+    figure.getByText(/the shadow of lattice point/i),
+  ).toBeVisible();
+  const tile = svg.locator("polygon").first();
+  await tile.hover();
+  await expect(
+    figure.getByText(/four corners.*shadows all land inside the window/i),
+  ).toBeVisible();
+});
