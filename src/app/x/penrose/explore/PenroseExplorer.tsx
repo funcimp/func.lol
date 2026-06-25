@@ -330,19 +330,21 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       />
       <div
         aria-live="polite"
-        className="absolute top-3 left-3 font-mono text-[10px] uppercase tracking-[0.12em] opacity-55 select-none pointer-events-none"
+        className="absolute top-3 left-3 select-none pointer-events-none"
       >
-        <div>seed&nbsp;&nbsp;{seed}</div>
-        {hoverAddress && (
-          <div className="mt-1">
-            address&nbsp;[{hoverAddress.coord.join(",")}] j{hoverAddress.j} k{hoverAddress.k}
-          </div>
-        )}
-        {pinnedAddress && (
-          <div className="mt-1">
-            pinned&nbsp;[{pinnedAddress.coord.join(",")}] j{pinnedAddress.j} k{pinnedAddress.k}
-          </div>
-        )}
+        <div className="rounded-md bg-paper/75 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink/85">
+          <div>seed&nbsp;&nbsp;{seed}</div>
+          {hoverAddress && (
+            <div className="mt-1">
+              address&nbsp;[{hoverAddress.coord.join(",")}] j{hoverAddress.j} k{hoverAddress.k}
+            </div>
+          )}
+          {pinnedAddress && (
+            <div className="mt-1">
+              pinned&nbsp;[{pinnedAddress.coord.join(",")}] j{pinnedAddress.j} k{pinnedAddress.k}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
