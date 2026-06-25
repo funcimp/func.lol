@@ -9,12 +9,17 @@ import type { RenderFace } from "./patch";
 
 export const CELL = 8;
 const KEEP_RING = 1; // generate one ring of cells beyond the viewport
-const EVICT_MARGIN = 4; // keep cells within this many of the viewport; must be > KEEP_RING
+// Derived so the evict band sits strictly outside the keep band by construction.
+const EVICT_MARGIN = KEEP_RING + 3;
 
 const cellKey = (cx: number, cy: number) => `${cx},${cy}`;
 
 export class ChunkCache {
   private cells = new Map<string, RenderFace[]>();
+  // Memo of the last visible cell window and its assembled faces. An unchanged
+  // integer window returns the cached array and skips both re-concat and eviction.
+  private lastWindow: [number, number, number, number] | null = null;
+  private lastFaces: RenderFace[] = [];
 
   constructor(private gamma: readonly number[]) {}
 
@@ -49,6 +54,11 @@ export class ChunkCache {
     const cx1 = Math.floor(view.maxX / CELL) + KEEP_RING;
     const cy0 = Math.floor(view.minY / CELL) - KEEP_RING;
     const cy1 = Math.floor(view.maxY / CELL) + KEEP_RING;
+    // Unchanged window: nothing to re-concat and nothing to evict. Return the cached array.
+    const last = this.lastWindow;
+    if (last && last[0] === cx0 && last[1] === cx1 && last[2] === cy0 && last[3] === cy1) {
+      return this.lastFaces;
+    }
     const out: RenderFace[] = [];
     for (let cx = cx0; cx <= cx1; cx++) {
       for (let cy = cy0; cy <= cy1; cy++) out.push(...this.cellFaces(cx, cy));
@@ -64,6 +74,8 @@ export class ChunkCache {
       const cy = Number(key.slice(comma + 1));
       if (cx < keepX0 || cx > keepX1 || cy < keepY0 || cy > keepY1) this.cells.delete(key);
     }
+    this.lastWindow = [cx0, cx1, cy0, cy1];
+    this.lastFaces = out;
     return out;
   }
 }

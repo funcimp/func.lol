@@ -54,17 +54,38 @@ function solveCrossing(j: number, k: number, aj: number, ak: number): [number, n
   return [(aj * d - b * ak) / det, (a * ak - aj * c) / det];
 }
 
+// The four cyclic corner coords of the rhombus [coord; j,k]: n, n+e_j, n+e_j+e_k, n+e_k.
+// The bump sequence and the Vec5 cast live only here; every caller routes through this.
+function corners4(coord: readonly number[], j: number, k: number): [Vec5, Vec5, Vec5, Vec5] {
+  const c0 = [...coord];
+  const c1 = [...c0]; c1[j]++;
+  const c2 = [...c1]; c2[k]++;
+  const c3 = [...c0]; c3[k]++;
+  return [c0, c1, c2, c3] as unknown as [Vec5, Vec5, Vec5, Vec5];
+}
+
+// Average of the given points.
+function centroid(pts: readonly Pt[]): Pt {
+  let x = 0, y = 0;
+  for (const [px, py] of pts) { x += px; y += py; }
+  return [x / pts.length, y / pts.length];
+}
+
+// Canonical face key for a tile address: "n0,n1,n2,n3,n4|jk".
+function faceKey(coord: readonly number[], j: number, k: number): string {
+  return `${coord.join(",")}|${j}${k}`;
+}
+
+// A rhombus is thick when its family gap is 1 or 4, thin otherwise.
+function rhombusType(j: number, k: number): "thick" | "thin" {
+  return k - j === 1 || k - j === 4 ? "thick" : "thin";
+}
+
 // Physical centroid of the rhombus [coord; j,k]: average of its four corners
 // n, n+e_j, n+e_j+e_k, n+e_k under physical(). Task 3 reuses this to recenter the
 // camera on a tile address without rebuilding the whole face.
 export function tileCentroid(coord: readonly number[], j: number, k: number): Pt {
-  const c0 = coord as unknown as Vec5;
-  const c1 = [...coord]; c1[j]++;
-  const c2 = [...c1]; c2[k]++;
-  const c3 = [...coord]; c3[k]++;
-  const p0 = physical(c0), p1 = physical(c1 as unknown as Vec5);
-  const p2 = physical(c2 as unknown as Vec5), p3 = physical(c3 as unknown as Vec5);
-  return [(p0[0] + p1[0] + p2[0] + p3[0]) / 4, (p0[1] + p1[1] + p2[1] + p3[1]) / 4];
+  return centroid(corners4(coord, j, k).map(physical));
 }
 
 // Is the rhombus [n; j,k] a real tile? It exists iff all four corners
@@ -73,17 +94,7 @@ export function tileCentroid(coord: readonly number[], j: number, k: number): Pt
 // A shared URL decodes to a shape-valid address; only this confirms it names a
 // tile the plane actually emits, so the camera does not pin empty space.
 export function tileExists(coord: readonly number[], j: number, k: number): boolean {
-  const [vx, vy] = WINDOW_CENTER;
-  const n = coord as unknown as Vec5;
-  const nj = [...coord]; nj[j]++;
-  const nk = [...coord]; nk[k]++;
-  const njk = [...nj]; njk[k]++;
-  return (
-    inWindow(n, vx, vy) &&
-    inWindow(nj as unknown as Vec5, vx, vy) &&
-    inWindow(nk as unknown as Vec5, vx, vy) &&
-    inWindow(njk as unknown as Vec5, vx, vy)
-  );
+  return corners4(coord, j, k).every((c) => inWindow(c, WINDOW_CENTER[0], WINDOW_CENTER[1]));
 }
 
 export function facesInViewport(view: Rect, gamma: readonly number[], physicalMargin = 1.5): RenderFace[] {
@@ -125,24 +136,19 @@ export function facesInViewport(view: Rect, gamma: readonly number[], physicalMa
           K[j] = mj; K[k] = mk;
 
           // corners n, n+e_j, n+e_j+e_k, n+e_k (cyclic), positions via physical.
-          const c0 = K as unknown as Vec5;
-          const c1 = [...K]; c1[j]++;
-          const c2 = [...c1]; c2[k]++;
-          const c3 = [...K]; c3[k]++;
-          const p0 = physical(c0), p1 = physical(c1 as unknown as Vec5), p2 = physical(c2 as unknown as Vec5), p3 = physical(c3 as unknown as Vec5);
-          const centroid: Pt = [(p0[0] + p1[0] + p2[0] + p3[0]) / 4, (p0[1] + p1[1] + p2[1] + p3[1]) / 4];
+          const [p0, p1, p2, p3] = corners4(K, j, k).map(physical);
+          const c: Pt = centroid([p0, p1, p2, p3]);
 
           // Step 4: filter by physical centroid.
-          if (centroid[0] < keepMinX || centroid[0] > keepMaxX || centroid[1] < keepMinY || centroid[1] > keepMaxY) continue;
+          if (c[0] < keepMinX || c[0] > keepMaxX || c[1] < keepMinY || c[1] > keepMaxY) continue;
 
-          const key = `${K.join(",")}|${j}${k}`;
+          const key = faceKey(K, j, k);
           if (seen.has(key)) continue;
           seen.add(key);
-          const d = k - j;
           out.push({
             key, coord: K, j, k,
-            type: d === 1 || d === 4 ? "thick" : "thin",
-            corners: [p0, p1, p2, p3], centroid,
+            type: rhombusType(j, k),
+            corners: [p0, p1, p2, p3], centroid: c,
           });
         }
       }

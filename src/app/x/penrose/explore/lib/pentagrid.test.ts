@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { generate, physical, type Vec5 } from "./cap";
+import { generate, physical } from "./cap";
 import { extractFaces } from "./faces";
 import { facesInViewport, gammaFromWindowCenter, GAMMA, tileCentroid, tileExists, WINDOW_CENTER, type Rect } from "./pentagrid";
 
@@ -30,7 +30,7 @@ describe("facesInViewport matches the generate() oracle key-for-key", () => {
       // restrict oracle to faces with centroid in the inner disk
       const oracleKeys = new Set(
         [...oracle.keys()].filter((key) => {
-          const f = faceCentroidFromKey(key);
+          const f = centroidFromKey(key);
           return inDisk(f[0], f[1], inner);
         }),
       );
@@ -50,16 +50,11 @@ describe("facesInViewport matches the generate() oracle key-for-key", () => {
   }
 });
 
-// helper: physical centroid of a face from its "n0,n1,n2,n3,n4|jk" key
-function faceCentroidFromKey(key: string): [number, number] {
+// helper: physical centroid of a face from its "n0,n1,n2,n3,n4|jk" key, via tileCentroid.
+function centroidFromKey(key: string): [number, number] {
   const [coordStr, jk] = key.split("|");
-  const n = coordStr.split(",").map(Number);
-  const j = Number(jk[0]), k = Number(jk[1]);
-  const c1 = [...n]; c1[j]++;
-  const c2 = [...c1]; c2[k]++;
-  const c3 = [...n]; c3[k]++;
-  const ps = [n, c1, c2, c3].map((c) => physical(c as Vec5));
-  return [(ps[0][0] + ps[1][0] + ps[2][0] + ps[3][0]) / 4, (ps[0][1] + ps[1][1] + ps[2][1] + ps[3][1]) / 4];
+  const coord = coordStr.split(",").map(Number);
+  return tileCentroid(coord, Number(jk[0]), Number(jk[1]));
 }
 
 describe("far-from-origin viewports drop nothing", () => {
