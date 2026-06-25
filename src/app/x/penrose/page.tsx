@@ -239,8 +239,9 @@ export default function PenrosePage() {
             other on his overhead projector and turned one across the other.
             Large regions snap into agreement, the two patterns locking tile for
             tile. Between those islands run shifting veins where they disagree,
-            and the whole map of islands and veins is organized by the same
-            five-fold symmetry that built the tiles.
+            and the whole map is organized by the same five-fold symmetry that
+            built the tiles. Drag the top layer below to slide it, or twist it,
+            and watch the rosettes form and move.
           </p>
         </div>
 

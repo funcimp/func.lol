@@ -21,10 +21,11 @@ import type { Pt, RenderFace } from "../../explore/lib/patch";
 
 export type { Pt } from "../../explore/lib/patch";
 
-// A modest square patch around the origin: enough tiles for the moiré to read, few
-// enough to draw every edge cleanly. The center of rotation is the origin, which is
-// the center of this patch.
-const VIEW = { minX: -8.5, minY: -8.5, maxX: 8.5, maxY: 8.5 } as const;
+// A square patch around the origin: enough tiles for the moiré to read, few enough
+// to draw every edge cleanly. The center of rotation is the origin, the patch center.
+// half defaults to a modest patch (the test reads this); the sketch asks for a larger,
+// zoomed-out patch so the five-fold interference shows at scale.
+const DEFAULT_HALF = 8.5;
 
 // Two tiles of the same kind whose centers fall within this distance (physical
 // units, edge length 1) count as coincident: the same tile in the same place. Set
@@ -48,8 +49,9 @@ export type Overlay = {
 // Build the overlay: layer A and layer B are the SAME real enumerator patch. They
 // are distinct arrays so the renderer can rotate B's geometry independently. The
 // patch is sorted by key for determinism (the test reads buildOverlay() too).
-export function buildOverlay(): Overlay {
-  const faces = facesInViewport(VIEW, GAMMA).sort((x, y) => x.key.localeCompare(y.key));
+export function buildOverlay(half = DEFAULT_HALF): Overlay {
+  const view = { minX: -half, minY: -half, maxX: half, maxY: half };
+  const faces = facesInViewport(view, GAMMA).sort((x, y) => x.key.localeCompare(y.key));
   return { a: faces, b: faces };
 }
 
