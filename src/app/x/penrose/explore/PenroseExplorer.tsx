@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { buildPatch, findFaceByTile, type Patch } from "./lib/patch";
+import { ChunkCache } from "./lib/chunks";
+import { GAMMA, tileCentroid } from "./lib/pentagrid";
 import { buildHitIndex, hitFace, type HitIndex } from "./lib/hitTest";
 import { encodeTile, decodeTile, parseSeed, parseZoom, type TileAddress } from "./lib/codec";
 
-const PATCH_LEVEL = 10; // ~55k faces, world radius ~123 unit edges, ~350ms one-time build
 const DEFAULT_ZOOM = 40; // px per unit edge
 
 function readCssVar(name: string): string {
@@ -14,31 +14,26 @@ function readCssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-// Deterministic seed to camera center: hash the seed, pick a face centroid in a
-// mid-radius band so the default view is generic. Off the singular sun center
-// at the origin, in from the patch boundary.
-function seedToCenter(seed: string, patch: Patch): readonly [number, number] {
+// Deterministic seed to camera center: a pure hash to a world position. The plane
+// is edgeless and homogeneous away from the origin, so any point is a valid
+// generic location; the cache generates whatever the viewport lands on. Spreads
+// seeds across a wide annulus off the singular sun center at the origin.
+function seedToCenter(seed: string): readonly [number, number] {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  const { minX, minY, maxX, maxY } = patch.bounds;
-  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-  const rMax = Math.min(maxX - cx, maxY - cy);
-  const band = patch.faces.filter((f) => {
-    const r = Math.hypot(f.centroid[0] - cx, f.centroid[1] - cy);
-    return r > rMax * 0.25 && r < rMax * 0.6;
-  });
-  const pool = band.length > 0 ? band : patch.faces;
-  return pool[(h >>> 0) % pool.length].centroid;
+  const r = 30 + ((h >>> 0) % 400);
+  const a = ((h >>> 8) % 360) * (Math.PI / 180);
+  return [r * Math.cos(a), r * Math.sin(a)];
 }
 
 export default function PenroseExplorer({ seed = "funclol" }: { seed?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const patchRef = useRef<Patch | null>(null);
+  const cacheRef = useRef<ChunkCache | null>(null);
   const hitRef = useRef<HitIndex | null>(null);
   const offsetRef = useRef<[number, number]>([0, 0]);
   const zoomRef = useRef<number>(DEFAULT_ZOOM);
@@ -52,13 +47,13 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
   const [pinnedAddress, setPinnedAddress] = useState<TileAddress | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Build the patch once for this seed (synchronous; the overlay paints first).
-  // Then read the share URL once: a pinned address and zoom override the
-  // seed-derived center, so a shared link reopens on the exact tile.
+  // The plane is generated per viewport, so there is no whole-plane build to wait
+  // on. Create the chunk cache, then read the share URL once: a pinned address and
+  // zoom override the seed-derived center, so a shared link reopens on the exact
+  // tile. The pin centers on the tile's physical centroid; the render loop then
+  // generates that tile in view and the hit index resolves it on the first frame.
   useEffect(() => {
-    const patch = buildPatch(PATCH_LEVEL);
-    patchRef.current = patch;
-    hitRef.current = buildHitIndex(patch.faces);
+    cacheRef.current = new ChunkCache(GAMMA);
 
     const params =
       typeof window !== "undefined"
@@ -68,18 +63,17 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
     const z = parseZoom(params.get("z") ?? undefined);
     if (z !== null) zoomRef.current = z;
 
-    const pinned = tAddr ? findFaceByTile(patch, tAddr) : null;
-    if (pinned) {
-      const addr: TileAddress = { coord: pinned.coord, j: pinned.j, k: pinned.k };
+    if (tAddr) {
+      const addr: TileAddress = { coord: tAddr.coord, j: tAddr.j, k: tAddr.k };
       pinnedRef.current = addr;
       setPinnedAddress(addr);
-      offsetRef.current = [pinned.centroid[0], pinned.centroid[1]];
+      const c = tileCentroid(tAddr.coord, tAddr.j, tAddr.k);
+      offsetRef.current = [c[0], c[1]];
     } else {
-      const c = seedToCenter(seed, patch);
+      const c = seedToCenter(seed);
       offsetRef.current = [c[0], c[1]];
     }
-    // Deliberate mount gate: the patch is built synchronously here, then ready
-    // flips so the canvas-wiring effect runs and the "building tiling" overlay clears.
+    // No multi-second build; the cache fills lazily as the viewport asks for cells.
     setReady(true);
   }, [seed]);
 
@@ -261,8 +255,8 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       rafRef.current = null;
       if (!dirtyRef.current) return;
       dirtyRef.current = false;
-      const patch = patchRef.current;
-      if (!patch) return;
+      const cache = cacheRef.current;
+      if (!cache) return;
       const { w, h } = sizeRef.current;
       const dpr = dprRef.current;
       const thick = readCssVar("--color-moment-1") || "#C89B3C";
@@ -278,11 +272,18 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const halfW = w / 2 / zoom + 2, halfH = h / 2 / zoom + 2;
       const x0 = ox - halfW, x1 = ox + halfW, y0 = oy - halfH, y1 = oy + halfH;
 
+      // Generate exactly the tiles the viewport touches, then rebuild the hit
+      // index over that same visible set so hover and click-to-pin test against
+      // what is drawn. The cache returns only in-view faces, so there is no
+      // centroid cull here. A viewport holds a few hundred to low-thousands of
+      // faces, so rebuilding the index each frame is cheap.
+      const faces = cache.facesInView({ minX: x0, minY: y0, maxX: x1, maxY: y1 });
+      hitRef.current = buildHitIndex(faces);
+
       ctx!.lineJoin = "round";
       ctx!.lineWidth = 1;
       ctx!.strokeStyle = grout;
-      for (const f of patch.faces) {
-        if (f.centroid[0] < x0 || f.centroid[0] > x1 || f.centroid[1] < y0 || f.centroid[1] > y1) continue;
+      for (const f of faces) {
         const [a, b, c, d] = f.corners;
         ctx!.beginPath();
         ctx!.moveTo((a[0] - ox) * zoom + cx, (a[1] - oy) * zoom + cy);
@@ -312,7 +313,7 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       if (writeTimer) clearTimeout(writeTimer);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- writeUrl reads `seed`, but seed is a stable prop in v1 (a seed change rebuilds the patch in the other effect, which flips `ready` and rewires this one). Keep the deps as [ready].
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- writeUrl reads `seed`, but seed is a stable prop in v1 (a seed change recreates the cache in the other effect, which flips `ready` and rewires this one). Keep the deps as [ready].
   }, [ready]);
 
   return (
@@ -339,11 +340,6 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
           </div>
         )}
       </div>
-      {!ready && (
-        <div className="absolute inset-0 grid place-items-center font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 pointer-events-none">
-          building tiling
-        </div>
-      )}
     </div>
   );
 }

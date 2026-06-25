@@ -46,3 +46,26 @@ test("a pinned address round-trips through the share URL", async ({ page }) => {
   await expect(canvas).toBeVisible();
   await expect(page.getByText(/pinned/i)).toHaveText(pinnedText!);
 });
+
+// The plane is edgeless: tiles are generated per viewport, so dragging far in one
+// direction never reaches a boundary. Drag many times, then confirm a tile address
+// still reads under the cursor. A bounded one-patch model would run out of tiles
+// and the address HUD would stop updating.
+test("the plane has no edge: panning far keeps showing tiles", async ({ page }) => {
+  await page.goto("/x/penrose/explore");
+  const canvas = page.locator("canvas[aria-label='Penrose tiling explorer canvas']");
+  await expect(canvas).toBeVisible();
+
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("no canvas box");
+  const midX = box.x + box.width / 2,
+    midY = box.y + box.height / 2;
+  for (let i = 0; i < 20; i++) {
+    await page.mouse.move(midX, midY);
+    await page.mouse.down();
+    await page.mouse.move(midX - 300, midY, { steps: 5 });
+    await page.mouse.up();
+  }
+  await page.mouse.move(midX, midY);
+  await expect(page.getByText(/address/i)).toBeVisible();
+});
