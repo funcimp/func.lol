@@ -199,7 +199,11 @@ export default function PenroseExplorer({ seed = "funclol" }: { seed?: string })
       const cy = e.clientY - rect.top - sizeRef.current.h / 2;
       const worldX = cx / zoomRef.current + offsetRef.current[0];
       const worldY = cy / zoomRef.current + offsetRef.current[1];
-      const newZoom = clamp(zoomRef.current * Math.exp(-e.deltaY * 0.001), 4, 800);
+      // Zoom speed. macOS trackpad pinch arrives as a wheel event with ctrlKey and
+      // small, frequent deltas, so it needs a higher factor than a discrete mouse
+      // wheel notch to feel responsive. Tune these two if it is too fast or too slow.
+      const factor = e.ctrlKey ? 0.01 : 0.0025;
+      const newZoom = clamp(zoomRef.current * Math.exp(-e.deltaY * factor), 4, 800);
       zoomRef.current = newZoom;
       offsetRef.current[0] = worldX - cx / newZoom;
       offsetRef.current[1] = worldY - cy / newZoom;
