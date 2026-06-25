@@ -216,15 +216,46 @@ function caption(
 
 // ---------------------------------------------------------------------------
 // Timeline. Outline the hole, seat the tempting fat-108 move (it fits), then the
-// next gap glows and every candidate shades its overlap, then the one correct
-// fat-72 filling completes and holds. The order is fixed, so the slider scrubs it.
+// gap glows and every candidate shades its overlap (the climax: nothing fits).
+// Then the failed attempts clear, the one correct fat-72 filling completes, and
+// the patch settles into a clean finished region. The order is fixed, so the
+// slider scrubs it; t = 1 is the clean resolved patch, the litter gone.
 // ---------------------------------------------------------------------------
 
-const HOLE_IN = 0.12; // [0, HOLE_IN] wall ring + hole outline appear
-const SEAT_FROM = 0.16; // the tempting move seats cleanly
-const SEAT_TO = 0.4;
-const WALL_FROM = 0.46; // the gap glows; candidates shade their overlap
-const WALL_TO = 0.72;
+const HOLE_IN = 0.1; // [0, HOLE_IN] wall ring + hole outline appear
+const SEAT_FROM = 0.14; // the tempting move seats cleanly
+const SEAT_TO = 0.34;
+const WALL_FROM = 0.4; // the gap glows; candidates shade their overlap
+const WALL_TO = 0.64;
+const COMP_FROM = 0.72; // the failed attempts clear; the right filling grows
+const COMP_TO = 0.94;
+
+// The candidate's worst (largest-area) real overlap with any board tile. The
+// shaded polygon IS the wall the viewer sees, so the dead-end is geometry, not a
+// label.
+function worstOverlap(
+  cand: readonly Pt[],
+  board: readonly (readonly Pt[])[],
+): Pt[] {
+  let worst: Pt[] = [];
+  let worstA = 0;
+  for (const bv of board) {
+    const ov = overlapPolygon(cand as Pt[], bv as Pt[]);
+    if (ov.length < 3) continue;
+    let a = 0;
+    for (let i = 0; i < ov.length; i++) {
+      const p = ov[i];
+      const q = ov[(i + 1) % ov.length];
+      a += p[0] * q[1] - q[0] * p[1];
+    }
+    a = Math.abs(a) / 2;
+    if (a > worstA) {
+      worstA = a;
+      worst = ov;
+    }
+  }
+  return worst;
+}
 
 function paint(
   ctx: CanvasRenderingContext2D,
@@ -239,9 +270,14 @@ function paint(
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
-  // 1. The committed wall ring, muted so the hole and the action read above it.
   const wallIn = smooth(0, HOLE_IN, t);
+  const comp = smooth(COMP_FROM, COMP_TO, t);
+  const clear = 1 - smooth(COMP_FROM, COMP_FROM + 0.1, t); // failed attempts fade out
+
+  // 1. The committed wall ring. Muted while the hole is the subject, brightening
+  // to a finished patch as the correct filling completes.
   if (wallIn > 0) {
+    const wallAlpha = wallIn * (0.34 + 0.5 * comp);
     for (const tile of wall) {
       fillTile(
         ctx,
@@ -249,95 +285,36 @@ function paint(
         toPx,
         tile.type === "fat" ? thick : thin,
         ink,
-        wallIn * 0.34,
+        wallAlpha,
         0.8,
       );
     }
-    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn, [5, 4]);
-    caption(
-      ctx,
-      "one small hole, exactly one filling",
-      VB_W / 2,
-      20,
-      ink,
-      wallIn * 0.85,
-    );
-  }
-
-  const atEnd = t >= 1;
-
-  // END STATE (reduced motion / t = 1): the wrong move seated, the gap shaded with
-  // every overlapping candidate, and the correct filling completing. Static.
-  if (atEnd) {
-    // The tempting wrong move, ghosted (it seated, but it strands).
-    fillTile(ctx, scene.wrongMove.v, toPx, ink, ink, 0.14, 1);
-    strokeLoop(ctx, scene.wrongMove.v, toPx, ink, 1.4, 0.5, [4, 3]);
-    // Every candidate on the gap, each shading its real overlap with the board.
-    const board = [...scene.wall, scene.wrongMove].map((x) => x.v);
-    for (const cand of gap.candidates) {
-      strokeLoop(ctx, cand.v, toPx, ink, 1, 0.32, [2, 3]);
-      let worst: Pt[] = [];
-      let worstA = 0;
-      for (const bv of board) {
-        const ov = overlapPolygon(cand.v as Pt[], bv as Pt[]);
-        if (ov.length >= 3) {
-          let a = 0;
-          for (let i = 0; i < ov.length; i++) {
-            const p = ov[i];
-            const q = ov[(i + 1) % ov.length];
-            a += p[0] * q[1] - q[0] * p[1];
-          }
-          a = Math.abs(a) / 2;
-          if (a > worstA) {
-            worstA = a;
-            worst = ov;
-          }
-        }
-      }
-      shadeOverlap(ctx, worst, toPx, ink, 0.4);
-    }
-    // The one correct filling, solid.
-    for (const tile of scene.uniqueCompletion) {
-      fillTile(
+    // The hole outline, fading as the filling closes it.
+    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn * (1 - comp), [5, 4]);
+    if (comp < 0.6) {
+      caption(
         ctx,
-        tile.v,
-        toPx,
-        tile.type === "fat" ? thick : thin,
+        "one small hole, exactly one filling",
+        VB_W / 2,
+        20,
         ink,
-        0.9,
-        1.1,
+        wallIn * 0.85 * (1 - comp),
       );
     }
-    caption(
-      ctx,
-      "the wrong piece fits, then strands; only one filling works",
-      VB_W / 2,
-      VB_H - 30,
-      ink,
-      0.8,
-    );
-    caption(
-      ctx,
-      "no rule invoked, the shapes alone decide",
-      VB_W / 2,
-      VB_H - 14,
-      ink,
-      0.62,
-    );
-    return;
   }
 
-  // 2. The tempting wrong move (fat-108) seats cleanly on the constrained edge.
+  // 2. The tempting wrong move (fat-108) seats cleanly on the constrained edge,
+  // then dims to a faint ghost under the climax and clears before the finish.
   const seat = smooth(SEAT_FROM, SEAT_TO, t);
-  const fade = 1 - smooth(WALL_FROM, WALL_FROM + 0.06, t); // it fades as the gap glows
-  if (seat > 0 && fade > 0) {
+  if (seat > 0 && clear > 0) {
+    const dim = 1 - 0.7 * smooth(WALL_FROM, WALL_FROM + 0.06, t);
     fillTile(
       ctx,
       scene.wrongMove.v,
       toPx,
       scene.wrongMove.type === "fat" ? thick : thin,
       ink,
-      seat * fade,
+      seat * clear * dim,
       1.1,
     );
     if (t < WALL_FROM) {
@@ -345,18 +322,15 @@ function paint(
     }
   }
 
-  // 3. The gap glows; every candidate shades its overlap with a committed tile.
+  // 3. The climax: the gap glows and every candidate shades its real overlap with
+  // a committed tile. Nothing fits. Clears as the finish takes over.
   const wallReveal = smooth(WALL_FROM, WALL_TO, t);
-  if (wallReveal > 0) {
-    // Keep the seated wrong move visible, faint, so the gap reads against it.
-    fillTile(ctx, scene.wrongMove.v, toPx, ink, ink, wallReveal * 0.14, 1);
-    strokeLoop(ctx, scene.wrongMove.v, toPx, ink, 1.4, wallReveal * 0.5, [4, 3]);
-
+  if (wallReveal > 0 && clear > 0) {
     const board = [...scene.wall, scene.wrongMove].map((x) => x.v);
     // Glow the gap edge.
     const [ea, eb] = gap.edge;
     ctx.save();
-    ctx.globalAlpha = wallReveal;
+    ctx.globalAlpha = wallReveal * clear;
     const [ax, ay] = toPx(ea);
     const [bx, by] = toPx(eb);
     ctx.beginPath();
@@ -371,45 +345,25 @@ function paint(
     // Reveal candidates one at a time, each shading its worst real overlap.
     const per = 1 / gap.candidates.length;
     gap.candidates.forEach((cand, k) => {
-      const appear = smooth(k * per, (k + 1) * per, wallReveal);
+      const appear = smooth(k * per, (k + 1) * per, wallReveal) * clear;
       if (appear <= 0) return;
       strokeLoop(ctx, cand.v, toPx, ink, 1, appear * 0.3, [2, 3]);
-      let worst: Pt[] = [];
-      let worstA = 0;
-      for (const bv of board) {
-        const ov = overlapPolygon(cand.v as Pt[], bv as Pt[]);
-        if (ov.length >= 3) {
-          let a = 0;
-          for (let i = 0; i < ov.length; i++) {
-            const p = ov[i];
-            const q = ov[(i + 1) % ov.length];
-            a += p[0] * q[1] - q[0] * p[1];
-          }
-          a = Math.abs(a) / 2;
-          if (a > worstA) {
-            worstA = a;
-            worst = ov;
-          }
-        }
-      }
-      shadeOverlap(ctx, worst, toPx, ink, appear * 0.42);
+      shadeOverlap(ctx, worstOverlap(cand.v, board), toPx, ink, appear * 0.42);
     });
-    if (t < 0.78) {
+    if (t < COMP_FROM) {
       caption(
         ctx,
         "now nothing fits: every piece overlaps",
         VB_W / 2,
         VB_H - 20,
         ink,
-        wallReveal * 0.85,
+        wallReveal * clear * 0.85,
       );
     }
   }
 
-  // 4. The one correct filling (fat-72) completes and holds solid.
-  const comp = smooth(0.78, 0.96, t);
+  // 4. The one correct filling (fat-72) completes and the patch settles clean.
   if (comp > 0) {
-    // The gap shading fades as the correct filling takes over.
     const per = 1 / scene.uniqueCompletion.length;
     scene.uniqueCompletion.forEach((tile, k) => {
       const appear = smooth(k * per, (k + 1) * per, comp);
@@ -424,14 +378,25 @@ function paint(
         1.1,
       );
     });
-    caption(
-      ctx,
-      "the only filling that works",
-      VB_W / 2,
-      VB_H - 20,
-      ink,
-      comp * 0.85,
-    );
+    if (comp > 0.5) {
+      const lead = (comp - 0.5) / 0.5;
+      caption(
+        ctx,
+        "the wrong piece fits, then strands; only one filling works",
+        VB_W / 2,
+        VB_H - 30,
+        ink,
+        lead * 0.8,
+      );
+      caption(
+        ctx,
+        "no rule invoked, the shapes alone decide",
+        VB_W / 2,
+        VB_H - 14,
+        ink,
+        lead * 0.62,
+      );
+    }
   }
 }
 

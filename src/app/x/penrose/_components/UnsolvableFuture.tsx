@@ -253,15 +253,18 @@ function caption(
 // ---------------------------------------------------------------------------
 // Timeline. Wall ring + hole outline appear, the locally legal forced prefix
 // builds, the tempting thin seats (it fits!), then the gap glows and every
-// candidate shades its overlap. Last, the wrong path clears and the one surviving
-// completion grows and holds. Fixed order, so the slider scrubs it.
+// candidate shades its overlap (the climax: nothing fits). Last, the wrong path
+// clears, the one surviving completion grows, and the patch settles into a clean
+// finished region. Fixed order, so the slider scrubs it; t = 1 is the clean
+// resolved patch, the litter gone.
 // ---------------------------------------------------------------------------
 
 const WALL_IN = 0.1; // [0, WALL_IN] wall ring + hole outline appear
 const PREFIX_TO = 0.34; // the forced prefix builds, all locally legal
 const THIN_TO = 0.46; // the tempting thin seats cleanly
-const WALL_TO = 0.66; // the gap glows; candidates shade their overlap
-const COMP_FROM = 0.72; // the surviving completion grows after the wall
+const WALL_TO = 0.64; // the gap glows; candidates shade their overlap
+const COMP_FROM = 0.72; // the wrong path clears; the surviving completion grows
+const COMP_TO = 0.94;
 
 function paint(
   ctx: CanvasRenderingContext2D,
@@ -276,9 +279,15 @@ function paint(
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
-  // 1. The committed wall ring, muted so the hole and the action read above it.
   const wallIn = smooth(0, WALL_IN, t);
+  const comp = smooth(COMP_FROM, COMP_TO, t);
+  // The fade that clears the wrong path once the completion takes over.
+  const clear = 1 - smooth(COMP_FROM, COMP_FROM + 0.08, t);
+
+  // 1. The committed wall ring. Muted while the hole is the subject, brightening
+  // to a finished patch as the surviving completion fills in.
   if (wallIn > 0) {
+    const wallAlpha = wallIn * (0.32 + 0.5 * comp);
     for (const tile of wall) {
       fillTile(
         ctx,
@@ -286,75 +295,23 @@ function paint(
         toPx,
         tile.type === "fat" ? thick : thin,
         ink,
-        wallIn * 0.32,
+        wallAlpha,
         0.8,
       );
     }
-    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn, [5, 4]);
-    caption(
-      ctx,
-      "one hole, one surviving completion",
-      VB_W / 2,
-      18,
-      ink,
-      wallIn * 0.85,
-    );
-  }
-
-  const atEnd = t >= 1;
-
-  // END STATE (reduced motion / t = 1): the wrong path placed (prefix + thin),
-  // ghosted; the gap shaded with every overlapping candidate; and the surviving
-  // completion solid. Static, the whole story in one frame.
-  if (atEnd) {
-    const board = [...scene.wall, ...scene.forcedPrefix, scene.temptingThin].map(
-      (x) => x.v,
-    );
-    // The locally legal prefix and the tempting thin, ghosted (they placed, then
-    // stranded).
-    for (const tile of scene.forcedPrefix) {
-      fillTile(ctx, tile.v, toPx, ink, ink, 0.12, 0.8);
-    }
-    fillTile(ctx, scene.temptingThin.v, toPx, ink, ink, 0.16, 1);
-    strokeLoop(ctx, scene.temptingThin.v, toPx, ink, 1.4, 0.5, [4, 3]);
-    // Every candidate on the gap, each shading its real overlap with the board.
-    for (const cand of gap.candidates) {
-      strokeLoop(ctx, cand.v, toPx, ink, 1, 0.26, [2, 3]);
-      shadeWorstOverlap(ctx, cand.v, board, toPx, ink, 0.36);
-    }
-    // The one surviving completion, solid.
-    for (const tile of scene.completion) {
-      fillTile(
+    // The hole outline, fading as the completion closes it.
+    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn * (1 - comp), [5, 4]);
+    if (comp < 0.6) {
+      caption(
         ctx,
-        tile.v,
-        toPx,
-        tile.type === "fat" ? thick : thin,
+        "one hole, one surviving completion",
+        VB_W / 2,
+        18,
         ink,
-        0.92,
-        1.1,
+        wallIn * 0.85 * (1 - comp),
       );
     }
-    caption(
-      ctx,
-      "the thin fits; place it, keep going, and now nothing fits",
-      VB_W / 2,
-      VB_H - 30,
-      ink,
-      0.8,
-    );
-    caption(
-      ctx,
-      "only one completion survives, by the shapes alone",
-      VB_W / 2,
-      VB_H - 14,
-      ink,
-      0.62,
-    );
-    return;
   }
-
-  // The fade that clears the wrong path once the completion takes over.
-  const clear = 1 - smooth(COMP_FROM, COMP_FROM + 0.06, t);
 
   // 2. The locally legal forced prefix builds, tile by tile.
   const prefixReveal = smooth(WALL_IN, PREFIX_TO, t);
@@ -413,7 +370,8 @@ function paint(
     }
   }
 
-  // 4. The gap glows; every candidate shades its overlap with a committed tile.
+  // 4. The climax: the gap glows and every candidate shades its overlap with a
+  // committed tile. Nothing fits. Clears as the completion takes over.
   const wallReveal = smooth(THIN_TO, WALL_TO, t);
   if (wallReveal > 0 && clear > 0) {
     const board = [...scene.wall, ...scene.forcedPrefix, scene.temptingThin].map(
@@ -434,13 +392,12 @@ function paint(
         VB_W / 2,
         VB_H - 20,
         ink,
-        wallReveal * 0.85,
+        wallReveal * clear * 0.85,
       );
     }
   }
 
-  // 5. The one surviving completion grows and holds solid.
-  const comp = smooth(COMP_FROM, 0.96, t);
+  // 5. The one surviving completion grows and the patch settles clean.
   if (comp > 0) {
     const per = 1 / scene.completion.length;
     scene.completion.forEach((tile, k) => {
@@ -456,14 +413,25 @@ function paint(
         1.1,
       );
     });
-    caption(
-      ctx,
-      "only one completion survives",
-      VB_W / 2,
-      VB_H - 16,
-      ink,
-      comp * 0.85,
-    );
+    if (comp > 0.5) {
+      const lead = (comp - 0.5) / 0.5;
+      caption(
+        ctx,
+        "the thin fits; place it, keep going, and now nothing fits",
+        VB_W / 2,
+        VB_H - 30,
+        ink,
+        lead * 0.8,
+      );
+      caption(
+        ctx,
+        "only one completion survives, by the shapes alone",
+        VB_W / 2,
+        VB_H - 14,
+        ink,
+        lead * 0.62,
+      );
+    }
   }
 }
 
@@ -532,7 +500,7 @@ export default function UnsolvableFuture() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch surrounds a single closed sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build along one path, then on the doomed frontier edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. Following it through, the next gap glows and every candidate rhombus is shown overlapping a committed tile, with the real overlap area shaded. The thin fits, you place it, you keep going, and now nothing fits, by the shapes alone with no matching rule invoked. Then the one surviving completion finishes the hole. The static end state shows the placed wrong path ghosted, the gap with every candidate overlapping shaded, and the surviving completion solid."
+        aria-label="A real Penrose patch surrounds a single closed sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build along one path, then on the doomed frontier edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. Following it through, the next gap glows and every candidate rhombus is shown overlapping a committed tile, with the real overlap area shaded. The thin fits, you place it, you keep going, and now nothing fits, by the shapes alone with no matching rule invoked. Then the wrong path clears and the one surviving completion finishes the hole. The static end state is the clean resolved patch: the failed attempts cleared away, the single surviving completion filling the hole."
       />
     </Sketch>
   );
