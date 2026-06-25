@@ -4,6 +4,7 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
+import AddressWalk from "./_components/AddressWalk";
 import CutAndProject from "./_components/CutAndProject";
 import FibonacciStrip from "./_components/FibonacciStrip";
 import GoldenRatio from "./_components/GoldenRatio";
@@ -258,21 +259,29 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 8. A coordinate system. (Prose now; may merge with 6 later.) */}
+        {/* 8. A coordinate system: the address is a walk along five directions. */}
         <h2 className={H2}>Every tile knows its address</h2>
         <div className={PROSE}>
           <p>
             Because every tile is the shadow of one lattice point, every tile
-            carries that point as a name. Five integers, exact, no two tiles
-            alike. It is a full coordinate system for a floor with no edges and
-            no origin you ever had to choose.
+            carries that point as a name: five integers, exact, no two tiles
+            alike. And the five integers are not an arbitrary code. Each one
+            counts steps along one of five fixed directions, the very directions
+            the tile edges run along. Walk those steps out from the origin and you
+            arrive at the tile. The address is a path you can trace.
           </p>
+        </div>
+
+        <AddressWalk />
+
+        <div className={PROSE}>
           <p>
             That is the trick that makes the explorer possible. Move anywhere,
             zoom anywhere, and the tile under your cursor can tell you precisely
-            where you are, by reading its own address off the lattice. A shared
-            link is just a coordinate. It drops the next person on the exact same
-            tile.
+            where you are, by reading its own address off the lattice. It is a
+            full coordinate system for a floor with no edges. A shared link is
+            just those five numbers, and it drops the next person on the exact
+            same tile.
           </p>
         </div>
 
