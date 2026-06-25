@@ -104,6 +104,47 @@ test("the unsolvable-future sketch loads at its stationary end state", async ({
   await expect(reset).toBeDisabled();
 });
 
+const overlayFigure = (page: import("@playwright/test").Page) =>
+  page.locator("figure").filter({
+    has: page.getByRole("img", {
+      name: /Two real Penrose tilings overlaid/i,
+    }),
+  });
+
+test("the interference-overlay sketch mounts its animated canvas and controls", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  const figure = overlayFigure(page);
+  await expect(
+    figure.getByRole("img", { name: /Two real Penrose tilings overlaid/i }),
+  ).toBeVisible();
+  await expect(
+    figure.getByRole("button", { name: "play", exact: true }),
+  ).toBeVisible();
+  await expect(figure.getByRole("button", { name: "step" })).toBeVisible();
+  await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
+  // The projector motion is the slider: it scrubs the turn of the top layer.
+  await expect(figure.getByRole("slider", { name: "turn" })).toBeVisible();
+});
+
+test("the interference-overlay sketch loads at its stationary end state", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  // Same harness contract: mounts at t = 1 (the representative islands-and-veins
+  // frame), so reset is enabled and step is disabled until the viewer rewinds.
+  const figure = overlayFigure(page);
+  const reset = figure.getByRole("button", { name: "reset" });
+  const step = figure.getByRole("button", { name: "step" });
+  await reset.scrollIntoViewIfNeeded();
+  await expect(reset).toBeEnabled();
+  await expect(step).toBeDisabled();
+  await reset.click();
+  await expect(step).toBeEnabled();
+  await expect(reset).toBeDisabled();
+});
+
 test("the cut-and-project sketch renders and links its two panels on hover", async ({
   page,
 }) => {

@@ -5,6 +5,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 import { experimentNumber } from "../page";
 import CutAndProject from "./_components/CutAndProject";
+import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
@@ -213,23 +214,31 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 7. The overlay. (Prose now; sketch later.) */}
+        {/* 7. The overlay. */}
         <h2 className={H2}>Slide one over another</h2>
         <div className={PROSE}>
           <p>
             Penrose noticed something when he laid two of these tilings over each
-            other and slid one across the other. Large regions snap into
-            agreement, the two patterns locking tile for tile. Between those
-            islands run shifting veins where they disagree, and the whole map of
-            islands and veins is organized by the same five-fold symmetry that
-            built the tiles.
+            other on his overhead projector and turned one across the other.
+            Large regions snap into agreement, the two patterns locking tile for
+            tile. Between those islands run shifting veins where they disagree,
+            and the whole map of islands and veins is organized by the same
+            five-fold symmetry that built the tiles.
           </p>
+        </div>
+
+        <InterferenceOverlay />
+
+        <div className={PROSE}>
           <p>
-            Here is the strange part. Any two Penrose tilings share every finite
-            patch you could name. Whatever stretch you see in one, you will find
-            an exact copy somewhere in the other. Yet slide and rotate all you
-            like, the two never line up everywhere at once. Infinitely alike up
-            close, never the same as a whole.
+            Overlay two of these tilings and turn one, and you see broad regions
+            agree while veins of mismatch ripple between them, organized by the
+            five-fold symmetry. That is the strange part. Any two Penrose tilings
+            share every finite patch you could name. Whatever stretch you see in
+            one, you will find an exact copy somewhere in the other. Yet slide and
+            rotate all you like, the two never line up everywhere at once.
+            Infinitely alike up close, never the same as a whole. This is what
+            Penrose saw on his projector.
           </p>
         </div>
 
