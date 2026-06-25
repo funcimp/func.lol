@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import ThemeToggle from "@/components/ThemeToggle";
 
+import DeadEnd from "./_components/DeadEnd";
 import MeetTheTiles from "./_components/MeetTheTiles";
 
 export const metadata: Metadata = {
@@ -71,6 +72,35 @@ export default function PenrosePage() {
         </div>
 
         <MeetTheTiles />
+
+        <h2 className="text-[24px] sm:text-[32px] font-bold leading-[1] tracking-[-0.03em] mb-6 mt-14">
+          The dead-end
+        </h2>
+
+        <div className="prose-hyphens flex flex-col gap-4 text-[16px] leading-[1.65] max-w-[60ch]">
+          <p>
+            Each edge carries a mark, a single or double arrow. The rule is local:
+            two tiles may touch only where their marks agree. Obey it and a tile
+            fits its neighbor. So you lay one, then the next, then the next, around
+            a shared corner, every join clean.
+          </p>
+          <p>
+            Penrose once spotted a university floor whose edge tile broke the rule.
+            He knew at a glance the pattern would go wrong somewhere in the middle
+            of the lawn. Here is that wrongness up close. The last wedge is a
+            perfect 72 degrees, exactly a thick rhombus&apos;s sharp corner. The
+            angle is fine. But the two marks flanking it demand opposite things, so
+            no tile can seat there. The patch is stuck.
+          </p>
+          <p>
+            The rules are local. Local is not enough. Somewhere far from where you
+            started, it can become impossible. That is why the explorer never lays
+            tiles by these marks at all. It projects each patch from a 5D lattice,
+            where the whole tiling is one shadow and a dead-end cannot exist.
+          </p>
+        </div>
+
+        <DeadEnd />
 
         <h2 className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-4 mt-12">
           research
