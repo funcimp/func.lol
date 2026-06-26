@@ -294,10 +294,10 @@ export default function PenrosePage() {
             φ. You can do this forever in either direction.
           </p>
           <p>
-            Count the tiles as you go and a number falls out. Step the level
-            deeper below and watch the running count of thick tiles to thin
-            tiles. It homes in on φ, the same golden ratio that set the angles in
-            the first place.
+            Count the fat tiles and the thin ones and divide. Below, a ruler marks
+            φ, and each level&#39;s ratio is a dot on it. Step the level deeper and
+            watch the dot march in on φ, the same golden ratio that set the angles
+            in the first place.
           </p>
         </div>
 
