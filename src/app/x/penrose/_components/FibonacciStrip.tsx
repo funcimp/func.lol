@@ -15,11 +15,12 @@ import {
 
 // "Cut and project, where you can see it": the spine's section-6 lead-in. The same
 // construction one dimension lower, fully visible. A square integer lattice, a line at
-// the golden slope, and a strip (the window) around it. A scan sweeps ALONG the line:
-// the points it crosses inside the strip drop onto the line and grow the Fibonacci
-// chain, long and short intervals, ratio phi, never repeating. Cut is the strip,
-// project is the drop. This is the cut-and-project method made visible; Penrose is the
-// same method one dimension up (5D -> 2D), which the next sketches show on the plane.
+// the golden slope, and a strip (the window) around it. SLIDE the strip across the
+// lattice: the points that fall inside it drop onto the line and form the Fibonacci
+// chain, long and short intervals, ratio phi, never repeating. As the strip slides the
+// selection shifts, which is the cut choosing the sequence. Cut is the strip, project
+// is the drop. This is the cut-and-project method made visible; Penrose is the same
+// method one dimension up (5D -> 2D), which the next sketches show on the plane.
 //
 // Bound to fibonacci.ts (and fibonacci.test.ts): every accepted point and every
 // long/short gap is computed, not drawn by hand. This sketch shows ONLY the 1D
@@ -27,8 +28,9 @@ import {
 // interval it bounds). It does not claim to draw the 2D Penrose tiles, which come from
 // a different lattice (the pentagrid / cut-and-project sketches handle those).
 //
-// Canvas: the harness drives render(t); t is the scan position. Theme colours are read
-// live. Reduced motion mounts at t = 1, the finished chain (scan gone).
+// Canvas: the harness drives render(t); t slides the strip's offset across the lattice.
+// Theme colours are read live. Reduced motion mounts at t = 1, the representative
+// centred chain.
 
 const VB_W = 680;
 const VB_H = 380;
@@ -42,12 +44,12 @@ const CHAIN_H = 18;
 const VIEW_M = 7;
 const VIEW_N = 5;
 const S_EXT = 16; // half-length of the drawn line/strip in data units (overshoots view)
-const OFFSET0 = 0.05; // the fixed window offset (centres the strip on the line)
+const OFFSET0 = 0.05; // representative window offset at t = 1 (clean, near-centred chain)
+const OFFSET_SPAN = WINDOW_W * 1.4; // how far the strip slides across the lattice as t runs
 
 type V2 = readonly [number, number];
 const add = (a: V2, b: V2): V2 => [a[0] + b[0], a[1] + b[1]];
 const scale = (k: number, v: V2): V2 => [k * v[0], k * v[1]];
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 // Data (m,n) plane -> pixels, equal scale so the lattice stays square, y flipped.
 const SCALE = Math.min(TOP.w / (2 * VIEW_M), TOP.h / (2 * VIEW_N));
@@ -90,31 +92,24 @@ function caption(
 
 function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   const { thick, thin, paper, ink } = colors;
-  const gamma = OFFSET0 - WINDOW_W / 2; // centre the window on the line
+  const offset = OFFSET0 + (t - 1) * OFFSET_SPAN; // t = 1 -> OFFSET0 (representative)
+  const gamma = offset - WINDOW_W / 2; // centre the window band on the line
 
   ctx.clearRect(0, 0, VB_W, VB_H);
   ctx.fillStyle = paper;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
   caption(ctx, "THE LATTICE, A LINE, A STRIP", TOP.x, 16, ink, 0.55, "left");
-  caption(ctx, "scan the strip across the grid ▸", VB_W - PAD, 16, ink, 0.5, "right");
+  caption(ctx, "◂ slide the strip across the grid ▸", VB_W - PAD, 16, ink, 0.5, "right");
 
+  // The accepted set is recomputed for the current offset, so as the strip slides the
+  // selection shifts: points enter and leave the window and the chain changes with it.
   const all = latticePoints(VIEW_M + 1, gamma).filter(
     (p) => Math.abs(p.m) <= VIEW_M && Math.abs(p.n) <= VIEW_N,
   );
   const accepted = all
     .filter((p) => p.accepted)
     .sort((a, b) => a.phys - b.phys);
-  const physMin = accepted.length ? accepted[0].phys : -1;
-  const physMax = accepted.length ? accepted[accepted.length - 1].phys : 1;
-
-  // The scan sweeps ALONG the line, from one end to the other, as t goes 0 -> 1.
-  const SW0 = physMin - 1;
-  const SW1 = physMax + 1;
-  const sweep = SW0 + t * (SW1 - SW0);
-  const BAND = 0.7;
-  const reveal = (phys: number) => clamp01((sweep - phys) / BAND);
-  const scanFade = 1 - clamp01((t - 0.92) / 0.08); // scan head gone at the finished frame
 
   // --- lattice panel, clipped -----------------------------------------------
   ctx.save();
@@ -122,7 +117,7 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   ctx.rect(TOP.x, TOP.y, TOP.w, TOP.h);
   ctx.clip();
 
-  // The strip (the window) and the line, the fixed apparatus the scan runs along.
+  // The strip (the window) at the current offset. This is the element that slides.
   const strip: V2[] = [
     onLine(gamma, -S_EXT),
     onLine(gamma, S_EXT),
@@ -139,7 +134,7 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   ctx.fillStyle = ink;
   ctx.globalAlpha = 0.08;
   ctx.fill();
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.32;
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   ctx.strokeStyle = ink;
@@ -147,6 +142,7 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
 
+  // The line (internal = 0), through the origin at the golden slope.
   const [l0x, l0y] = fitD(onLine(0, -S_EXT));
   const [l1x, l1y] = fitD(onLine(0, S_EXT));
   ctx.beginPath();
@@ -158,21 +154,20 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   ctx.stroke();
   ctx.globalAlpha = 1;
 
+  // Rejected lattice points: faint dots, outside the window.
   for (const p of all) {
     if (p.accepted) continue;
-    const ap = reveal(p.phys);
-    if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
     ctx.beginPath();
     ctx.arc(px, py, 2, 0, Math.PI * 2);
     ctx.fillStyle = ink;
-    ctx.globalAlpha = 0.22 * ap;
+    ctx.globalAlpha = 0.22;
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // Accepted points: drop a perpendicular onto the line, then mark the point.
   for (const p of accepted) {
-    const ap = reveal(p.phys);
-    if (ap <= 0.01) continue;
     const foot = scale(physical(p.m, p.n), D);
     const [pxx, pyy] = fitD([p.m, p.n]);
     const [fxx, fyy] = fitD(foot);
@@ -181,15 +176,12 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
     ctx.lineTo(fxx, fyy);
     ctx.lineWidth = 1;
     ctx.strokeStyle = ink;
-    ctx.globalAlpha = 0.4 * ap;
+    ctx.globalAlpha = 0.4;
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
   for (const p of accepted) {
-    const ap = reveal(p.phys);
-    if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
-    ctx.globalAlpha = ap;
     ctx.beginPath();
     ctx.arc(px, py, 3.4, 0, Math.PI * 2);
     ctx.fillStyle = ink;
@@ -202,36 +194,20 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   }
   ctx.globalAlpha = 1;
 
-  // The scan head: a bright line perpendicular to the strip, travelling along it.
-  if (scanFade > 0.01 && sweep > SW0 && sweep < SW1) {
-    const a = add(scale(sweep, D), scale(gamma - 0.5, DPERP));
-    const b = add(scale(sweep, D), scale(gamma + WINDOW_W + 0.5, DPERP));
-    const [ax, ay] = fitD(a);
-    const [bx, by] = fitD(b);
-    ctx.save();
-    ctx.globalAlpha = scanFade;
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx, by);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   ctx.restore(); // end clip
 
   // --- the 1D chain bar ------------------------------------------------------
+  // The current selection, projected flat. As the strip slides the gaps shift, which
+  // is the same quasiperiodic chain read from a different cut.
   if (accepted.length >= 2) {
+    const physMin = accepted[0].phys;
+    const physMax = accepted[accepted.length - 1].phys;
     const x0 = PAD + 8;
     const x1 = VB_W - PAD - 8;
     const barX = (phys: number) =>
       x0 + ((phys - physMin) / (physMax - physMin || 1)) * (x1 - x0);
     const mid = (LONG + SHORT) / 2;
     for (const p of accepted) {
-      const ap = reveal(p.phys);
-      if (ap <= 0.01) continue;
       const foot = scale(physical(p.m, p.n), D);
       const [, fy] = fitD(foot);
       const bx = barX(p.phys);
@@ -240,12 +216,11 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
       ctx.lineTo(bx, CHAIN_Y - CHAIN_H / 2 - 2);
       ctx.lineWidth = 1;
       ctx.strokeStyle = ink;
-      ctx.globalAlpha = 0.12 * ap;
+      ctx.globalAlpha = 0.12;
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
     for (let i = 1; i < accepted.length; i++) {
-      if (accepted[i].phys > sweep) continue;
       const gap = accepted[i].phys - accepted[i - 1].phys;
       const isLong = gap > mid;
       const xa = barX(accepted[i - 1].phys);
@@ -254,15 +229,13 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
       ctx.fillRect(xa, CHAIN_Y - CHAIN_H / 2, xb - xa - 1.5, CHAIN_H);
     }
     for (const p of accepted) {
-      const ap = reveal(p.phys);
-      if (ap <= 0.01) continue;
       const bx = barX(p.phys);
       ctx.beginPath();
       ctx.moveTo(bx, CHAIN_Y - CHAIN_H / 2 - 3);
       ctx.lineTo(bx, CHAIN_Y + CHAIN_H / 2 + 3);
       ctx.lineWidth = 1;
       ctx.strokeStyle = ink;
-      ctx.globalAlpha = 0.5 * ap;
+      ctx.globalAlpha = 0.5;
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -278,7 +251,7 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
 
   caption(
     ctx,
-    "points inside the strip drop onto the line as the scan passes",
+    "points inside the strip drop onto the line as it slides",
     VB_W / 2,
     TOP.y + TOP.h + 18,
     ink,
@@ -343,7 +316,7 @@ export default function FibonacciStrip() {
   return (
     <Sketch
       label="sketch 04 · cut and project, in a dimension you can see"
-      animation={{ duration: 8000, render, slider: { label: "scan" } }}
+      animation={{ duration: 8000, render, slider: { label: "slide" } }}
     >
       <canvas
         ref={canvasRef}
@@ -354,7 +327,7 @@ export default function FibonacciStrip() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. A scan line sweeps along the strip; the ${accepted} lattice points it crosses inside the strip drop a perpendicular onto the line, and those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. This is the cut-and-project method made visible in a dimension you can see; Penrose tilings are the same method one dimension up, from five dimensions to two, shown in the sketches that follow.`}
+        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. Sliding the control slides the strip across the lattice; the roughly ${accepted} lattice points that fall inside the strip drop a perpendicular onto the line, and those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. As the strip slides the selection shifts. This is the cut-and-project method made visible in a dimension you can see; Penrose tilings are the same method one dimension up, from five dimensions to two, shown in the sketches that follow.`}
       />
     </Sketch>
   );
