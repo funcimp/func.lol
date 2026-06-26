@@ -237,8 +237,8 @@ export default function PenrosePage() {
             Large regions snap into agreement, the two patterns locking tile for
             tile. Between those islands run shifting veins where they disagree,
             and the whole map is organized by the same five-fold symmetry that
-            built the tiles. Drag the top layer below to slide it, or twist it,
-            and watch the rosettes form and move.
+            built the tiles. Spin the top layer below a full turn, or drag it
+            around, and watch the rosettes bloom and drift.
           </p>
         </div>
 

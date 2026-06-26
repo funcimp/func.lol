@@ -3,33 +3,33 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
-import { buildOverlay, FIFTH, rotate, type Overlay, type Pt } from "./lib/overlay";
+import { buildOverlay, type Overlay, type Pt } from "./lib/overlay";
 
 // "Slide one over another": the spine's section-7 sketch, Penrose's overhead-
-// projector demo, rebuilt to be a thing you push around. Two real Penrose tilings are
-// drawn as line work, the bottom in ink and the top in a translucent accent. Drag the
-// top layer to slide it; the twist control turns it about the center. Zoomed out, the
-// places where the two disagree organize into the five-fold rosettes Penrose saw, and
-// they shift and breathe as you move the top layer.
+// projector demo, rebuilt to push and spin. Two real Penrose tilings are drawn as
+// line work over a large plane that runs well off screen, the bottom in ink and the
+// top in a translucent accent. Spin the top layer a full turn, or drag it, and the
+// places where the two disagree organize into five-fold rosettes that bloom and
+// drift. Zoomed out, those rosettes read at scale; the off-screen plane means there
+// is always tiling under the frame to move into view.
 //
-// HONEST BY CONSTRUCTION. Both layers are the SAME real enumerator patch (lib/overlay.ts
-// and its test). The interference is emergent: nothing is tinted or highlighted, the
-// moiré is just two real tilings overlapping. The two share every finite patch yet
-// never line up everywhere at once.
+// HONEST BY CONSTRUCTION. Both layers are the SAME real enumerator patch
+// (lib/overlay.ts and its test). The interference is emergent: nothing is tinted,
+// the moiré is just two real tilings overlapping. Only the visible tiles are drawn
+// each frame (culled by centroid), so a large plane stays smooth to spin and drag.
 //
-// The harness drives render(t) for the twist (and play/reduced-motion); pointer drag
-// translates the top layer independently, repainting at the current twist. Theme
-// colors are read live so it inverts with the toggle.
+// The harness drives render(t) for the spin (full 360, looping); pointer drag slides
+// the top layer. Theme colours are read live so it inverts with the toggle.
 
-const VB_W = 560;
-const VB_H = 560;
-const MARGIN = 12;
-// Zoomed out: a large patch generated, a tighter window shown, so the top layer still
-// covers the frame as it is dragged and turned.
-const GEN_HALF = 15;
-const VIEW_HALF = 12;
-const TWIST_MAX = 0.16 * FIFTH; // up to ~11.5 degrees: dramatic rosettes that morph
-const OFFSET_MAX = 3.5; // how far the top layer may be dragged, in tile-edge units
+const VB = 560;
+const MARGIN = 10;
+// Zoomed out: a tighter window over a large generated plane, so rosettes read at
+// scale and dragging never runs out of tiling.
+const VIEW_HALF = 22;
+const GEN_HALF = 48;
+const CULL_R = VIEW_HALF + 2; // draw only tiles whose centroid is within the frame
+const PHASE0 = 0.05 * Math.PI * 2; // ~18 deg: the resting rosette (reduced-motion frame)
+const OFFSET_MAX = 18; // how far the top layer may be dragged, in tile-edge units
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -39,14 +39,15 @@ function readVar(name: string, fallback: string): string {
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
 
-const SCALE = Math.min(VB_W - 2 * MARGIN, VB_H - 2 * MARGIN) / (2 * VIEW_HALF);
+const SCALE = (VB - 2 * MARGIN) / (2 * VIEW_HALF);
 const toPx = (p: Pt): [number, number] => [
-  VB_W / 2 + p[0] * SCALE,
-  VB_H / 2 - p[1] * SCALE, // canvas y grows downward
+  VB / 2 + p[0] * SCALE,
+  VB / 2 - p[1] * SCALE, // canvas y grows downward
 ];
 
 const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 
+// Stroke a list of faces (optionally transformed) in one path. Caller culls first.
 function strokeFaces(
   ctx: CanvasRenderingContext2D,
   faces: Overlay["a"],
@@ -96,41 +97,6 @@ function caption(
   ctx.restore();
 }
 
-function paint(
-  ctx: CanvasRenderingContext2D,
-  twist: number,
-  offset: Pt,
-  o: Overlay,
-  colors: Colors,
-) {
-  const { thick, paper, ink } = colors;
-
-  ctx.clearRect(0, 0, VB_W, VB_H);
-  ctx.fillStyle = paper;
-  ctx.fillRect(0, 0, VB_W, VB_H);
-
-  // BOTTOM layer: the real tiling, in place, ink line work.
-  strokeFaces(ctx, o.a, null, ink, 0.7, 0.5);
-
-  // TOP layer: the SAME tiling, turned by `twist` about the center then slid by the
-  // drag offset, in translucent accent. Where it falls off the bottom seams the two
-  // agree; where it cuts across, the five-fold veins of mismatch appear.
-  const xf = (p: Pt): Pt => {
-    const r = rotate(p, twist);
-    return [r[0] + offset[0], r[1] + offset[1]];
-  };
-  strokeFaces(ctx, o.b, xf, thick, 0.95, 0.62);
-
-  caption(
-    ctx,
-    "drag the top layer to slide it · twist to turn",
-    VB_W / 2,
-    VB_H - 16,
-    ink,
-    0.7,
-  );
-}
-
 export default function InterferenceOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colorsRef = useRef<Colors>({
@@ -141,10 +107,16 @@ export default function InterferenceOverlay() {
   });
   const dprRef = useRef(0);
   const overlay = useMemo(() => buildOverlay(GEN_HALF), []);
+  // The bottom layer is fixed; its visible tiles never change, so cull once.
+  const bottomVisible = useMemo(
+    () =>
+      overlay.a.filter(
+        (f) => Math.abs(f.centroid[0]) <= CULL_R && Math.abs(f.centroid[1]) <= CULL_R,
+      ),
+    [overlay],
+  );
 
-  // Twist comes from the harness clock/slider (t); offset comes from pointer drag.
-  // Both feed the same paint, repainting on either.
-  const twistRef = useRef(TWIST_MAX); // mount at the representative twist (t = 1)
+  const twistRef = useRef(PHASE0); // mount at the resting rosette (t = 1)
   const offsetRef = useRef<Pt>([0, 0]);
 
   const refreshColors = useCallback(() => {
@@ -164,24 +136,46 @@ export default function InterferenceOverlay() {
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     if (dpr !== dprRef.current) {
       dprRef.current = dpr;
-      canvas.width = VB_W * dpr;
-      canvas.height = VB_H * dpr;
+      canvas.width = VB * dpr;
+      canvas.height = VB * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       refreshColors();
     }
-    paint(ctx, twistRef.current, offsetRef.current, overlay, colorsRef.current);
-  }, [overlay, refreshColors]);
+    const { thick, paper, ink } = colorsRef.current;
+    const twist = twistRef.current;
+    const [ox, oy] = offsetRef.current;
+    const cos = Math.cos(twist);
+    const sin = Math.sin(twist);
+    const xf = (p: Pt): Pt => [p[0] * cos - p[1] * sin + ox, p[0] * sin + p[1] * cos + oy];
+
+    ctx.clearRect(0, 0, VB, VB);
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, VB, VB);
+
+    // BOTTOM layer: the fixed tiling, ink line work.
+    strokeFaces(ctx, bottomVisible, null, ink, 0.6, 0.5);
+
+    // TOP layer: the same tiling, spun and slid, in translucent accent. Cull by the
+    // transformed centroid so only what lands in the frame is drawn.
+    const topVisible = overlay.b.filter((f) => {
+      const cx = f.centroid[0] * cos - f.centroid[1] * sin + ox;
+      const cy = f.centroid[0] * sin + f.centroid[1] * cos + oy;
+      return Math.abs(cx) <= CULL_R && Math.abs(cy) <= CULL_R;
+    });
+    strokeFaces(ctx, topVisible, xf, thick, 0.7, 0.62);
+
+    caption(ctx, "drag to slide the top layer · spin to turn it", VB / 2, VB - 14, ink, 0.7);
+  }, [overlay, bottomVisible, refreshColors]);
 
   const render = useCallback(
     (t: number) => {
-      twistRef.current = t * TWIST_MAX;
+      twistRef.current = t * Math.PI * 2 + PHASE0;
       repaint();
     },
     [repaint],
   );
 
-  // Pointer drag translates the top layer. Pixel deltas convert to data units through
-  // the canvas's on-screen scale, with the y axis flipped.
+  // Pointer drag translates the top layer. Pixel deltas convert to data units.
   const dragging = useRef(false);
   const last = useRef<[number, number]>([0, 0]);
 
@@ -195,8 +189,7 @@ export default function InterferenceOverlay() {
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (!dragging.current) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      const perData = rect.width / VB_W; // CSS px per data unit = (css/view px)*(view px/data)
-      const k = perData * SCALE;
+      const k = (rect.width / VB) * SCALE; // CSS px per data unit
       const dx = (e.clientX - last.current[0]) / k;
       const dy = -(e.clientY - last.current[1]) / k;
       last.current = [e.clientX, e.clientY];
@@ -216,7 +209,6 @@ export default function InterferenceOverlay() {
     }
   }, []);
 
-  // Repaint on theme flip so the stationary state inverts with the toggle.
   useEffect(() => {
     const observer = new MutationObserver(() => {
       refreshColors();
@@ -231,8 +223,8 @@ export default function InterferenceOverlay() {
 
   return (
     <Sketch
-      label="sketch 06 · two tilings, one slid over the other"
-      animation={{ duration: 9000, render, slider: { label: "twist" } }}
+      label="sketch 06 · two tilings, one spun over the other"
+      animation={{ duration: 16000, render, loop: true, slider: { label: "spin" } }}
     >
       <canvas
         ref={canvasRef}
@@ -243,13 +235,13 @@ export default function InterferenceOverlay() {
         style={{
           width: "100%",
           height: "auto",
-          aspectRatio: `${VB_W} / ${VB_H}`,
+          aspectRatio: "1 / 1",
           touchAction: "none",
           cursor: "grab",
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="Two real Penrose tilings drawn as line work and overlaid, zoomed out. The bottom layer is ink; the same tiling is drawn again over it in a translucent accent. Dragging the top layer slides it, and a twist control turns it about the center. Where the two tilings disagree, the mismatch organizes into five-fold rosettes that shift and breathe as the top layer moves. Broad regions still agree while veins of mismatch run between them, all carrying the five-fold symmetry. The two share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
+        aria-label="Two real Penrose tilings drawn as line work and overlaid over a large plane that runs off screen, zoomed out. The bottom layer is ink; the same tiling is drawn over it in a translucent accent. The spin control turns the top layer a full circle, and dragging slides it. Where the two tilings disagree, the mismatch organizes into five-fold rosettes that bloom and drift as the top layer turns and moves. Broad regions still agree while veins of mismatch run between them, all carrying the five-fold symmetry. The two share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
       />
     </Sketch>
   );
