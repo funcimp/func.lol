@@ -3,38 +3,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Sketch from "./Sketch";
-import { halfExtent, PHI, rhombiAt, type Pt, type Rhombus } from "./lib/scaling";
+import { PHI, rhombiAt, type Pt, type Rhombus } from "./lib/scaling";
 
-// "Zoom the hierarchy": the spine's section-9 sketch two, rebuilt to show the
-// transition BETWEEN layers, not snap between them. The choreography the slider
-// walks: a filled pattern, the level-up supertiles outlined over it, then the
-// supertiles fill in and BECOME the pattern while the next level up appears in
-// outline. Scrub it and the tiling inflates one step at a time, each level
-// dissolving into the next, the self-similarity made continuous.
+// "Zoom the hierarchy": the spine's section-9 sketch two, rebuilt as a real zoom-out
+// where the lines become tiles. The camera sits deep inside one fixed deflated patch,
+// showing fine tiles with their level-up SUPERTILES outlined over them. Zoom out (the
+// slider, or play) and the supertile outlines shrink to the size the small tiles had
+// and FILL IN, becoming the new tiles, while the next level up appears in outline.
+// The tiling is self-similar, so this can go step after step.
 //
-// HONEST BY CONSTRUCTION. deflate(L) is subdivide(deflate(L-1)), so the supertiles
-// are the genuine level-up tiling rhombiAt(L-1), not hand-drawn boundaries. Every
-// layer is real engine output (lib/scaling.ts and its test). The crossfade is at a
-// constant scale, so the wheel stays inscribed and the promotion of supertiles to
-// tiles is exact: rhombiAt(L-1) outlined at the start of a step is rhombiAt(L-1)
-// filled at its end.
+// HONEST BY CONSTRUCTION. deflate(L) is subdivide(deflate(L-1)); every level is real
+// engine output (lib/scaling.ts and its test), and the supertiles are the genuine
+// level-up tiling rhombiAt(L-1), not hand-drawn. The zoom is a true camera scale; the
+// level of detail crossfades as it crosses each phi-step, hidden by the dissolve.
+// The camera stays well inside the wheel's rim, so no ragged edge is ever exposed,
+// and only the tiles whose centroid lands in the frame are drawn (culled).
 //
-// Note on the maintainer's "zoom out slightly" idea: a literal camera zoom-out would
-// expose the finite wheel's ragged rim, so instead the tiles inflate in place (each
-// level's tiles grow by phi into the next), which keeps the frame clean and shows the
-// same relationship. A true infinite zoom would need a different, unbounded generator.
-//
-// Canvas: the harness drives render(t) and the slider scrubs the depth. t = 1 is the
-// finest level (the rich reduced-motion frame); scrubbing down inflates it.
+// Canvas: the harness drives render(t); t = 1 is zoomed in on the finest level (the
+// rich reduced-motion frame), and lowering it zooms out, lines becoming tiles.
 
 const VB = 480;
-const MARGIN = 12;
+const MARGIN = 0;
 
-// The levels walked. L is the small-tile level, L-1 its supertiles. MIN 2 so there is
-// always a supertiling; MAX 6 so the finest tiles stay legible.
-const MIN_LEVEL = 2;
-const MAX_LEVEL = 6;
-const FILL = 0.78; // pattern fill opacity; bold ink supertile outlines read over it
+// One fixed deep patch; the camera roams its interior. DEEP is the finest level
+// drawn; the zoom walks DEEP down to DEEP - STEPS, each step a factor of phi.
+const DEEP = 8;
+const STEPS = 3;
+const MIN_FILL = DEEP - STEPS; // 5
+const FILL = 0.8;
+
+// The camera. RHO0 is the view radius at the finest zoom; it grows by phi per step.
+// VIEW_C is off the wheel centre (which is a five-fold star) so we see a generic
+// patch, and is chosen with RHO0 so the view stays inside the unit-radius wheel.
+const RHO0 = 0.11;
+const VIEW_C: Pt = [0.22, 0.08];
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -43,30 +45,41 @@ function readVar(name: string, fallback: string): string {
 }
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
+type Cell = { kind: "thick" | "thin"; corners: readonly Pt[]; cx: number; cy: number };
 
-// Smoothstep: hold the pure "pattern + supertile lines" state briefly at each end of
-// a step, dissolve through the middle, so the inflation reads as a transition.
 const smooth = (e0: number, e1: number, x: number): number => {
   const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
   return u * u * (3 - 2 * u);
 };
 
+function cellsAt(level: number): Cell[] {
+  return rhombiAt(level).map((r: Rhombus) => {
+    let cx = 0;
+    let cy = 0;
+    for (const [x, y] of r.corners) {
+      cx += x;
+      cy += y;
+    }
+    return { kind: r.kind, corners: r.corners, cx: cx / 4, cy: cy / 4 };
+  });
+}
+
 type ToPx = (p: Pt) => [number, number];
 
-function fillRhombi(
+function fillCells(
   ctx: CanvasRenderingContext2D,
-  rhombi: readonly Rhombus[],
+  cells: Cell[],
   toPx: ToPx,
+  cullR: number,
   colors: Colors,
   alpha: number,
 ) {
   if (alpha <= 0.01) return;
   const { thick, thin, ink } = colors;
-  const edge = Math.max(0.25, Math.min(0.8, 14 / Math.sqrt(rhombi.length)));
   ctx.save();
-  ctx.globalAlpha = alpha;
   ctx.lineJoin = "round";
-  for (const r of rhombi) {
+  for (const r of cells) {
+    if (Math.hypot(r.cx - VIEW_C[0], r.cy - VIEW_C[1]) > cullR) continue;
     ctx.beginPath();
     const [x0, y0] = toPx(r.corners[0]);
     ctx.moveTo(x0, y0);
@@ -75,21 +88,22 @@ function fillRhombi(
       ctx.lineTo(x, y);
     }
     ctx.closePath();
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = r.kind === "thick" ? thick : thin;
     ctx.fill();
-    ctx.globalAlpha = alpha * 0.7;
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.lineWidth = 0.8;
     ctx.strokeStyle = ink;
-    ctx.lineWidth = edge;
     ctx.stroke();
-    ctx.globalAlpha = alpha;
   }
   ctx.restore();
 }
 
-function strokeRhombi(
+function strokeCells(
   ctx: CanvasRenderingContext2D,
-  rhombi: readonly Rhombus[],
+  cells: Cell[],
   toPx: ToPx,
+  cullR: number,
   ink: string,
   alpha: number,
 ) {
@@ -99,8 +113,9 @@ function strokeRhombi(
   ctx.strokeStyle = ink;
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
-  for (const r of rhombi) {
-    ctx.beginPath();
+  ctx.beginPath();
+  for (const r of cells) {
+    if (Math.hypot(r.cx - VIEW_C[0], r.cy - VIEW_C[1]) > cullR) continue;
     const [x0, y0] = toPx(r.corners[0]);
     ctx.moveTo(x0, y0);
     for (let i = 1; i < 4; i++) {
@@ -108,8 +123,8 @@ function strokeRhombi(
       ctx.lineTo(x, y);
     }
     ctx.closePath();
-    ctx.stroke();
   }
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -123,20 +138,15 @@ export default function ZoomHierarchy() {
   });
   const dprRef = useRef(0);
 
-  // Precompute each level's rhombi and one shared scale. All levels are the same wheel
-  // at unit radius, so one half-extent frames every level and they stay registered.
-  const byLevel = useMemo<Rhombus[][]>(
-    () => Array.from({ length: MAX_LEVEL + 1 }, (_, l) => (l >= 1 ? rhombiAt(l) : [])),
-    [],
-  );
-  const fitHalf = useMemo(() => {
-    let h = 0;
-    for (let l = MIN_LEVEL; l <= MAX_LEVEL; l++) h = Math.max(h, halfExtent(byLevel[l]));
-    return h;
-  }, [byLevel]);
+  // Precompute the levels the zoom touches (fill levels and their outline levels).
+  const byLevel = useMemo<Record<number, Cell[]>>(() => {
+    const out: Record<number, Cell[]> = {};
+    for (let L = MIN_FILL - 2; L <= DEEP; L++) out[L] = cellsAt(L);
+    return out;
+  }, []);
 
-  const [level, setLevel] = useState(MAX_LEVEL);
-  const levelRef = useRef(MAX_LEVEL);
+  const [level, setLevel] = useState(DEEP);
+  const levelRef = useRef(DEEP);
   const lastTRef = useRef(1);
 
   const refreshColors = useCallback(() => {
@@ -164,37 +174,41 @@ export default function ZoomHierarchy() {
         refreshColors();
       }
 
-      // t = 1 is the finest level; lowering it inflates the tiling one step at a time.
-      const span = MAX_LEVEL - MIN_LEVEL;
-      const p = (1 - t) * span;
-      const Lf = MAX_LEVEL - Math.floor(p);
-      const frac = p - Math.floor(p);
-      const fade = smooth(0.18, 0.82, frac);
+      // t = 1: zoomed in on DEEP. Lowering t zooms out, one phi-step at a time.
+      const u = (1 - t) * STEPS;
+      const Lfill = DEEP - Math.floor(u);
+      const frac = u - Math.floor(u);
+      const fade = smooth(0.1, 0.9, frac);
 
-      const s = (VB - 2 * MARGIN) / (2 * fitHalf);
-      const toPx: ToPx = (q) => [VB / 2 + q[0] * s, VB / 2 - q[1] * s];
+      const rho = RHO0 * Math.pow(PHI, u);
+      const c = (VB / 2 - MARGIN) / rho;
+      const toPx: ToPx = (p) => [
+        VB / 2 + (p[0] - VIEW_C[0]) * c,
+        VB / 2 - (p[1] - VIEW_C[1]) * c,
+      ];
+      const cullR = rho * 1.45;
       const colors = colorsRef.current;
 
       ctx.clearRect(0, 0, VB, VB);
       ctx.fillStyle = colors.paper;
       ctx.fillRect(0, 0, VB, VB);
 
-      // The pattern: the fine level fading out, the level-up filling in to replace it.
-      fillRhombi(ctx, byLevel[Lf], toPx, colors, FILL * (1 - fade));
-      if (Lf - 1 >= 1) fillRhombi(ctx, byLevel[Lf - 1], toPx, colors, FILL * fade);
+      // The fine tiles fading out, the level-up filling in to replace them.
+      fillCells(ctx, byLevel[Lfill], toPx, cullR, colors, FILL * (1 - fade));
+      if (byLevel[Lfill - 1]) fillCells(ctx, byLevel[Lfill - 1], toPx, cullR, colors, FILL * fade);
 
-      // The supertile lines: the current supertiles fading as they fill in, and the
-      // next level up appearing in outline to take their place.
-      if (Lf - 1 >= 1) strokeRhombi(ctx, byLevel[Lf - 1], toPx, colors.ink, 1 - fade);
-      if (Lf - 2 >= 1) strokeRhombi(ctx, byLevel[Lf - 2], toPx, colors.ink, fade);
+      // The supertile lines: the current supertiles fading as they fill, the next
+      // level up appearing in outline to take their place.
+      if (byLevel[Lfill - 1]) strokeCells(ctx, byLevel[Lfill - 1], toPx, cullR, colors.ink, 1 - fade);
+      if (byLevel[Lfill - 2]) strokeCells(ctx, byLevel[Lfill - 2], toPx, cullR, colors.ink, fade);
 
-      const shown = frac < 0.5 ? Lf : Lf - 1;
+      const shown = frac < 0.5 ? Lfill : Lfill - 1;
       if (shown !== levelRef.current) {
         levelRef.current = shown;
         setLevel(shown);
       }
     },
-    [byLevel, fitHalf, refreshColors],
+    [byLevel, refreshColors],
   );
 
   useEffect(() => {
@@ -209,46 +223,35 @@ export default function ZoomHierarchy() {
     return () => observer.disconnect();
   }, [refreshColors, render]);
 
-  const smallN = byLevel[level]?.length ?? 0;
-  const superN = level - 1 >= 1 ? byLevel[level - 1].length : 0;
-
   return (
     <Sketch
       label="sketch 09 · zoom the hierarchy"
-      animation={{ duration: 7000, render, slider: { label: "depth" } }}
+      animation={{ duration: 9000, render, slider: { label: "zoom out" } }}
     >
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "auto", aspectRatio: "1 / 1" }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch from the substitution engine, shown as an inflation that you scrub. At each step a filled pattern of rhombi has the genuine level-up tiling, the supertiles it composes into, drawn over it as bold ink outlines. Moving the slider dissolves the small tiles into those supertiles: the outlines fill in and become the new pattern, while the next level up appears in outline to take their place. The same two shapes recur at every scale, larger by the golden ratio each step, the tiling self-similar without end."
+        aria-label="A real Penrose patch from the substitution engine, shown as a true zoom-out. The camera starts deep inside the tiling on the finest tiles, with their level-up supertiles drawn over them as bold ink outlines. Zooming out, the supertile outlines shrink to the size the small tiles had and fill in, becoming the new tiles, while the next level up appears in outline to take their place. The same two shapes recur at every scale, larger by the golden ratio each step, the tiling self-similar without end."
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono">
           <span>
-            <span className="opacity-55">depth</span>{" "}
+            <span className="opacity-55">level</span>{" "}
             <span className="font-bold">{level}</span>
           </span>
           <span aria-live="polite">
-            <span className="opacity-55">small tiles</span>{" "}
-            <span className="font-bold">{smallN.toLocaleString()}</span>
-          </span>
-          <span>
-            <span className="opacity-55">supertiles</span>{" "}
-            <span className="font-bold">{superN.toLocaleString()}</span>
-          </span>
-          <span>
-            <span className="opacity-55">small ÷ super</span>{" "}
-            <span className="font-bold">{superN ? (smallN / superN).toFixed(3) : "—"}</span>
+            <span className="opacity-55">tiles per supertile</span>{" "}
+            <span className="font-bold">≈ {(PHI * PHI).toFixed(3)}</span>
           </span>
         </div>
         <p className="mt-2 opacity-70">
           The bold outlines are the real level-up tiles, the same two shapes φ ≈{" "}
-          {PHI.toFixed(3)} times larger. Each holds φ² ≈ {(PHI * PHI).toFixed(3)} times
-          as many small tiles a level down. Scrub the depth and watch a level dissolve
-          into the next: inflate or deflate forever and you stay on a valid Penrose
-          tiling, a copy of itself at every scale.
+          {PHI.toFixed(3)} times larger. Zoom out and they shrink into place and fill
+          in: each holds φ² ≈ {(PHI * PHI).toFixed(3)} of the tiles a level down.
+          Inflate or deflate forever and you stay on a valid Penrose tiling, a copy of
+          itself at every scale.
         </p>
       </div>
     </Sketch>
