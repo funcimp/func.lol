@@ -142,6 +142,13 @@ function paint(
     .filter((p) => p.accepted)
     .sort((a, b) => a.phys - b.phys);
 
+  // The 1D build wavefront: reveal points (and their drops and chain) outward along
+  // the line as t advances, in step with the plane building out below.
+  const maxAbsPhys = accepted.reduce((m, p) => Math.max(m, Math.abs(p.phys)), 1);
+  const revealPhys = t * (maxAbsPhys + 0.6);
+  const revealAlpha = (phys: number) =>
+    Math.max(0, Math.min(1, (revealPhys - Math.abs(phys)) / 0.6));
+
   // --- 2D lattice panel, clipped to its box ---------------------------------
   ctx.save();
   ctx.beginPath();
@@ -185,20 +192,24 @@ function paint(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Rejected lattice points: faint dots. Accepted handled below so they sit on top.
+  // Rejected lattice points: faint dots, revealed outward by the wavefront.
   for (const p of all) {
     if (p.accepted) continue;
+    const ap = revealAlpha(p.phys);
+    if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
     ctx.beginPath();
     ctx.arc(px, py, 2, 0, Math.PI * 2);
     ctx.fillStyle = ink;
-    ctx.globalAlpha = 0.22;
+    ctx.globalAlpha = 0.22 * ap;
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  // Accepted points: drop a perpendicular onto the line, then mark the point.
+  // Accepted points, revealed outward: drop a perpendicular onto the line, then mark.
   for (const p of accepted) {
+    const ap = revealAlpha(p.phys);
+    if (ap <= 0.01) continue;
     const foot = scale(physical(p.m, p.n), D);
     const [pxx, pyy] = fitD([p.m, p.n]);
     const [fxx, fyy] = fitD(foot);
@@ -207,12 +218,15 @@ function paint(
     ctx.lineTo(fxx, fyy);
     ctx.lineWidth = 1;
     ctx.strokeStyle = ink;
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = 0.4 * ap;
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
   for (const p of accepted) {
+    const ap = revealAlpha(p.phys);
+    if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
+    ctx.globalAlpha = ap;
     ctx.beginPath();
     ctx.arc(px, py, 3.4, 0, Math.PI * 2);
     ctx.fillStyle = ink;
@@ -223,6 +237,7 @@ function paint(
     ctx.strokeStyle = paper;
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 
   ctx.restore(); // end clip
 
@@ -237,8 +252,10 @@ function paint(
     const mid = (LONG + SHORT) / 2;
 
     // Faint connectors that "unroll" the tilted line into the flat chain: each
-    // accepted point's foot drops to its place on the bar.
+    // revealed point's foot drops to its place on the bar.
     for (const p of accepted) {
+      const ap = revealAlpha(p.phys);
+      if (ap <= 0.01) continue;
       const foot = scale(physical(p.m, p.n), D);
       const [, fy] = fitD(foot);
       const bx = barX(p.phys);
@@ -247,13 +264,16 @@ function paint(
       ctx.lineTo(bx, CHAIN_Y - CHAIN_H / 2 - 2);
       ctx.lineWidth = 1;
       ctx.strokeStyle = ink;
-      ctx.globalAlpha = 0.12;
+      ctx.globalAlpha = 0.12 * ap;
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    // The chain: a long/short bar per gap, colored like the two tiles.
+    // The chain: a long/short bar per gap, colored like the two tiles. A gap shows
+    // once both its endpoints have been revealed, so the chain builds out too.
     for (let i = 1; i < accepted.length; i++) {
+      if (Math.abs(accepted[i - 1].phys) > revealPhys) continue;
+      if (Math.abs(accepted[i].phys) > revealPhys) continue;
       const gap = accepted[i].phys - accepted[i - 1].phys;
       const isLong = gap > mid;
       const xa = barX(accepted[i - 1].phys);
@@ -261,15 +281,17 @@ function paint(
       ctx.fillStyle = isLong ? thick : thin;
       ctx.fillRect(xa, CHAIN_Y - CHAIN_H / 2, xb - xa - 1.5, CHAIN_H);
     }
-    // Ticks at each projected point.
+    // Ticks at each revealed point.
     for (const p of accepted) {
+      const ap = revealAlpha(p.phys);
+      if (ap <= 0.01) continue;
       const bx = barX(p.phys);
       ctx.beginPath();
       ctx.moveTo(bx, CHAIN_Y - CHAIN_H / 2 - 3);
       ctx.lineTo(bx, CHAIN_Y + CHAIN_H / 2 + 3);
       ctx.lineWidth = 1;
       ctx.strokeStyle = ink;
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.5 * ap;
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -454,7 +476,7 @@ export default function FibonacciStrip() {
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
       if (dpr !== dprRef.current) {
         dprRef.current = dpr;
         canvas.width = VB_W * dpr;
