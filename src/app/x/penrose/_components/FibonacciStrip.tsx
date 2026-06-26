@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
 import {
@@ -13,6 +13,12 @@ import {
   WINDOW_W,
   type LatPt,
 } from "./lib/fibonacci";
+import {
+  facesInViewport,
+  gammaFromWindowCenter,
+  WINDOW_CENTER,
+} from "../explore/lib/pentagrid";
+import type { RenderFace } from "../explore/lib/patch";
 
 // "Cut and project, where you can see it": the spine's section-6 lead-in. Before
 // the honest-but-abstract Z^5 panel (CutAndProject), show the same construction one
@@ -32,13 +38,14 @@ import {
 // the reduced-motion end state is a clean centered strip with its chain.
 
 const VB_W = 720;
-const VB_H = 440;
+const VB_H = 712;
 const PAD = 30;
 
-// The 2D lattice panel and the 1D chain bar below it.
-const TOP = { x: PAD, y: 30, w: VB_W - 2 * PAD, h: 264 };
-const CHAIN_Y = 372;
+// The 2D lattice panel, the 1D chain bar, and the real Penrose patch below them.
+const TOP = { x: PAD, y: 26, w: VB_W - 2 * PAD, h: 214 };
+const CHAIN_Y = 288;
 const CHAIN_H = 16;
+const PEN = { x: PAD, y: 350, w: VB_W - 2 * PAD, h: 330 };
 
 // How much of the lattice to show. The line of slope 1/phi runs across this box.
 const VIEW_M = 7;
@@ -48,6 +55,25 @@ const S_EXT = 16; // half-length of the drawn line/strip in data units (overshoo
 // The strip slides over ~1.4 cell widths as t goes 0 -> 1, so several points cross.
 const OFFSET_SPAN = WINDOW_W * 1.4;
 const OFFSET0 = 0.05; // representative offset at t = 1 (near-centered, clean chain)
+
+// The Penrose patch: the same cut-and-project, one stage up (5D -> 2D). Its window
+// center slides with the same slider, so moving the window gives different tiles. We
+// precompute a strip of patches at sampled window centers and show the matching one.
+const PEN_PX = 8.5; // physical half-width shown
+const PEN_PY = (PEN_PX * PEN.h) / PEN.w; // matched to the panel aspect
+const PEN_SCALE = Math.min(PEN.w / (2 * PEN_PX), PEN.h / (2 * PEN_PY));
+const PEN_VIEW = {
+  minX: -PEN_PX - 0.8,
+  maxX: PEN_PX + 0.8,
+  minY: -PEN_PY - 0.8,
+  maxY: PEN_PY + 0.8,
+};
+const SAMPLES = 48;
+const WINDOW_RANGE = 0.34; // how far the 2D window center slides, internal units
+const penToPx = ([x, y]: V2): [number, number] => [
+  PEN.x + PEN.w / 2 + x * PEN_SCALE,
+  PEN.y + PEN.h / 2 - y * PEN_SCALE,
+];
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -93,7 +119,12 @@ function caption(
   ctx.restore();
 }
 
-function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
+function paint(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  colors: Colors,
+  patches: RenderFace[][],
+) {
   const { thick, thin, paper, ink } = colors;
   const offset = OFFSET0 + (t - 1) * OFFSET_SPAN; // t = 1 -> OFFSET0 (representative)
   const gamma = offset - WINDOW_W / 2; // center the window on the line
@@ -267,9 +298,56 @@ function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
     ctx,
     "points inside the strip drop onto the line",
     VB_W / 2,
-    TOP.y + TOP.h + 18,
+    TOP.y + TOP.h + 16,
     ink,
     0.7,
+  );
+
+  // --- The real Penrose tiling the same window gives, one stage up -----------
+  // The cut-and-project window slides with the same slider; in 2D the window is a
+  // pentagon, not a strip, and moving it gives a different (locally identical) Penrose
+  // tiling. We draw the precomputed patch for the current window offset.
+  caption(
+    ctx,
+    "THE SAME WINDOW, ONE STAGE UP · 5D → 2D · REAL PENROSE TILES",
+    PEN.x,
+    PEN.y - 14,
+    ink,
+    0.55,
+    "left",
+  );
+  const idx = Math.min(SAMPLES - 1, Math.max(0, Math.round(t * (SAMPLES - 1))));
+  const patch = patches[idx];
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PEN.x, PEN.y, PEN.w, PEN.h);
+  ctx.clip();
+  ctx.lineJoin = "round";
+  for (const f of patch) {
+    ctx.beginPath();
+    f.corners.forEach((c, i) => {
+      const [px, py] = penToPx([c[0], c[1]]);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = f.type === "thick" ? thick : thin;
+    ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  caption(
+    ctx,
+    "slide the strip and the window slides too: it picks which tiles appear",
+    VB_W / 2,
+    PEN.y + PEN.h + 18,
+    ink,
+    0.72,
   );
 }
 
@@ -282,6 +360,19 @@ export default function FibonacciStrip() {
     ink: "#ede9d8",
   });
   const dprRef = useRef(0);
+
+  // Precompute the Penrose patch at each sampled window offset, so sliding just picks
+  // the matching one (no per-frame enumeration). The window center slides along the
+  // internal axis, the same offset the 1D strip slides.
+  const patches = useMemo<RenderFace[][]>(() => {
+    const out: RenderFace[][] = [];
+    for (let i = 0; i < SAMPLES; i++) {
+      const vx = WINDOW_CENTER[0] + (i / (SAMPLES - 1) - 0.5) * 2 * WINDOW_RANGE;
+      const vy = WINDOW_CENTER[1];
+      out.push(facesInViewport(PEN_VIEW, gammaFromWindowCenter(vx, vy)));
+    }
+    return out;
+  }, []);
 
   const refreshColors = useCallback(() => {
     colorsRef.current = {
@@ -306,9 +397,9 @@ export default function FibonacciStrip() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      paint(ctx, t, colorsRef.current);
+      paint(ctx, t, colorsRef.current, patches);
     },
-    [refreshColors],
+    [refreshColors, patches],
   );
 
   useEffect(() => {
@@ -343,7 +434,7 @@ export default function FibonacciStrip() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. The ${accepted} lattice points inside the strip each drop a perpendicular onto the line; those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. Cut is the strip, project is the drop-line. Sliding the strip lets points enter and leave and reshuffles the chain, but the two lengths never change. This is the same construction the explorer runs from five dimensions down to two.`}
+        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. The ${accepted} lattice points inside the strip each drop a perpendicular onto the line; those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. Cut is the strip, project is the drop-line. Below that is a real two-dimensional Penrose tiling produced by the same cut and project one stage up, from five dimensions to two, where the window is a pentagon instead of a strip. Sliding the strip slides that window too, and it picks which Penrose tiles appear, so you can see the window selecting the tiles on the grid.`}
       />
     </Sketch>
   );

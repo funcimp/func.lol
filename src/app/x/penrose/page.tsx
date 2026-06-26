@@ -208,13 +208,14 @@ export default function PenrosePage() {
             two lengths are already a hint of the two tiles to come.
           </p>
           <p>
-            Penrose is this same construction one stage up. The grid is the
-            integer lattice ℤ⁵, five dimensions. The line becomes our plane, and
-            the strip becomes a window shaped like four nested pentagons. A tile
-            exists exactly when its 5D shadow lands in that window, a test you run
-            on one point alone, with no walking out from an origin and no
-            backtracking. The plane is <em>computed</em>, never assembled, so it
-            can never dead-end. This is what the explorer runs.
+            Penrose is this same construction one stage up, and the panel at the
+            foot of the sketch shows it running. The grid is the integer lattice
+            ℤ⁵, five dimensions. The line becomes our plane, and the strip becomes
+            a window shaped like nested pentagons. A tile exists exactly when its
+            5D shadow lands in that window, a test you run on one point alone, with
+            no backtracking. Slide the strip and the window slides too, picking
+            which real Penrose tiles appear: the plane is <em>computed</em>, never
+            assembled, so it can never dead-end. This is what the explorer runs.
           </p>
         </div>
 
