@@ -23,15 +23,15 @@ import { buildOverlay, type Overlay, type Pt } from "./lib/overlay";
 
 const VB = 560;
 const MARGIN = 10;
-// Zoomed way out over a large generated plane, so the five-fold interference reads at
-// scale and dragging never runs out of tiling.
-const VIEW_HALF = 28;
-const GEN_HALF = 52;
+// Zoomed far out over a large generated plane, so the five-fold interference rosettes
+// read at scale and dragging never runs out of tiling.
+const VIEW_HALF = 42;
+const GEN_HALF = 75;
 const CULL_R = VIEW_HALF + 2; // draw only tiles whose centroid is within the frame
 // The tilings carry five-fold symmetry, so a full spin just repeats; one fifth of a
 // turn is the whole story. The slider turns the top layer across [0, 72 deg].
 const TURN_MAX = (2 * Math.PI) / 5;
-const OFFSET_MAX = 16; // how far the top layer may be dragged, in tile-edge units
+const OFFSET_MAX = 12; // how far the top layer may be dragged, in tile-edge units
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -154,8 +154,8 @@ export default function InterferenceOverlay() {
     ctx.fillStyle = paper;
     ctx.fillRect(0, 0, VB, VB);
 
-    // BOTTOM layer: the fixed tiling, ink line work.
-    strokeFaces(ctx, bottomVisible, null, ink, 0.6, 0.5);
+    // BOTTOM layer: the fixed tiling, faint thin ink, so the top reads crisply over it.
+    strokeFaces(ctx, bottomVisible, null, ink, 0.5, 0.3);
 
     // TOP layer: the same tiling, spun and slid, in translucent accent. Cull by the
     // transformed centroid so only what lands in the frame is drawn.
@@ -164,7 +164,7 @@ export default function InterferenceOverlay() {
       const cy = f.centroid[0] * sin + f.centroid[1] * cos + oy;
       return Math.abs(cx) <= CULL_R && Math.abs(cy) <= CULL_R;
     });
-    strokeFaces(ctx, topVisible, xf, thick, 0.7, 0.62);
+    strokeFaces(ctx, topVisible, xf, thick, 0.7, 0.85);
 
     caption(ctx, "drag to slide the top layer · turn it up to a fifth", VB / 2, VB - 14, ink, 0.7);
   }, [overlay, bottomVisible, refreshColors]);
