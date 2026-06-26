@@ -5,37 +5,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Sketch from "./Sketch";
 import { PHI, rhombiAt, type Pt, type Rhombus } from "./lib/scaling";
 
-// "Zoom the hierarchy": the spine's section-9 sketch two, a deflation zoom-in. The
-// camera dives into one fixed deflated patch. The fade choreography the maintainer
-// asked for, per step:
-//   - colored tiles with their white supertile overlay
-//   - the colors fade and the larger white overlay fades; the tiles themselves turn
-//     into white outlines with nothing behind
-//   - then finer colored tiles fade in underneath, and the cycle repeats one level
-//     deeper.
-// Each tile becomes the boundary of the finer tiles inside it: self-similarity made
-// continuous, dived through five levels.
+// "Zoom the hierarchy": the spine's section-9 sketch two, a deflation zoom-in drawn
+// as NESTED LINE GRIDS in alternating colours. Each deflation level is the tiling's
+// edges drawn in one colour; consecutive levels alternate gold and blue, so as the
+// camera dives the nesting stays legible: a gold grid with a finer blue grid inside
+// it, then blue prominent with a finer gold grid inside, level after level. The
+// current level is brightest, its coarser and finer neighbours fainter, with a gentle
+// crossfade as the camera passes each phi-step (no heavy fade to lose the nesting in).
 //
 // HONEST BY CONSTRUCTION. deflate(L) is subdivide(deflate(L-1)); every level is real
-// engine output (lib/scaling.ts and its test), so the white outline of one level is
-// exactly the colored tiles of the level above. The zoom is a true camera scale; the
-// level of detail crossfades as it crosses each phi-step, hidden by the dissolve. The
-// camera stays well inside the wheel's rim, and tiles are culled by centroid so only
-// the visible patch draws. (The geometry is finite: level 10 is already ~55k tiles, so
-// the descent spans five real levels rather than literally sixteen.)
+// engine output (lib/scaling.ts and its test), so the finer grid inside a tile is
+// exactly that tile's subdivision. The zoom is a true camera scale; the camera stays
+// inside the wheel's rim, and tiles are culled by centroid so only the visible patch
+// draws. (The geometry is finite: level 10 is already ~55k tiles, so the dive spans
+// five real levels.)
 //
-// Canvas: the harness drives render(t); t = 1 is the deepest zoom on the finest level
-// (the rich reduced-motion frame); lowering t zooms back out.
+// Canvas: the harness drives render(t); t = 1 is the deepest zoom on the finest level;
+// lowering t zooms back out.
 
 const VB = 480;
 
-// Levels drawn. The colored level walks MIN_C..MIN_C+STEPS as the camera zooms in;
-// the white overlay is one level coarser, the finer tiles one level finer.
+// Levels drawn. The current level walks MIN_C..MIN_C+STEPS as the camera zooms in.
 const MIN_C = 5;
-const STEPS = 4; // colored 5 -> 9 across the zoom
-const LO_LEVEL = MIN_C - 1; // 4 (coarsest white overlay)
-const HI_LEVEL = MIN_C + STEPS + 1; // 10 (finest tiles that fade in)
-const FILL = 0.8;
+const STEPS = 4;
+const LO_LEVEL = MIN_C - 1; // 4
+const HI_LEVEL = MIN_C + STEPS + 1; // 10
+const PROM = 1.5; // how many levels each side stay visible around the current one
 
 // The camera dives toward VIEW_C, off the central five-fold star, staying inside the
 // unit-radius wheel. RHO_START is the view radius at the coarsest level; it shrinks by
@@ -50,12 +45,7 @@ function readVar(name: string, fallback: string): string {
 }
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
-type Cell = { kind: "thick" | "thin"; corners: readonly Pt[]; cx: number; cy: number };
-
-const smooth = (e0: number, e1: number, x: number): number => {
-  const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
-  return u * u * (3 - 2 * u);
-};
+type Cell = { corners: readonly Pt[]; cx: number; cy: number };
 
 function cellsAt(level: number): Cell[] {
   return rhombiAt(level).map((r: Rhombus) => {
@@ -65,58 +55,30 @@ function cellsAt(level: number): Cell[] {
       cx += x;
       cy += y;
     }
-    return { kind: r.kind, corners: r.corners, cx: cx / 4, cy: cy / 4 };
+    return { corners: r.corners, cx: cx / 4, cy: cy / 4 };
   });
 }
 
 type ToPx = (p: Pt) => [number, number];
 
-function fillCells(
-  ctx: CanvasRenderingContext2D,
-  cells: Cell[],
-  toPx: ToPx,
-  cullR: number,
-  colors: Colors,
-  alpha: number,
-) {
-  if (alpha <= 0.01) return;
-  const { thick, thin, ink } = colors;
-  ctx.save();
-  ctx.lineJoin = "round";
-  for (const r of cells) {
-    if (Math.hypot(r.cx - VIEW_C[0], r.cy - VIEW_C[1]) > cullR) continue;
-    ctx.beginPath();
-    const [x0, y0] = toPx(r.corners[0]);
-    ctx.moveTo(x0, y0);
-    for (let i = 1; i < 4; i++) {
-      const [x, y] = toPx(r.corners[i]);
-      ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = r.kind === "thick" ? thick : thin;
-    ctx.fill();
-    ctx.globalAlpha = alpha * 0.5;
-    ctx.lineWidth = 0.6;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-  }
-  ctx.restore();
-}
+// Even levels gold, odd levels blue, so consecutive (nested) levels always contrast.
+const colorForLevel = (level: number, colors: Colors) =>
+  level % 2 === 0 ? colors.thick : colors.thin;
 
-function strokeCells(
+function strokeLevel(
   ctx: CanvasRenderingContext2D,
   cells: Cell[],
   toPx: ToPx,
   cullR: number,
-  ink: string,
+  color: string,
+  width: number,
   alpha: number,
 ) {
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
   ctx.lineJoin = "round";
   ctx.beginPath();
   for (const r of cells) {
@@ -180,15 +142,9 @@ export default function ZoomHierarchy() {
 
       // t = 1: deepest zoom on the finest level. Lowering t zooms out one step at a time.
       const u = t * STEPS;
-      const Lc = MIN_C + Math.floor(u); // the colored level
-      const frac = u - Math.floor(u);
-      // Stage the fade: first the colors and larger overlay go and the tiles become a
-      // white outline (nothing behind); then the finer tiles fade in underneath.
-      const fadeA = smooth(0, 0.45, frac);
-      const fadeB = smooth(0.45, 0.9, frac);
-
+      const ideal = MIN_C + u; // the continuous "current" level
       const rho = RHO_START * Math.pow(PHI, -u);
-      const c = (VB / 2) / rho;
+      const c = VB / 2 / rho;
       const toPx: ToPx = (p) => [
         VB / 2 + (p[0] - VIEW_C[0]) * c,
         VB / 2 - (p[1] - VIEW_C[1]) * c,
@@ -200,16 +156,26 @@ export default function ZoomHierarchy() {
       ctx.fillStyle = colors.paper;
       ctx.fillRect(0, 0, VB, VB);
 
-      // finer colored tiles, fading in underneath
-      if (byLevel[Lc + 1]) fillCells(ctx, byLevel[Lc + 1], toPx, cullR, colors, FILL * fadeB);
-      // current colored tiles, fading out
-      fillCells(ctx, byLevel[Lc], toPx, cullR, colors, FILL * (1 - fadeA));
-      // the larger white overlay (supertiles), fading out
-      if (byLevel[Lc - 1]) strokeCells(ctx, byLevel[Lc - 1], toPx, cullR, colors.ink, 1 - fadeA);
-      // the current tiles becoming white outlines
-      strokeCells(ctx, byLevel[Lc], toPx, cullR, colors.ink, fadeA);
+      // Draw each nearby level as a line grid, coarse to fine, in its alternating
+      // colour. Prominence is a smooth triangle window around the current level, so
+      // grids rise and fall as the camera dives, with no pop and no level lost to fade.
+      const lo = Math.max(LO_LEVEL, Math.ceil(ideal - PROM));
+      const hi = Math.min(HI_LEVEL, Math.floor(ideal + PROM));
+      for (let L = lo; L <= hi; L++) {
+        const prom = Math.max(0, 1 - Math.abs(L - ideal) / PROM);
+        if (prom <= 0.01) continue;
+        strokeLevel(
+          ctx,
+          byLevel[L],
+          toPx,
+          cullR,
+          colorForLevel(L, colors),
+          0.8 + prom * 1.4,
+          0.25 + prom * 0.7,
+        );
+      }
 
-      const shown = fadeB < 0.5 ? Lc : Lc + 1;
+      const shown = Math.round(ideal);
       if (shown !== levelRef.current) {
         levelRef.current = shown;
         setLevel(shown);
@@ -240,7 +206,7 @@ export default function ZoomHierarchy() {
         style={{ width: "100%", height: "auto", aspectRatio: "1 / 1" }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch from the substitution engine, shown as a deflation zoom-in. Colored tiles carry a white outline of their supertiles. Zooming in, the colors fade and the larger white overlay fades, the tiles themselves become white outlines with nothing behind, and finer colored tiles fade in underneath, each tile becoming the boundary of the finer tiles inside it. The same two shapes recur at every scale, smaller by the golden ratio each step, the tiling self-similar as the camera dives through five levels."
+        aria-label="A real Penrose patch from the substitution engine, shown as a deflation zoom-in drawn as nested line grids. Each deflation level is the tiling's edges in one colour, and consecutive levels alternate gold and blue, so the nesting stays clear: a gold grid with a finer blue grid inside it, then blue prominent with a finer gold grid inside, level after level. Zooming in dives through five levels; each tile is subdivided into the same two shapes 1/phi the size. The current level is brightest, its neighbours fainter, the tiling self-similar at every scale."
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono">
@@ -248,16 +214,21 @@ export default function ZoomHierarchy() {
             <span className="opacity-55">level</span>{" "}
             <span className="font-bold">{level}</span>
           </span>
+          <span>
+            <span className="opacity-55">each level</span>{" "}
+            <span className="font-bold">alternates gold / blue</span>
+          </span>
           <span aria-live="polite">
             <span className="opacity-55">tiles per supertile</span>{" "}
             <span className="font-bold">≈ {(PHI * PHI).toFixed(3)}</span>
           </span>
         </div>
         <p className="mt-2 opacity-70">
-          Each tile becomes the outline of the finer tiles inside it, the same two
-          shapes 1/φ ≈ {(1 / PHI).toFixed(3)} the size. Every supertile holds φ² ≈{" "}
-          {(PHI * PHI).toFixed(3)} of them. Inflate or deflate forever and you stay on
-          a valid Penrose tiling, a copy of itself at every scale.
+          Each grid is one deflation level, the next 1/φ ≈ {(1 / PHI).toFixed(3)} the
+          size nested inside it, drawn in the opposite colour so the layers stay
+          distinct. Every supertile holds φ² ≈ {(PHI * PHI).toFixed(3)} of the tiles a
+          level down. Inflate or deflate forever and you stay on a valid Penrose
+          tiling, a copy of itself at every scale.
         </p>
       </div>
     </Sketch>

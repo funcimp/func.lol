@@ -308,11 +308,10 @@ export default function PenrosePage() {
           <p>
             The reason is the same self-similarity, seen the other way. Those
             smaller tiles are not just finer, they group back into larger tiles of
-            the very same two shapes. Below, the filled rhombi are a real deflated
-            patch and the white outlines are the supertiles they compose into, the
-            same two shapes scaled by φ. Zoom in and each tile becomes the outline
-            of finer tiles that fade in underneath, the same two shapes 1/φ the
-            size, diving level after level.
+            the very same two shapes. Below, each deflation level is drawn as a line
+            grid in its own colour, gold and blue alternating so neighbouring levels
+            stay distinct. Zoom in and a finer grid nests inside every tile, the
+            same two shapes 1/φ the size, diving level after level.
           </p>
           <p>
             Inflate or deflate as far as you like and you always land on another
