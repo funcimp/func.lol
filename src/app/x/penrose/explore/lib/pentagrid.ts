@@ -97,6 +97,105 @@ export function tileExists(coord: readonly number[], j: number, k: number): bool
   return corners4(coord, j, k).every((c) => inWindow(c, WINDOW_CENTER[0], WINDOW_CENTER[1]));
 }
 
+// ---------------------------------------------------------------------------
+// The pentagrid view, for the teaching sketch. Same construction as
+// facesInViewport, but it also returns the five families of grid lines (in
+// grid space) and tags each crossing with the tile it becomes. de Bruijn:
+// a crossing of families j,k IS the rhombus [K; j,k]. This is the real
+// bijection, not an analogy, so a sketch can draw a line from any crossing to
+// its tile and be telling the truth.
+// ---------------------------------------------------------------------------
+
+export type GridLine = { l: number; m: number; a: Pt; b: Pt }; // segment in grid space
+export type GridCrossing = { z: Pt; j: number; k: number; face: RenderFace };
+export type PentagridView = {
+  zRegion: Rect;
+  lines: GridLine[];
+  crossings: GridCrossing[];
+};
+
+// Clip the grid line z·(PCOS[l],PSIN[l]) = c to a rect; null if it misses.
+function clipGridLine(l: number, c: number, rect: Rect): [Pt, Pt] | null {
+  const nx = PCOS[l], ny = PSIN[l];
+  const z0x = c * nx, z0y = c * ny; // closest point on the line to the origin
+  const dx = -ny, dy = nx; // along the line
+  let sLo = -Infinity, sHi = Infinity;
+  if (Math.abs(dx) > 1e-12) {
+    const s1 = (rect.minX - z0x) / dx, s2 = (rect.maxX - z0x) / dx;
+    sLo = Math.max(sLo, Math.min(s1, s2));
+    sHi = Math.min(sHi, Math.max(s1, s2));
+  } else if (z0x < rect.minX || z0x > rect.maxX) return null;
+  if (Math.abs(dy) > 1e-12) {
+    const s1 = (rect.minY - z0y) / dy, s2 = (rect.maxY - z0y) / dy;
+    sLo = Math.max(sLo, Math.min(s1, s2));
+    sHi = Math.min(sHi, Math.max(s1, s2));
+  } else if (z0y < rect.minY || z0y > rect.maxY) return null;
+  if (sLo > sHi) return null;
+  return [
+    [z0x + sLo * dx, z0y + sLo * dy],
+    [z0x + sHi * dx, z0y + sHi * dy],
+  ];
+}
+
+export function pentagridView(view: Rect, gamma: readonly number[]): PentagridView {
+  const [pgx, pgy] = physicalGamma(gamma);
+  const zx0 = (2 / 5) * (view.minX - pgx), zx1 = (2 / 5) * (view.maxX - pgx);
+  const zy0 = (2 / 5) * (view.minY - pgy), zy1 = (2 / 5) * (view.maxY - pgy);
+  const zRegion: Rect = {
+    minX: Math.min(zx0, zx1) - GRID_MARGIN, maxX: Math.max(zx0, zx1) + GRID_MARGIN,
+    minY: Math.min(zy0, zy1) - GRID_MARGIN, maxY: Math.max(zy0, zy1) + GRID_MARGIN,
+  };
+
+  const ranges: [number, number][] = [];
+  for (let l = 0; l < 5; l++) ranges.push(lineRange(zRegion, l, gamma));
+
+  const lines: GridLine[] = [];
+  for (let l = 0; l < 5; l++) {
+    const [lo, hi] = ranges[l];
+    for (let m = lo; m <= hi; m++) {
+      const seg = clipGridLine(l, m - gamma[l], zRegion);
+      if (seg) lines.push({ l, m, a: seg[0], b: seg[1] });
+    }
+  }
+
+  const crossings: GridCrossing[] = [];
+  const seen = new Set<string>();
+  for (let j = 0; j < 5; j++) {
+    for (let k = j + 1; k < 5; k++) {
+      const [mjLo, mjHi] = ranges[j];
+      const [mkLo, mkHi] = ranges[k];
+      for (let mj = mjLo; mj <= mjHi; mj++) {
+        for (let mk = mkLo; mk <= mkHi; mk++) {
+          const [x, y] = solveCrossing(j, k, mj - gamma[j], mk - gamma[k]);
+          if (x < zRegion.minX || x > zRegion.maxX || y < zRegion.minY || y > zRegion.maxY) continue;
+          const eps = 1e-7;
+          const nx = x + eps * PCOS[j] + eps * PCOS[k];
+          const ny = y + eps * PSIN[j] + eps * PSIN[k];
+          const K = new Array(5) as number[];
+          for (let l = 0; l < 5; l++) K[l] = Math.ceil(fl(nx, ny, l) + gamma[l]);
+          K[j] = mj; K[k] = mk;
+          const [p0, p1, p2, p3] = corners4(K, j, k).map(physical);
+          const key = faceKey(K, j, k);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          crossings.push({
+            z: [x, y],
+            j,
+            k,
+            face: {
+              key, coord: K, j, k,
+              type: rhombusType(j, k),
+              corners: [p0, p1, p2, p3],
+              centroid: centroid([p0, p1, p2, p3]),
+            },
+          });
+        }
+      }
+    }
+  }
+  return { zRegion, lines, crossings };
+}
+
 export function facesInViewport(view: Rect, gamma: readonly number[], physicalMargin = 1.5): RenderFace[] {
   const out: RenderFace[] = [];
   const seen = new Set<string>();

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { generate, physical } from "./cap";
+import { generate, physical, PCOS, PSIN } from "./cap";
 import { extractFaces } from "./faces";
-import { facesInViewport, gammaFromWindowCenter, GAMMA, tileCentroid, tileExists, WINDOW_CENTER, type Rect } from "./pentagrid";
+import { facesInViewport, gammaFromWindowCenter, GAMMA, pentagridView, tileCentroid, tileExists, WINDOW_CENTER, type Rect } from "./pentagrid";
 
 // Oracle: the tested cut-and-project generate(), as faces, for the same tiling.
 // generate() yields Vertex{n,p}; extractFaces wants LiftedVertex{pos,coord}.
@@ -125,6 +125,40 @@ describe("tileExists validates a shared address against the real tiling", () => 
   test("a fabricated address names empty space, so tileExists is false", () => {
     // shape-valid (decodeTile would accept it) but no such tile exists
     expect(tileExists([7, 7, 7, 7, 7], 0, 1)).toBe(false);
+  });
+});
+
+describe("pentagridView: every crossing is a real tile (de Bruijn bijection)", () => {
+  const fl = (x: number, y: number, l: number) => x * PCOS[l] + y * PSIN[l];
+  const views: Rect[] = [
+    { minX: -6, minY: -6, maxX: 6, maxY: 6 },
+    { minX: 8, minY: 3, maxX: 14, maxY: 9 },
+  ];
+  for (const view of views) {
+    test(`view (${view.minX},${view.minY})-(${view.maxX},${view.maxY})`, () => {
+      const pv = pentagridView(view, GAMMA);
+      expect(pv.lines.length).toBeGreaterThan(10);
+      expect(pv.crossings.length).toBeGreaterThan(50);
+
+      for (const c of pv.crossings) {
+        // the crossing z lies on both of its grid lines: f_l(z) + gamma_l = K_l
+        expect(fl(c.z[0], c.z[1], c.j) + GAMMA[c.j]).toBeCloseTo(c.face.coord[c.j], 9);
+        expect(fl(c.z[0], c.z[1], c.k) + GAMMA[c.k]).toBeCloseTo(c.face.coord[c.k], 9);
+        // and the tile it names actually exists in the plane
+        expect(tileExists(c.face.coord, c.j, c.k)).toBe(true);
+      }
+
+      // keys are unique: one crossing per tile
+      expect(new Set(pv.crossings.map((c) => c.face.key)).size).toBe(pv.crossings.length);
+    });
+  }
+
+  test("every facesInViewport tile appears as a crossing", () => {
+    const view: Rect = { minX: -4, minY: -4, maxX: 4, maxY: 4 };
+    const faces = facesInViewport(view, GAMMA);
+    const keys = new Set(pentagridView(view, GAMMA).crossings.map((c) => c.face.key));
+    expect(faces.length).toBeGreaterThan(20);
+    expect(faces.filter((f) => !keys.has(f.key))).toEqual([]);
   });
 });
 

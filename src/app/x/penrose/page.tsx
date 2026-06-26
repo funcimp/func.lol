@@ -10,6 +10,7 @@ import FibonacciStrip from "./_components/FibonacciStrip";
 import GoldenRatio from "./_components/GoldenRatio";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
+import PentaGrid from "./_components/PentaGrid";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
 import ZoomHierarchy from "./_components/ZoomHierarchy";
@@ -226,6 +227,40 @@ export default function PenrosePage() {
             The dead-ends came from deciding locally. Here every tile is decided
             by where its 5D shadow falls, a test that never traps you, and that
             same coordinate is the address the explorer reads under your cursor.
+          </p>
+        </div>
+
+        {/* 6b. The dual view: de Bruijn's pentagrid draws the tiles. */}
+        <h2 className={H2}>The tiles fall out of a grid of lines</h2>
+        <div className={PROSE}>
+          <p>
+            Cut and project tests one point at a time. There is a second way to
+            see the same tiling, and it draws the whole thing at once. Take five
+            families of evenly spaced parallel lines, one family running in each
+            of the five pentagon directions. Lay them over each other and they
+            cross everywhere. de Bruijn proved that every crossing is one tile.
+            Where two families meet at a shallow angle you get a fat rhombus,
+            where they meet at a steep angle you get a thin one.
+          </p>
+          <p>
+            This is the same five dimensions, seen from the other side. Each
+            crossing is one square face of the 5D cube lattice, and the rhombus
+            on the plane is the shadow of that face. The tiles fall straight out of the
+            grid. On the left below are the five line families and their crossings.
+            On the right is the tiling, exactly one rhombus per crossing, with a
+            line drawn from one crossing to the tile it becomes.
+          </p>
+        </div>
+
+        <PentaGrid />
+
+        <div className={PROSE}>
+          <p>
+            Nothing is placed by hand. Every crossing in view becomes a tile, and
+            every tile is some crossing, so the grid and the tiling carry the same
+            information. Cut and project and the pentagrid are two faces of one
+            construction: project the lattice points that land in the window, or
+            read off the crossings of its shadow. Both compute the same plane.
           </p>
         </div>
 
