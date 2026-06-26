@@ -23,13 +23,15 @@ import { buildOverlay, type Overlay, type Pt } from "./lib/overlay";
 
 const VB = 560;
 const MARGIN = 10;
-// Zoomed out: a tighter window over a large generated plane, so rosettes read at
+// Zoomed way out over a large generated plane, so the five-fold interference reads at
 // scale and dragging never runs out of tiling.
-const VIEW_HALF = 22;
-const GEN_HALF = 48;
+const VIEW_HALF = 28;
+const GEN_HALF = 52;
 const CULL_R = VIEW_HALF + 2; // draw only tiles whose centroid is within the frame
-const PHASE0 = 0.05 * Math.PI * 2; // ~18 deg: the resting rosette (reduced-motion frame)
-const OFFSET_MAX = 18; // how far the top layer may be dragged, in tile-edge units
+// The tilings carry five-fold symmetry, so a full spin just repeats; one fifth of a
+// turn is the whole story. The slider turns the top layer across [0, 72 deg].
+const TURN_MAX = (2 * Math.PI) / 5;
+const OFFSET_MAX = 16; // how far the top layer may be dragged, in tile-edge units
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -116,7 +118,7 @@ export default function InterferenceOverlay() {
     [overlay],
   );
 
-  const twistRef = useRef(PHASE0); // mount at the resting rosette (t = 1)
+  const twistRef = useRef(TURN_MAX); // mount at a fifth-turn (t = 1), full interference
   const offsetRef = useRef<Pt>([0, 0]);
 
   const refreshColors = useCallback(() => {
@@ -164,12 +166,12 @@ export default function InterferenceOverlay() {
     });
     strokeFaces(ctx, topVisible, xf, thick, 0.7, 0.62);
 
-    caption(ctx, "drag to slide the top layer · spin to turn it", VB / 2, VB - 14, ink, 0.7);
+    caption(ctx, "drag to slide the top layer · turn it up to a fifth", VB / 2, VB - 14, ink, 0.7);
   }, [overlay, bottomVisible, refreshColors]);
 
   const render = useCallback(
     (t: number) => {
-      twistRef.current = t * Math.PI * 2 + PHASE0;
+      twistRef.current = t * TURN_MAX;
       repaint();
     },
     [repaint],
@@ -223,8 +225,8 @@ export default function InterferenceOverlay() {
 
   return (
     <Sketch
-      label="sketch 06 · two tilings, one spun over the other"
-      animation={{ duration: 16000, render, loop: true, slider: { label: "spin" } }}
+      label="sketch 06 · two tilings, one turned over the other"
+      animation={{ duration: 7000, render, slider: { label: "turn" } }}
     >
       <canvas
         ref={canvasRef}
@@ -241,7 +243,7 @@ export default function InterferenceOverlay() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="Two real Penrose tilings drawn as line work and overlaid over a large plane that runs off screen, zoomed out. The bottom layer is ink; the same tiling is drawn over it in a translucent accent. The spin control turns the top layer a full circle, and dragging slides it. Where the two tilings disagree, the mismatch organizes into five-fold rosettes that bloom and drift as the top layer turns and moves. Broad regions still agree while veins of mismatch run between them, all carrying the five-fold symmetry. The two share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
+        aria-label="Two real Penrose tilings drawn as line work and overlaid over a large plane that runs off screen, zoomed far out. The bottom layer is ink; the same tiling is drawn over it in a translucent accent. The turn control rotates the top layer across one fifth of a turn, the fundamental range for a five-fold tiling, and dragging slides it. Where the two tilings disagree, the mismatch organizes into five-fold rosettes that bloom and drift as the top layer turns and moves. Broad regions still agree while veins of mismatch run between them, all carrying the five-fold symmetry. The two share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
       />
     </Sketch>
   );
