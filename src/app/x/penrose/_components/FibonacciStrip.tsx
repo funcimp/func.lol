@@ -142,10 +142,13 @@ function paint(
     .filter((p) => p.accepted)
     .sort((a, b) => a.phys - b.phys);
 
-  // The 1D build wavefront: reveal points (and their drops and chain) outward along
-  // the line as t advances, in step with the plane building out below.
+  // The build wavefront. sqrt(t) so the count grows evenly (the area, and so the tile
+  // count, scales with the radius squared; a linear radius would dump most of it at
+  // the end and read as a jump). The same fraction drives the plane below, so the 1D
+  // and 2D wavefronts reach out together.
+  const wf = Math.sqrt(Math.max(0, t));
   const maxAbsPhys = accepted.reduce((m, p) => Math.max(m, Math.abs(p.phys)), 1);
-  const revealPhys = t * (maxAbsPhys + 0.6);
+  const revealPhys = wf * (maxAbsPhys + 0.6);
   const revealAlpha = (phys: number) =>
     Math.max(0, Math.min(1, (revealPhys - Math.abs(phys)) / 0.6));
 
@@ -328,7 +331,7 @@ function paint(
     0.55,
     "left",
   );
-  const revealR = t * REVEAL_MAX;
+  const revealR = wf * REVEAL_MAX;
   ctx.save();
   ctx.beginPath();
   ctx.rect(PEN.x, PEN.y, PEN.w, PEN.h);
@@ -395,7 +398,7 @@ function paint(
         if (d < bestL) { bestL = d; longX = segX; }
       } else if (d < bestS) { bestS = d; shortX = segX; }
     }
-    const revealR = t * REVEAL_MAX;
+    const revealR = wf * REVEAL_MAX;
     let fat: V2 | null = null;
     let thn: V2 | null = null;
     let bestFat = Infinity;
