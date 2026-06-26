@@ -215,8 +215,8 @@ export default function PenrosePage() {
             5D shadow lands in that window, a test you run on one point alone, with
             no backtracking. Each tile is decided on its own, so the plane is{" "}
             <em>computed</em>, never assembled, and it can never dead-end. Scan the
-            strip across the grid below and the line and the plane fill in step. This
-            is what the explorer runs.
+            strip across the grid below: the line fills as it crosses points, and the
+            plane is computed outward from its centre. This is what the explorer runs.
           </p>
         </div>
 
