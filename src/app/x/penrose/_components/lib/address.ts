@@ -45,11 +45,17 @@ export function walkExtent(coord: readonly number[]): number {
 }
 
 const nonzero = (c: readonly number[]) => c.filter((n) => n !== 0).length;
+const stepCount = (c: readonly number[]) =>
+  c.reduce((a, n) => a + Math.abs(n), 0);
 
-// Deterministic representative: a real accepted tile whose address uses four of the
-// five directions (rich enough to show, bounded enough to stay on screen) with the
-// shortest walk; tie-break to the lexicographically greatest coord so positive steps
-// lead. Bound to buildPatch, so it is a genuine tile of the real tiling.
+// How far the walk may stray and still sit inside the drawn patch.
+const EXT_MAX = 4.6;
+
+// Deterministic representative: a real accepted tile with a long, rich walk, one that
+// uses as many of the five directions as possible and as many steps as possible while
+// staying inside the patch. Tie-break to the lexicographically greatest coord so
+// positive steps lead. Bound to buildPatch, so it is a genuine tile of the real
+// tiling, and the walk lands inside the tile set that fades in around it.
 export function pickAddressTile(): AddressTile {
   const patch = buildPatch();
   const byCoord = new Map<string, (typeof patch)[number]>();
@@ -58,13 +64,20 @@ export function pickAddressTile(): AddressTile {
     if (!byCoord.has(k)) byCoord.set(k, t);
   }
   const tiles = [...byCoord.values()];
-  const pool = tiles.filter((t) => nonzero(t.coord as number[]) === 4);
+  const pool = tiles.filter((t) => {
+    const c = t.coord as number[];
+    return nonzero(c) >= 3 && walkExtent(c) <= EXT_MAX;
+  });
   const ranked = (pool.length ? pool : tiles).slice().sort((a, b) => {
-    const ea = walkExtent(a.coord as number[]);
-    const eb = walkExtent(b.coord as number[]);
-    if (Math.abs(ea - eb) > 1e-9) return ea - eb;
     const ca = a.coord as number[];
     const cb = b.coord as number[];
+    const dn = nonzero(cb) - nonzero(ca); // more directions first
+    if (dn !== 0) return dn;
+    const ds = stepCount(cb) - stepCount(ca); // longer walk first
+    if (ds !== 0) return ds;
+    const ea = walkExtent(ca);
+    const eb = walkExtent(cb);
+    if (Math.abs(ea - eb) > 1e-9) return ea - eb; // tighter walk
     for (let i = 0; i < 5; i++) if (ca[i] !== cb[i]) return cb[i] - ca[i];
     return 0;
   });

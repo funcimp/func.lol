@@ -91,7 +91,7 @@ describe("the representative is a real, accepted tile", () => {
     expect(end[1]).toBeCloseTo(py, 12);
   });
 
-  test("the walk stays on screen (bounded extent)", () => {
-    expect(walkExtent(tile.coord)).toBeLessThan(3.2);
+  test("the walk stays inside the drawn patch (bounded extent)", () => {
+    expect(walkExtent(tile.coord)).toBeLessThan(4.6);
   });
 });
