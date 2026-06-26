@@ -48,9 +48,8 @@ const VIEW_M = 7;
 const VIEW_N = 5;
 const S_EXT = 16; // half-length of the drawn line/strip in data units (overshoots view)
 
-// The strip slides over ~1.4 cell widths as t goes 0 -> 1, so several points cross.
-const OFFSET_SPAN = WINDOW_W * 1.4;
-const OFFSET0 = 0.05; // representative offset at t = 1 (near-centered, clean chain)
+// The strip is fixed at a representative offset; the slider now builds the plane out.
+const OFFSET0 = 0.05;
 
 // The Penrose patch: the same cut-and-project, one stage up (5D -> 2D). The window is
 // FIXED; the panel BUILDS the tiling outward from the centre as the slider advances,
@@ -125,7 +124,7 @@ function paint(
   cells: Cell2D[],
 ) {
   const { thick, thin, paper, ink } = colors;
-  const offset = OFFSET0 + (t - 1) * OFFSET_SPAN; // t = 1 -> OFFSET0 (representative)
+  const offset = OFFSET0; // strip fixed; the slider builds the plane out
   const gamma = offset - WINDOW_W / 2; // center the window on the line
 
   ctx.clearRect(0, 0, VB_W, VB_H);
@@ -134,15 +133,7 @@ function paint(
 
   // Panel titles.
   caption(ctx, "THE LATTICE, A LINE, A STRIP", TOP.x, 16, ink, 0.55, "left");
-  caption(
-    ctx,
-    "slide the strip",
-    VB_W - PAD,
-    16,
-    ink,
-    0.5,
-    "right",
-  );
+  caption(ctx, "build the plane below ▸", VB_W - PAD, 16, ink, 0.5, "right");
 
   const all = latticePoints(VIEW_M + 1, gamma).filter(
     (p) => Math.abs(p.m) <= VIEW_M && Math.abs(p.n) <= VIEW_N,
@@ -353,9 +344,73 @@ function paint(
   }
   ctx.globalAlpha = 1;
   ctx.restore();
+
+  // --- Tie the 1D chain to the 2D tiles: the same two prototiles, one stage up -----
+  // The colours already pair them (long with gold/fat, short with blue/thin). A gold
+  // line links a long interval to a fat tile, a blue line a short interval to a thin
+  // tile, appearing once the plane has built out. This is the analogy made visible
+  // (both are cut-and-project quasicrystals with two prototiles), not a tile-by-tile
+  // map between the dimensions.
+  const tie = Math.max(0, Math.min(1, (t - 0.55) / 0.4));
+  if (tie > 0.02 && accepted.length >= 3) {
+    const physMin = accepted[0].phys;
+    const physMax = accepted[accepted.length - 1].phys;
+    const cx0 = PAD + 8;
+    const cx1 = VB_W - PAD - 8;
+    const barX = (phys: number) =>
+      cx0 + ((phys - physMin) / (physMax - physMin)) * (cx1 - cx0);
+    const mid = (LONG + SHORT) / 2;
+    const center = (cx0 + cx1) / 2;
+    let longX: number | null = null;
+    let shortX: number | null = null;
+    let bestL = Infinity;
+    let bestS = Infinity;
+    for (let i = 1; i < accepted.length; i++) {
+      const gap = accepted[i].phys - accepted[i - 1].phys;
+      const segX = (barX(accepted[i - 1].phys) + barX(accepted[i].phys)) / 2;
+      const d = Math.abs(segX - center);
+      if (gap > mid) {
+        if (d < bestL) { bestL = d; longX = segX; }
+      } else if (d < bestS) { bestS = d; shortX = segX; }
+    }
+    const revealR = t * REVEAL_MAX;
+    let fat: V2 | null = null;
+    let thn: V2 | null = null;
+    let bestFat = Infinity;
+    let bestThin = Infinity;
+    for (const { f, r } of cells) {
+      if (r >= revealR) continue;
+      if (f.type === "thick") {
+        if (r < bestFat) { bestFat = r; fat = [f.centroid[0], f.centroid[1]]; }
+      } else if (r < bestThin) { bestThin = r; thn = [f.centroid[0], f.centroid[1]]; }
+    }
+    const tieLine = (segX: number | null, tile: V2 | null, color: string) => {
+      if (segX == null || tile == null) return;
+      const [tx, ty] = penToPx(tile);
+      ctx.save();
+      ctx.globalAlpha = tie * 0.8;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(segX, CHAIN_Y + CHAIN_H / 2 + 3);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(segX, CHAIN_Y + CHAIN_H / 2 + 3, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+    tieLine(longX, fat, thick);
+    tieLine(shortX, thn, thin);
+  }
+
   caption(
     ctx,
-    "the plane is computed outward, tile by tile, never backtracking",
+    "the plane is computed outward, tile by tile; the two lengths become the two tiles",
     VB_W / 2,
     PEN.y + PEN.h + 18,
     ink,
@@ -433,7 +488,7 @@ export default function FibonacciStrip() {
   return (
     <Sketch
       label="sketch 04 · cut and project, in a dimension you can see"
-      animation={{ duration: 7000, render, slider: { label: "strip" } }}
+      animation={{ duration: 8000, render, slider: { label: "build" } }}
     >
       <canvas
         ref={canvasRef}

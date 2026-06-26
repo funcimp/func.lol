@@ -46,9 +46,7 @@ const BAR_X0 = 80;
 const BLUE_LEN = 188;
 const GOLD_Y = 332;
 const BLUE_Y = 374;
-const MARK_H = 26;
-const MARK_W = 12;
-const PITCH = 15; // centre-to-centre spacing of the tile marks
+const BAR_H = 26;
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -98,9 +96,7 @@ function drawPatch(
   ctx.restore();
 }
 
-// A stack: a row of small rhombus marks from x0 to x1, clipped, so the stack reads as
-// a run of tiles. The number of marks tracks the length, so gold has phi times as many
-// as blue at the deepest levels.
+// A stack: a solid colour bar from x0 to x1, the count drawn as length.
 function drawStack(
   ctx: CanvasRenderingContext2D,
   x0: number,
@@ -110,24 +106,12 @@ function drawStack(
   ink: string,
 ) {
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(x0 - 1, y - MARK_H / 2 - 1, x1 - x0 + 2, MARK_H + 2);
-  ctx.clip();
-  for (let cx = x0 + MARK_W / 2; cx - MARK_W / 2 < x1 - 0.5; cx += PITCH) {
-    ctx.beginPath();
-    ctx.moveTo(cx - MARK_W / 2, y);
-    ctx.lineTo(cx, y - MARK_H / 2);
-    ctx.lineTo(cx + MARK_W / 2, y);
-    ctx.lineTo(cx, y + MARK_H / 2);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
+  ctx.fillStyle = color;
+  ctx.fillRect(x0, y - BAR_H / 2, x1 - x0, BAR_H);
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = ink;
+  ctx.strokeRect(x0, y - BAR_H / 2, x1 - x0, BAR_H);
   ctx.restore();
 }
 
@@ -157,8 +141,8 @@ function drawStacks(ctx: CanvasRenderingContext2D, counts: Counts, colors: Color
   const eqX = BAR_X0 + BLUE_LEN; // where blue ends, and gold ends if the ratio were 1
   const phiX = BAR_X0 + BLUE_LEN * PHI; // the golden-ratio mark
   const goldX1 = BAR_X0 + BLUE_LEN * ratio;
-  const yTop = GOLD_Y - MARK_H / 2 - 14;
-  const yBot = BLUE_Y + MARK_H / 2 + 6;
+  const yTop = GOLD_Y - BAR_H / 2 - 14;
+  const yBot = BLUE_Y + BAR_H / 2 + 6;
 
   // the "x1" reference (ratio of one) and the golden mark
   ctx.save();
