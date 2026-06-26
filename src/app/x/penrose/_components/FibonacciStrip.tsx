@@ -13,11 +13,7 @@ import {
   WINDOW_W,
   type LatPt,
 } from "./lib/fibonacci";
-import {
-  facesInViewport,
-  gammaFromWindowCenter,
-  WINDOW_CENTER,
-} from "../explore/lib/pentagrid";
+import { facesInViewport, GAMMA } from "../explore/lib/pentagrid";
 import type { RenderFace } from "../explore/lib/patch";
 
 // "Cut and project, where you can see it": the spine's section-6 lead-in. Before
@@ -56,9 +52,10 @@ const S_EXT = 16; // half-length of the drawn line/strip in data units (overshoo
 const OFFSET_SPAN = WINDOW_W * 1.4;
 const OFFSET0 = 0.05; // representative offset at t = 1 (near-centered, clean chain)
 
-// The Penrose patch: the same cut-and-project, one stage up (5D -> 2D). Its window
-// center slides with the same slider, so moving the window gives different tiles. We
-// precompute a strip of patches at sampled window centers and show the matching one.
+// The Penrose patch: the same cut-and-project, one stage up (5D -> 2D). The window is
+// FIXED; the panel BUILDS the tiling outward from the centre as the slider advances,
+// each tile computed from its own coordinate, never backtracking. A growing wavefront
+// reveals tiles by physical radius.
 const PEN_PX = 8.5; // physical half-width shown
 const PEN_PY = (PEN_PX * PEN.h) / PEN.w; // matched to the panel aspect
 const PEN_SCALE = Math.min(PEN.w / (2 * PEN_PX), PEN.h / (2 * PEN_PY));
@@ -68,12 +65,14 @@ const PEN_VIEW = {
   minY: -PEN_PY - 0.8,
   maxY: PEN_PY + 0.8,
 };
-const SAMPLES = 48;
-const WINDOW_RANGE = 0.34; // how far the 2D window center slides, internal units
+const REVEAL_MAX = 10.2; // the build wavefront reaches this physical radius at t = 1
+const REVEAL_BAND = 1.4; // soft width of the wavefront, in physical units
 const penToPx = ([x, y]: V2): [number, number] => [
   PEN.x + PEN.w / 2 + x * PEN_SCALE,
   PEN.y + PEN.h / 2 - y * PEN_SCALE,
 ];
+
+type Cell2D = { f: RenderFace; r: number };
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -123,7 +122,7 @@ function paint(
   ctx: CanvasRenderingContext2D,
   t: number,
   colors: Colors,
-  patches: RenderFace[][],
+  cells: Cell2D[],
 ) {
   const { thick, thin, paper, ink } = colors;
   const offset = OFFSET0 + (t - 1) * OFFSET_SPAN; // t = 1 -> OFFSET0 (representative)
@@ -303,27 +302,28 @@ function paint(
     0.7,
   );
 
-  // --- The real Penrose tiling the same window gives, one stage up -----------
-  // The cut-and-project window slides with the same slider; in 2D the window is a
-  // pentagon, not a strip, and moving it gives a different (locally identical) Penrose
-  // tiling. We draw the precomputed patch for the current window offset.
+  // --- The real Penrose tiling, BUILT OUT one stage up ----------------------
+  // The window is fixed; the plane is computed outward from the centre, each tile
+  // decided by its own coordinate, never backtracking. A wavefront reveals tiles by
+  // physical radius as the slider advances, so the tileset is built, not mutated.
   caption(
     ctx,
-    "THE SAME WINDOW, ONE STAGE UP · 5D → 2D · REAL PENROSE TILES",
+    "THE SAME METHOD, ONE STAGE UP · 5D → 2D · REAL PENROSE TILES, BUILT OUTWARD",
     PEN.x,
     PEN.y - 14,
     ink,
     0.55,
     "left",
   );
-  const idx = Math.min(SAMPLES - 1, Math.max(0, Math.round(t * (SAMPLES - 1))));
-  const patch = patches[idx];
+  const revealR = t * REVEAL_MAX;
   ctx.save();
   ctx.beginPath();
   ctx.rect(PEN.x, PEN.y, PEN.w, PEN.h);
   ctx.clip();
   ctx.lineJoin = "round";
-  for (const f of patch) {
+  for (const { f, r } of cells) {
+    const appear = Math.max(0, Math.min(1, (revealR - r) / REVEAL_BAND));
+    if (appear <= 0.01) continue;
     ctx.beginPath();
     f.corners.forEach((c, i) => {
       const [px, py] = penToPx([c[0], c[1]]);
@@ -331,19 +331,31 @@ function paint(
       else ctx.lineTo(px, py);
     });
     ctx.closePath();
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = appear * 0.9;
     ctx.fillStyle = f.type === "thick" ? thick : thin;
     ctx.fill();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = appear * 0.5;
     ctx.lineWidth = 0.8;
     ctx.strokeStyle = ink;
     ctx.stroke();
+  }
+  // The build wavefront: a faint ring at the current reach.
+  if (revealR < REVEAL_MAX - 0.2) {
+    const [ox, oy] = penToPx([0, 0]);
+    ctx.beginPath();
+    ctx.arc(ox, oy, revealR * PEN_SCALE, 0, Math.PI * 2);
+    ctx.globalAlpha = 0.25;
+    ctx.setLineDash([4, 5]);
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
   ctx.restore();
   caption(
     ctx,
-    "slide the strip and the window slides too: it picks which tiles appear",
+    "the plane is computed outward, tile by tile, never backtracking",
     VB_W / 2,
     PEN.y + PEN.h + 18,
     ink,
@@ -361,18 +373,16 @@ export default function FibonacciStrip() {
   });
   const dprRef = useRef(0);
 
-  // Precompute the Penrose patch at each sampled window offset, so sliding just picks
-  // the matching one (no per-frame enumeration). The window center slides along the
-  // internal axis, the same offset the 1D strip slides.
-  const patches = useMemo<RenderFace[][]>(() => {
-    const out: RenderFace[][] = [];
-    for (let i = 0; i < SAMPLES; i++) {
-      const vx = WINDOW_CENTER[0] + (i / (SAMPLES - 1) - 0.5) * 2 * WINDOW_RANGE;
-      const vy = WINDOW_CENTER[1];
-      out.push(facesInViewport(PEN_VIEW, gammaFromWindowCenter(vx, vy)));
-    }
-    return out;
-  }, []);
+  // Precompute the fixed Penrose patch once, each tile tagged with its physical radius
+  // so the build wavefront can reveal them outward without re-enumerating.
+  const cells = useMemo<Cell2D[]>(
+    () =>
+      facesInViewport(PEN_VIEW, GAMMA).map((f) => ({
+        f,
+        r: Math.hypot(f.centroid[0], f.centroid[1]),
+      })),
+    [],
+  );
 
   const refreshColors = useCallback(() => {
     colorsRef.current = {
@@ -397,9 +407,9 @@ export default function FibonacciStrip() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      paint(ctx, t, colorsRef.current, patches);
+      paint(ctx, t, colorsRef.current, cells);
     },
-    [refreshColors, patches],
+    [refreshColors, cells],
   );
 
   useEffect(() => {
@@ -434,7 +444,7 @@ export default function FibonacciStrip() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. The ${accepted} lattice points inside the strip each drop a perpendicular onto the line; those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. Cut is the strip, project is the drop-line. Below that is a real two-dimensional Penrose tiling produced by the same cut and project one stage up, from five dimensions to two, where the window is a pentagon instead of a strip. Sliding the strip slides that window too, and it picks which Penrose tiles appear, so you can see the window selecting the tiles on the grid.`}
+        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. The ${accepted} lattice points inside the strip each drop a perpendicular onto the line; those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. Cut is the strip, project is the drop-line. Below that is a real two-dimensional Penrose tiling produced by the same cut and project one stage up, from five dimensions to two. As the slider advances, that plane is built outward from the centre behind a growing wavefront, each tile computed from its own coordinate with no backtracking, so you watch the tileset get built rather than mutated.`}
       />
     </Sketch>
   );
