@@ -30,7 +30,10 @@ const MIN_C = 5;
 const STEPS = 4;
 const LO_LEVEL = MIN_C - 1; // 4
 const HI_LEVEL = MIN_C + STEPS + 1; // 10
-const PROM = 1.5; // how many levels each side stay visible around the current one
+// One level wide each side: at a whole level only that grid shows (the layer alone),
+// halfway between two both show (the nesting). The beat lives in that contrast.
+const PROM = 1.0;
+const HOLD = 0.5; // fraction of each level's time the camera holds it alone, breathing
 
 // The camera dives toward VIEW_C, off the central five-fold star, staying inside the
 // unit-radius wheel. RHO_START is the view radius at the coarsest level; it shrinks by
@@ -46,6 +49,11 @@ function readVar(name: string, fallback: string): string {
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
 type Cell = { corners: readonly Pt[]; cx: number; cy: number };
+
+const smooth = (e0: number, e1: number, x: number): number => {
+  const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+  return u * u * (3 - 2 * u);
+};
 
 function cellsAt(level: number): Cell[] {
   return rhombiAt(level).map((r: Rhombus) => {
@@ -140,10 +148,14 @@ export default function ZoomHierarchy() {
         refreshColors();
       }
 
-      // t = 1: deepest zoom on the finest level. Lowering t zooms out one step at a time.
-      const u = t * STEPS;
-      const ideal = MIN_C + u; // the continuous "current" level
-      const rho = RHO_START * Math.pow(PHI, -u);
+      // t = 1: deepest zoom on the finest level. Lowering t zooms out one step at a
+      // time. Each level gets a beat: the camera holds it alone, then transitions.
+      const raw = t * STEPS;
+      const k = Math.min(STEPS - 1, Math.floor(raw));
+      const f = raw - k;
+      const uStepped = k + (f <= HOLD ? 0 : smooth(HOLD, 1, f));
+      const ideal = MIN_C + uStepped; // the current level, holding on whole numbers
+      const rho = RHO_START * Math.pow(PHI, -uStepped);
       const c = VB / 2 / rho;
       const toPx: ToPx = (p) => [
         VB / 2 + (p[0] - VIEW_C[0]) * c,
@@ -199,7 +211,7 @@ export default function ZoomHierarchy() {
   return (
     <Sketch
       label="sketch 09 · zoom the hierarchy"
-      animation={{ duration: 11000, render, slider: { label: "zoom in" } }}
+      animation={{ duration: 18000, render, slider: { label: "zoom in" } }}
     >
       <canvas
         ref={canvasRef}
