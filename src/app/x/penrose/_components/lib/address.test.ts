@@ -52,4 +52,31 @@ describe("the edge walk lies on real tile edges (it lines up with the grid)", ()
       expect(dot).toBeCloseTo(1, 6);
     }
   });
+
+  // The address IS the running tally of the walk: each edge changes exactly one of the
+  // five coordinates by exactly +-1, the coordinate named by that edge's direction. So
+  // start coord plus the signed steps equals the target address.
+  test("each edge changes exactly one coordinate by +-1, named by the edge direction", () => {
+    expect(w.coords.length).toBe(w.path.length);
+    for (let i = 1; i < w.coords.length; i++) {
+      const a = w.coords[i - 1];
+      const b = w.coords[i];
+      let changed = 0;
+      let where = -1;
+      for (let l = 0; l < 5; l++) {
+        const d = b[l] - a[l];
+        if (d !== 0) {
+          changed++;
+          where = l;
+          expect(Math.abs(d)).toBe(1);
+        }
+      }
+      expect(changed).toBe(1);
+      expect(where).toBe(w.edgeDirs[i - 1]);
+    }
+  });
+
+  test("the last coord on the route is the target address", () => {
+    expect(w.coords[w.coords.length - 1]).toEqual(w.targetCoord);
+  });
 });

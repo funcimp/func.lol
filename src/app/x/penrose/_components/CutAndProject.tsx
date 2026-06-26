@@ -239,6 +239,20 @@ export default function CutAndProject() {
             );
           })}
 
+          {/* the lit tile's shadow rhombus: its four corner shadows joined. Note the
+              shape flips, a thick tile casts a thin-shaped shadow and the reverse,
+              because internal space turns each edge by twice the angle physical does. */}
+          {active && (
+            <polygon
+              points={pointsAttr(active.internal.map(fitR))}
+              fill={fillFor(active)}
+              fillOpacity={0.18}
+              stroke={fillFor(active)}
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+            />
+          )}
+
           {/* the lit tile's four shadows, landing inside the window */}
           {active &&
             active.internal.map(fitR).map(([x, y], i) => {
@@ -266,9 +280,11 @@ export default function CutAndProject() {
             <>
               This tile is the shadow of lattice point{" "}
               <span className="font-mono">[{addr}]</span>. Its four corners&#39;
-              shadows all land inside the window, so the plane keeps it. The
-              crossed points are lattice points whose shadow lands outside, so the
-              plane discards them.
+              shadows all land inside the window, so the plane keeps it. Notice the
+              shadow is the other shape: a fat tile casts a thin outline, a thin tile
+              a fat one, because internal space turns each edge by twice the angle
+              physical space does. The crossed points are lattice points whose shadow
+              lands outside, so the plane discards them.
             </>
           ) : (
             "Hover a tile. Its four 5D corners cast shadows into the window on the right; all inside means accepted."

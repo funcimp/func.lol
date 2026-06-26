@@ -8,18 +8,22 @@ import { buildOverlay, type Overlay, type Pt } from "./lib/overlay";
 // "Slide one over another": the spine's section-7 sketch, Penrose's overhead-
 // projector demo, rebuilt to push and spin. Two real Penrose tilings are drawn as
 // line work over a large plane that runs well off screen, the bottom in ink and the
-// top in a translucent accent. Spin the top layer a full turn, or drag it, and the
-// places where the two disagree organize into five-fold rosettes that bloom and
-// drift. Zoomed out, those rosettes read at scale; the off-screen plane means there
-// is always tiling under the frame to move into view.
+// top in a translucent accent. Spin the top layer a fifth of a turn, or drag it, and
+// the places where the two disagree organize into five-fold rosettes that bloom and
+// drift. Zoomed out, those rosettes read at scale.
 //
 // HONEST BY CONSTRUCTION. Both layers are the SAME real enumerator patch
-// (lib/overlay.ts and its test). The interference is emergent: nothing is tinted,
-// the moiré is just two real tilings overlapping. Only the visible tiles are drawn
-// each frame (culled by centroid), so a large plane stays smooth to spin and drag.
+// (lib/overlay.ts and its test). The interference is emergent: nothing is tinted, the
+// moiré is just two real tilings overlapping. Each layer is rasterised ONCE to an
+// offscreen canvas, then composited every frame, the top one rotated and translated.
+// A rigid rotation of the bitmap is the same as rotating the tiling, so this is
+// faithful, and it is literally Penrose's two transparencies on a projector. Two
+// drawImage calls per frame instead of stroking thousands of tiles, so spin and drag
+// stay smooth on the large plane.
 //
-// The harness drives render(t) for the spin (full 360, looping); pointer drag slides
-// the top layer. Theme colours are read live so it inverts with the toggle.
+// The harness drives render(t) for the spin (one fifth, looping); pointer drag slides
+// the top layer. Theme colours are read live; the offscreen layers rebuild on a theme
+// or device-pixel-ratio change.
 
 const VB = 560;
 const MARGIN = 10;
@@ -27,11 +31,17 @@ const MARGIN = 10;
 // read at scale and dragging never runs out of tiling.
 const VIEW_HALF = 42;
 const GEN_HALF = 75;
-const CULL_R = VIEW_HALF + 2; // draw only tiles whose centroid is within the frame
 // The tilings carry five-fold symmetry, so a full spin just repeats; one fifth of a
 // turn is the whole story. The slider turns the top layer across [0, 72 deg].
 const TURN_MAX = (2 * Math.PI) / 5;
 const OFFSET_MAX = 12; // how far the top layer may be dragged, in tile-edge units
+
+const SCALE = (VB - 2 * MARGIN) / (2 * VIEW_HALF);
+// Offscreen half-extents, in data units. The bottom never moves, so it only needs the
+// frame. The top is rotated about the centre and dragged, so it needs the frame's
+// diagonal plus the drag so it still covers the frame at any angle.
+const RAD_BOTTOM = VIEW_HALF + 3;
+const RAD_TOP = VIEW_HALF * Math.SQRT2 + OFFSET_MAX + 2;
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -40,44 +50,41 @@ function readVar(name: string, fallback: string): string {
 }
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
-
-const SCALE = (VB - 2 * MARGIN) / (2 * VIEW_HALF);
-const toPx = (p: Pt): [number, number] => [
-  VB / 2 + p[0] * SCALE,
-  VB / 2 - p[1] * SCALE, // canvas y grows downward
-];
-
 const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 
-// Stroke a list of faces (optionally transformed) in one path. Caller culls first.
-function strokeFaces(
-  ctx: CanvasRenderingContext2D,
+// Rasterise one tiling layer to an offscreen canvas, once. Faces are culled to a data
+// radius and stroked in offscreen pixels; the per-frame compositor maps the bitmap back
+// into the view. Line width is scaled by dpr so the composited result matches a direct
+// stroke at `width` CSS px.
+function buildLayer(
   faces: Overlay["a"],
-  xf: ((p: Pt) => Pt) | null,
+  rad: number,
   color: string,
   width: number,
   alpha: number,
-) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.lineJoin = "round";
-  ctx.beginPath();
+  dpr: number,
+): HTMLCanvasElement {
+  const s = SCALE * dpr;
+  const px = Math.ceil(2 * rad * s);
+  const off = document.createElement("canvas");
+  off.width = px;
+  off.height = px;
+  const octx = off.getContext("2d")!;
+  const c = px / 2;
+  octx.globalAlpha = alpha;
+  octx.strokeStyle = color;
+  octx.lineWidth = width * dpr;
+  octx.lineJoin = "round";
+  octx.beginPath();
   for (const f of faces) {
-    const c = f.corners;
-    const p0 = xf ? xf(c[0]) : c[0];
-    const [x0, y0] = toPx(p0);
-    ctx.moveTo(x0, y0);
-    for (let i = 1; i < c.length; i++) {
-      const p = xf ? xf(c[i]) : c[i];
-      const [x, y] = toPx(p);
-      ctx.lineTo(x, y);
-    }
-    ctx.closePath();
+    if (Math.abs(f.centroid[0]) > rad || Math.abs(f.centroid[1]) > rad) continue;
+    const cor = f.corners;
+    octx.moveTo(c + cor[0][0] * s, c - cor[0][1] * s);
+    for (let i = 1; i < cor.length; i++) octx.lineTo(c + cor[i][0] * s, c - cor[i][1] * s);
+    octx.closePath();
   }
-  ctx.stroke();
-  ctx.restore();
+  octx.stroke();
+  return off;
 }
 
 function caption(
@@ -99,6 +106,8 @@ function caption(
   ctx.restore();
 }
 
+type Cache = { dpr: number; ink: string; thick: string; bottom: HTMLCanvasElement; top: HTMLCanvasElement };
+
 export default function InterferenceOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colorsRef = useRef<Colors>({
@@ -108,15 +117,8 @@ export default function InterferenceOverlay() {
     ink: "#ede9d8",
   });
   const dprRef = useRef(0);
+  const cacheRef = useRef<Cache | null>(null);
   const overlay = useMemo(() => buildOverlay(GEN_HALF), []);
-  // The bottom layer is fixed; its visible tiles never change, so cull once.
-  const bottomVisible = useMemo(
-    () =>
-      overlay.a.filter(
-        (f) => Math.abs(f.centroid[0]) <= CULL_R && Math.abs(f.centroid[1]) <= CULL_R,
-      ),
-    [overlay],
-  );
 
   const twistRef = useRef(TURN_MAX); // mount at a fifth-turn (t = 1), full interference
   const offsetRef = useRef<Pt>([0, 0]);
@@ -130,12 +132,28 @@ export default function InterferenceOverlay() {
     };
   }, []);
 
+  // Rebuild the two offscreen layers if the dpr or the relevant theme colours changed.
+  const ensureCache = useCallback((dpr: number) => {
+    const { ink, thick } = colorsRef.current;
+    const c = cacheRef.current;
+    if (c && c.dpr === dpr && c.ink === ink && c.thick === thick) return c;
+    const next: Cache = {
+      dpr,
+      ink,
+      thick,
+      bottom: buildLayer(overlay.a, RAD_BOTTOM, ink, 0.5, 0.3, dpr),
+      top: buildLayer(overlay.b, RAD_TOP, thick, 0.7, 0.85, dpr),
+    };
+    cacheRef.current = next;
+    return next;
+  }, [overlay]);
+
   const repaint = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     if (dpr !== dprRef.current) {
       dprRef.current = dpr;
       canvas.width = VB * dpr;
@@ -143,31 +161,31 @@ export default function InterferenceOverlay() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       refreshColors();
     }
-    const { thick, paper, ink } = colorsRef.current;
+    const { paper, ink } = colorsRef.current;
+    const cache = ensureCache(dpr);
     const twist = twistRef.current;
     const [ox, oy] = offsetRef.current;
-    const cos = Math.cos(twist);
-    const sin = Math.sin(twist);
-    const xf = (p: Pt): Pt => [p[0] * cos - p[1] * sin + ox, p[0] * sin + p[1] * cos + oy];
 
     ctx.clearRect(0, 0, VB, VB);
     ctx.fillStyle = paper;
     ctx.fillRect(0, 0, VB, VB);
 
-    // BOTTOM layer: the fixed tiling, faint thin ink, so the top reads crisply over it.
-    strokeFaces(ctx, bottomVisible, null, ink, 0.5, 0.3);
+    // BOTTOM: the fixed tiling bitmap, mapped straight into the view.
+    const rb = RAD_BOTTOM * SCALE;
+    ctx.drawImage(cache.bottom, VB / 2 - rb, VB / 2 - rb, 2 * rb, 2 * rb);
 
-    // TOP layer: the same tiling, spun and slid, in translucent accent. Cull by the
-    // transformed centroid so only what lands in the frame is drawn.
-    const topVisible = overlay.b.filter((f) => {
-      const cx = f.centroid[0] * cos - f.centroid[1] * sin + ox;
-      const cy = f.centroid[0] * sin + f.centroid[1] * cos + oy;
-      return Math.abs(cx) <= CULL_R && Math.abs(cy) <= CULL_R;
-    });
-    strokeFaces(ctx, topVisible, xf, thick, 0.7, 0.85);
+    // TOP: the same tiling, spun about the centre and dragged. toPx(rotate(twist)*p +
+    // offset) reduces to: translate to centre + offset, rotate by -twist (canvas y is
+    // down), then draw the bitmap centred. One composite, no per-tile work.
+    const rt = RAD_TOP * SCALE;
+    ctx.save();
+    ctx.translate(VB / 2 + ox * SCALE, VB / 2 - oy * SCALE);
+    ctx.rotate(-twist);
+    ctx.drawImage(cache.top, -rt, -rt, 2 * rt, 2 * rt);
+    ctx.restore();
 
     caption(ctx, "drag to slide the top layer · turn it up to a fifth", VB / 2, VB - 14, ink, 0.7);
-  }, [overlay, bottomVisible, refreshColors]);
+  }, [ensureCache, refreshColors]);
 
   const render = useCallback(
     (t: number) => {
@@ -214,6 +232,7 @@ export default function InterferenceOverlay() {
   useEffect(() => {
     const observer = new MutationObserver(() => {
       refreshColors();
+      cacheRef.current = null; // colours changed; rebuild the layers
       repaint();
     });
     observer.observe(document.documentElement, {

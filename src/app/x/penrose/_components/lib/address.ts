@@ -24,6 +24,7 @@ export type EdgeWalk = {
   targetType: "thick" | "thin";
   targetCorners: Pt[]; // the target tile, to highlight
   path: Pt[]; // physical points along the route, start..target vertex
+  coords: number[][]; // the ℤ⁵ coord at each path vertex (length path.length)
   edgeDirs: number[]; // direction index 0..4 of each edge (length path.length - 1)
 };
 
@@ -116,12 +117,17 @@ export function buildEdgeWalk(): EdgeWalk {
   keys.reverse();
   dirs.reverse();
 
+  // The engine's Math.ceil can yield -0; normalize so coords are clean integers (a
+  // bare -0 would read as "-0" and breaks structural equality against +0).
+  const norm = (c: readonly number[]) => c.map((v) => v + 0);
+
   return {
     start: vert.get(startK)!,
-    targetCoord: [...(targetTile.coord as number[])],
+    targetCoord: norm(targetTile.coord as number[]),
     targetType: targetTile.type,
     targetCorners: targetTile.physical.map(([x, y]) => [x, y] as Pt),
     path: keys.map((k) => vert.get(k)!.p),
+    coords: keys.map((k) => norm(vert.get(k)!.coord)),
     edgeDirs: dirs,
   };
 }

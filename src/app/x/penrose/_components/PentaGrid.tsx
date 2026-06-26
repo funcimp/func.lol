@@ -142,14 +142,25 @@ function buildView(): View {
   return { lines: pv.lines, drawn, inViewCount, featured, maxDist, leftToPx, rightToPx };
 }
 
-// The featured crossing's two lines, looked up from the line set so the highlight is the
-// very segment that meets at the crossing (family j at m = K[j], family k at m = K[k]).
-function featuredLines(v: View): GridLine[] {
-  if (!v.featured) return [];
-  const { j, k, face } = v.featured;
+// A crossing's two lines, looked up from the line set so the highlight is the very
+// segment that meets at the crossing (family j at m = K[j], family k at m = K[k]).
+function linesFor(v: View, cr: GridCrossing | null): GridLine[] {
+  if (!cr) return [];
+  const { j, k, face } = cr;
   return v.lines.filter(
     (ln) => (ln.l === j && ln.m === face.coord[j]) || (ln.l === k && ln.m === face.coord[k]),
   );
+}
+
+// Even-odd point-in-quadrilateral, for hit-testing a rhombus under the cursor.
+function pointInQuad(x: number, y: number, q: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = 3; i < 4; j = i++) {
+    const [xi, yi] = q[i];
+    const [xj, yj] = q[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 function strokeSeg(ctx: CanvasRenderingContext2D, a: [number, number], b: [number, number]) {
@@ -201,7 +212,7 @@ export default function PentaGrid() {
   const lastTRef = useRef(1);
 
   const view = useMemo(() => buildView(), []);
-  const featLines = useMemo(() => featuredLines(view), [view]);
+  const hoverRef = useRef<GridCrossing | null>(null);
 
   const refreshColors = useCallback(() => {
     colorsRef.current = {
@@ -243,12 +254,15 @@ export default function PentaGrid() {
       const sweep = clamp01((t - 0.12) / (0.9 - 0.12));
       const scanR = sweep * (1 + band + 0.05);
       const lineAlpha = smooth(0, 0.1, t);
-      const featured = view.featured;
-      const isFeatured = (c: GridCrossing) => featured !== null && c.face.key === featured.face.key;
+      // The highlighted crossing is whatever the cursor is over, else the default
+      // featured one. Hover a tile or a crossing and its partner lights up.
+      const hovering = hoverRef.current;
+      const highlight = hovering ?? view.featured;
+      const isHi = (c: GridCrossing) => highlight !== null && c.face.key === highlight.face.key;
 
-      // Reveal fraction for one crossing by the radial wavefront (featured: always on).
+      // Reveal fraction for one crossing by the radial wavefront (highlight: always on).
       const revealOf = (c: GridCrossing): number => {
-        if (isFeatured(c)) return 1;
+        if (isHi(c)) return 1;
         const rNorm = view.maxDist > 0 ? Math.hypot(c.face.centroid[0], c.face.centroid[1]) / view.maxDist : 0;
         return clamp01((scanR - rNorm) / band);
       };
@@ -266,7 +280,7 @@ export default function PentaGrid() {
       for (const ln of view.lines) strokeSeg(ctx, view.leftToPx(ln.a), view.leftToPx(ln.b));
       for (const c of view.drawn) {
         const a = revealOf(c);
-        if (a <= 0.01 || isFeatured(c)) continue;
+        if (a <= 0.01 || isHi(c)) continue;
         const [px, py] = view.leftToPx(c.z);
         ctx.globalAlpha = a;
         ctx.fillStyle = colorFor(c.face.type);
@@ -285,7 +299,7 @@ export default function PentaGrid() {
       ctx.lineJoin = "round";
       for (const c of view.drawn) {
         const a = revealOf(c);
-        if (a <= 0.01 || isFeatured(c)) continue;
+        if (a <= 0.01 || isHi(c)) continue;
         const pts = c.face.corners.map(view.rightToPx);
         ctx.beginPath();
         ctx.moveTo(pts[0][0], pts[0][1]);
@@ -318,21 +332,23 @@ export default function PentaGrid() {
         ctx.restore();
       }
 
-      // The featured crossing: its two lines, its dot, its rhombus, and the connector
-      // from the one to the other. The explicit line from a crossing to its tile.
-      if (featured) {
-        const col = colorFor(featured.face.type);
-        const featAlpha = smooth(0.12, 0.3, t);
+      // The highlighted crossing: its two lines, its dot, its rhombus, and the connector
+      // from the one to the other. The explicit line from a crossing to its tile, on the
+      // default featured tile or whatever the cursor is over.
+      if (highlight) {
+        const col = colorFor(highlight.face.type);
+        const hiAlpha = hovering ? 1 : smooth(0.12, 0.3, t);
+        const hiLines = linesFor(view, highlight);
 
-        const dot = view.leftToPx(featured.z);
+        const dot = view.leftToPx(highlight.z);
         ctx.save();
         ctx.beginPath();
         ctx.rect(X0L, TOP, PANEL, PANEL);
         ctx.clip();
-        ctx.globalAlpha = featAlpha;
+        ctx.globalAlpha = hiAlpha;
         ctx.strokeStyle = col;
         ctx.lineWidth = 2;
-        for (const ln of featLines) strokeSeg(ctx, view.leftToPx(ln.a), view.leftToPx(ln.b));
+        for (const ln of hiLines) strokeSeg(ctx, view.leftToPx(ln.a), view.leftToPx(ln.b));
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.arc(dot[0], dot[1], 3.4, 0, Math.PI * 2);
@@ -344,12 +360,12 @@ export default function PentaGrid() {
         ctx.stroke();
         ctx.restore();
 
-        const pts = featured.face.corners.map(view.rightToPx);
+        const pts = highlight.face.corners.map(view.rightToPx);
         ctx.save();
         ctx.beginPath();
         ctx.rect(X0R, TOP, PANEL, PANEL);
         ctx.clip();
-        ctx.globalAlpha = featAlpha;
+        ctx.globalAlpha = hiAlpha;
         ctx.beginPath();
         ctx.moveTo(pts[0][0], pts[0][1]);
         for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
@@ -362,9 +378,9 @@ export default function PentaGrid() {
         ctx.stroke();
         ctx.restore();
 
-        const tile = view.rightToPx(featured.face.centroid);
+        const tile = view.rightToPx(highlight.face.centroid);
         ctx.save();
-        ctx.globalAlpha = featAlpha * 0.85;
+        ctx.globalAlpha = hiAlpha * 0.85;
         ctx.strokeStyle = col;
         ctx.lineWidth = 1.3;
         ctx.setLineDash([5, 4]);
@@ -380,16 +396,16 @@ export default function PentaGrid() {
         ctx.stroke();
         ctx.restore();
 
-        const gap = featured.k - featured.j;
+        const gap = highlight.k - highlight.j;
         const deg = gap === 1 || gap === 4 ? 72 : 144;
         caption(
           ctx,
-          `this crossing meets at ${deg}° → ${featured.face.type} tile`,
+          `this crossing meets at ${deg}° → ${highlight.face.type} tile`,
           VB_W / 2,
           18,
           col,
           "center",
-          featAlpha,
+          hiAlpha,
           12,
           true,
         );
@@ -399,8 +415,45 @@ export default function PentaGrid() {
       caption(ctx, "the pentagrid · five line families", X0L, 40, ink, "left", 0.7);
       caption(ctx, "the tiling · one rhombus per crossing", X0R + PANEL, 40, ink, "right", 0.7);
     },
-    [view, featLines, refreshColors],
+    [view, refreshColors],
   );
+
+  // Hover hit-test: a tile in the right panel, or a crossing dot in the left. Sets the
+  // highlight and repaints at the current time so its partner across the panels lights.
+  const onHover = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * VB_W;
+      const y = ((e.clientY - rect.top) / rect.height) * VB_H;
+      let found: GridCrossing | null = null;
+      if (x >= X0R && x <= X0R + PANEL && y >= TOP && y <= TOP + PANEL) {
+        for (const c of view.drawn) {
+          if (pointInQuad(x, y, c.face.corners.map(view.rightToPx))) { found = c; break; }
+        }
+      } else if (x >= X0L && x <= X0L + PANEL && y >= TOP && y <= TOP + PANEL) {
+        let best = 81; // (9px)^2
+        for (const c of view.drawn) {
+          const [px, py] = view.leftToPx(c.z);
+          const d = (px - x) ** 2 + (py - y) ** 2;
+          if (d < best) { best = d; found = c; }
+        }
+      }
+      if ((found?.face.key ?? null) !== (hoverRef.current?.face.key ?? null)) {
+        hoverRef.current = found;
+        render(lastTRef.current);
+      }
+    },
+    [view, render],
+  );
+
+  const onLeave = useCallback(() => {
+    if (hoverRef.current) {
+      hoverRef.current = null;
+      render(lastTRef.current);
+    }
+  }, [render]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -424,7 +477,9 @@ export default function PentaGrid() {
     >
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", height: "auto", aspectRatio: `${VB_W} / ${VB_H}` }}
+        onPointerMove={onHover}
+        onPointerLeave={onLeave}
+        style={{ width: "100%", height: "auto", aspectRatio: `${VB_W} / ${VB_H}`, cursor: "crosshair", touchAction: "none" }}
         className="block w-full bg-paper"
         role="img"
         aria-label="Two panels showing de Bruijn's pentagrid, the dual of cut and project. On the left, five families of evenly spaced parallel lines in grid space, one family per pentagon direction, with a dot at every crossing of two families. On the right, the Penrose tiling in the plane, with exactly one rhombus per crossing: gold thick rhombi where the lines cross at a shallow 72 degree angle, teal thin rhombi where they cross at a steep 144 degree angle. A radial wavefront sweeps both panels in step, revealing each crossing and its rhombus together, and one featured crossing is linked to its tile by a drawn connector. Every crossing is one square face of the five-dimensional cube lattice and each rhombus is that face's shadow, so the tiles fall out of the higher-dimensional grid."
@@ -452,8 +507,8 @@ export default function PentaGrid() {
           Five families of parallel lines, one per pentagon direction. Every crossing
           is one tile: a shallow 72° crossing makes a thick rhombus, a steep 144° one a
           thin rhombus. Each crossing is a square face of the 5D cube lattice, and the
-          rhombus is its shadow. Nothing is placed by hand, and every crossing in view
-          becomes a tile.
+          rhombus is its shadow. Hover a tile or a crossing and its partner lights up.
+          Nothing is placed by hand, and every crossing in view becomes a tile.
         </p>
       </div>
     </Sketch>

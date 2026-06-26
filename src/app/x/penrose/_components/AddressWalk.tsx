@@ -206,19 +206,29 @@ function paint(
   ctx.stroke();
   caption(ctx, "start", o[0], o[1] + 15, ink, 0.5 * (1 - fade * 0.4));
 
-  // The address row, up top: the target tile's coordinate, lit once the route lands.
-  const addrAlpha = shown >= E ? 0.95 : 0.4;
+  // The address row, up top. The address IS the running tally of the walk: each edge
+  // adds +-1 to one coordinate, the one named by that edge's direction. So the digits
+  // fill in as the route steps, the just-changed one lit, landing on the target address.
+  const cur = walk.coords[Math.min(shown, walk.coords.length - 1)];
+  const changedL = shown > 0 && shown <= E ? walk.edgeDirs[shown - 1] : -1;
+  const done = shown >= E;
   ctx.save();
-  ctx.font = "15px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
   ctx.textBaseline = "middle";
   ctx.textAlign = "center";
   caption(ctx, "ADDRESS", VB_W / 2, 14, ink, 0.5);
-  const digitGap = 30;
-  const startX = VB_W / 2 - (digitGap * 4) / 2;
+  const digitGap = 34;
+  const startX = VB_W / 2 - digitGap * 2; // center the five digits (indices 0..4)
   for (let l = 0; l < 5; l++) {
-    ctx.globalAlpha = addrAlpha;
+    const x = startX + l * digitGap;
+    const lit = l === changedL && !done;
+    ctx.globalAlpha = done ? 0.95 : lit ? 1 : 0.55;
+    ctx.fillStyle = lit ? thick : ink;
+    ctx.font = "15px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
+    ctx.fillText(String(cur[l]), x, 34);
+    ctx.globalAlpha = 0.32;
     ctx.fillStyle = ink;
-    ctx.fillText(String(walk.targetCoord[l]), startX + l * digitGap, 34);
+    ctx.font = "9px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
+    ctx.fillText(String(l), x, 48);
   }
   ctx.restore();
   ctx.globalAlpha = 1;
@@ -227,7 +237,7 @@ function paint(
   if (fade > 0.2) {
     caption(ctx, "the route ran along real edges, so it lines up with the grid", VB_W / 2, VB_H - 14, ink, fade * 0.8);
   } else {
-    caption(ctx, "walk along the edges to the tile, each edge one of five directions", VB_W / 2, VB_H - 14, ink, 0.72);
+    caption(ctx, "each edge adds ±1 to one coordinate — the address builds as you walk", VB_W / 2, VB_H - 14, ink, 0.72);
   }
 }
 
@@ -304,14 +314,16 @@ export default function AddressWalk() {
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
           Address <span className="font-mono">[{addr}]</span>. Every edge of the
-          tiling runs in one of five fixed directions, so you can walk to any tile
-          along its edges. Trace the route from the start tile and you arrive here,
-          on the boundaries of the real tiles.
+          tiling runs in one of five fixed directions, and each edge adds ±1 to the
+          coordinate for that direction. So the address is just the running tally of
+          the walk: start, step, step, until you land here on the real tile boundaries.
         </p>
         <p className="mt-2 opacity-70">
-          Every tile gets five integers like this, an exact name on a floor with no
-          edges. That is the coordinate the explorer reads under your cursor, and a
-          shared link is just these five numbers.
+          A tile far from the start carries big numbers, like{" "}
+          <span className="font-mono">[33, 151, 151, 12, 0]</span>. Same rule, just more
+          steps. The explorer never actually walks there: it reads the five integers
+          straight off the lattice under your cursor, and a shared link is just those
+          five numbers.
         </p>
       </div>
     </Sketch>
