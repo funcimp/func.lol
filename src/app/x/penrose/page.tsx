@@ -308,10 +308,10 @@ export default function PenrosePage() {
             The reason is the same self-similarity, seen the other way. Those
             smaller tiles are not just finer, they group back into larger tiles of
             the very same two shapes. Below, the filled rhombi are a real deflated
-            patch and the bold outlines are the genuine level up, the supertiles
-            the small ones compose into, the same two shapes scaled by φ. Zoom out
-            and watch the supertile lines shrink into place and fill in, becoming
-            the tiles, while a fresh level up appears in outline.
+            patch and the white outlines are the supertiles they compose into, the
+            same two shapes scaled by φ. Zoom in and each tile becomes the outline
+            of finer tiles that fade in underneath, the same two shapes 1/φ the
+            size, diving level after level.
           </p>
           <p>
             Inflate or deflate as far as you like and you always land on another

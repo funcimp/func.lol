@@ -5,38 +5,43 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Sketch from "./Sketch";
 import { PHI, rhombiAt, type Pt, type Rhombus } from "./lib/scaling";
 
-// "Zoom the hierarchy": the spine's section-9 sketch two, rebuilt as a real zoom-out
-// where the lines become tiles. The camera sits deep inside one fixed deflated patch,
-// showing fine tiles with their level-up SUPERTILES outlined over them. Zoom out (the
-// slider, or play) and the supertile outlines shrink to the size the small tiles had
-// and FILL IN, becoming the new tiles, while the next level up appears in outline.
-// The tiling is self-similar, so this can go step after step.
+// "Zoom the hierarchy": the spine's section-9 sketch two, a deflation zoom-in. The
+// camera dives into one fixed deflated patch. The fade choreography the maintainer
+// asked for, per step:
+//   - colored tiles with their white supertile overlay
+//   - the colors fade and the larger white overlay fades; the tiles themselves turn
+//     into white outlines with nothing behind
+//   - then finer colored tiles fade in underneath, and the cycle repeats one level
+//     deeper.
+// Each tile becomes the boundary of the finer tiles inside it: self-similarity made
+// continuous, dived through five levels.
 //
 // HONEST BY CONSTRUCTION. deflate(L) is subdivide(deflate(L-1)); every level is real
-// engine output (lib/scaling.ts and its test), and the supertiles are the genuine
-// level-up tiling rhombiAt(L-1), not hand-drawn. The zoom is a true camera scale; the
-// level of detail crossfades as it crosses each phi-step, hidden by the dissolve.
-// The camera stays well inside the wheel's rim, so no ragged edge is ever exposed,
-// and only the tiles whose centroid lands in the frame are drawn (culled).
+// engine output (lib/scaling.ts and its test), so the white outline of one level is
+// exactly the colored tiles of the level above. The zoom is a true camera scale; the
+// level of detail crossfades as it crosses each phi-step, hidden by the dissolve. The
+// camera stays well inside the wheel's rim, and tiles are culled by centroid so only
+// the visible patch draws. (The geometry is finite: level 10 is already ~55k tiles, so
+// the descent spans five real levels rather than literally sixteen.)
 //
-// Canvas: the harness drives render(t); t = 1 is zoomed in on the finest level (the
-// rich reduced-motion frame), and lowering it zooms out, lines becoming tiles.
+// Canvas: the harness drives render(t); t = 1 is the deepest zoom on the finest level
+// (the rich reduced-motion frame); lowering t zooms back out.
 
 const VB = 480;
-const MARGIN = 0;
 
-// One fixed deep patch; the camera roams its interior. DEEP is the finest level
-// drawn; the zoom walks DEEP down to DEEP - STEPS, each step a factor of phi.
-const DEEP = 8;
-const STEPS = 3;
-const MIN_FILL = DEEP - STEPS; // 5
+// Levels drawn. The colored level walks MIN_C..MIN_C+STEPS as the camera zooms in;
+// the white overlay is one level coarser, the finer tiles one level finer.
+const MIN_C = 5;
+const STEPS = 4; // colored 5 -> 9 across the zoom
+const LO_LEVEL = MIN_C - 1; // 4 (coarsest white overlay)
+const HI_LEVEL = MIN_C + STEPS + 1; // 10 (finest tiles that fade in)
 const FILL = 0.8;
 
-// The camera. RHO0 is the view radius at the finest zoom; it grows by phi per step.
-// VIEW_C is off the wheel centre (which is a five-fold star) so we see a generic
-// patch, and is chosen with RHO0 so the view stays inside the unit-radius wheel.
-const RHO0 = 0.11;
-const VIEW_C: Pt = [0.22, 0.08];
+// The camera dives toward VIEW_C, off the central five-fold star, staying inside the
+// unit-radius wheel. RHO_START is the view radius at the coarsest level; it shrinks by
+// phi per step (zoom in).
+const RHO_START = 0.32;
+const VIEW_C: Pt = [0.32, 0.13];
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -91,8 +96,8 @@ function fillCells(
     ctx.globalAlpha = alpha;
     ctx.fillStyle = r.kind === "thick" ? thick : thin;
     ctx.fill();
-    ctx.globalAlpha = alpha * 0.6;
-    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.lineWidth = 0.6;
     ctx.strokeStyle = ink;
     ctx.stroke();
   }
@@ -138,15 +143,14 @@ export default function ZoomHierarchy() {
   });
   const dprRef = useRef(0);
 
-  // Precompute the levels the zoom touches (fill levels and their outline levels).
   const byLevel = useMemo<Record<number, Cell[]>>(() => {
     const out: Record<number, Cell[]> = {};
-    for (let L = MIN_FILL - 2; L <= DEEP; L++) out[L] = cellsAt(L);
+    for (let L = LO_LEVEL; L <= HI_LEVEL; L++) out[L] = cellsAt(L);
     return out;
   }, []);
 
-  const [level, setLevel] = useState(DEEP);
-  const levelRef = useRef(DEEP);
+  const [level, setLevel] = useState(MIN_C + STEPS);
+  const levelRef = useRef(MIN_C + STEPS);
   const lastTRef = useRef(1);
 
   const refreshColors = useCallback(() => {
@@ -174,35 +178,38 @@ export default function ZoomHierarchy() {
         refreshColors();
       }
 
-      // t = 1: zoomed in on DEEP. Lowering t zooms out, one phi-step at a time.
-      const u = (1 - t) * STEPS;
-      const Lfill = DEEP - Math.floor(u);
+      // t = 1: deepest zoom on the finest level. Lowering t zooms out one step at a time.
+      const u = t * STEPS;
+      const Lc = MIN_C + Math.floor(u); // the colored level
       const frac = u - Math.floor(u);
-      const fade = smooth(0.1, 0.9, frac);
+      // Stage the fade: first the colors and larger overlay go and the tiles become a
+      // white outline (nothing behind); then the finer tiles fade in underneath.
+      const fadeA = smooth(0, 0.45, frac);
+      const fadeB = smooth(0.45, 0.9, frac);
 
-      const rho = RHO0 * Math.pow(PHI, u);
-      const c = (VB / 2 - MARGIN) / rho;
+      const rho = RHO_START * Math.pow(PHI, -u);
+      const c = (VB / 2) / rho;
       const toPx: ToPx = (p) => [
         VB / 2 + (p[0] - VIEW_C[0]) * c,
         VB / 2 - (p[1] - VIEW_C[1]) * c,
       ];
-      const cullR = rho * 1.45;
+      const cullR = rho * 1.5;
       const colors = colorsRef.current;
 
       ctx.clearRect(0, 0, VB, VB);
       ctx.fillStyle = colors.paper;
       ctx.fillRect(0, 0, VB, VB);
 
-      // The fine tiles fading out, the level-up filling in to replace them.
-      fillCells(ctx, byLevel[Lfill], toPx, cullR, colors, FILL * (1 - fade));
-      if (byLevel[Lfill - 1]) fillCells(ctx, byLevel[Lfill - 1], toPx, cullR, colors, FILL * fade);
+      // finer colored tiles, fading in underneath
+      if (byLevel[Lc + 1]) fillCells(ctx, byLevel[Lc + 1], toPx, cullR, colors, FILL * fadeB);
+      // current colored tiles, fading out
+      fillCells(ctx, byLevel[Lc], toPx, cullR, colors, FILL * (1 - fadeA));
+      // the larger white overlay (supertiles), fading out
+      if (byLevel[Lc - 1]) strokeCells(ctx, byLevel[Lc - 1], toPx, cullR, colors.ink, 1 - fadeA);
+      // the current tiles becoming white outlines
+      strokeCells(ctx, byLevel[Lc], toPx, cullR, colors.ink, fadeA);
 
-      // The supertile lines: the current supertiles fading as they fill, the next
-      // level up appearing in outline to take their place.
-      if (byLevel[Lfill - 1]) strokeCells(ctx, byLevel[Lfill - 1], toPx, cullR, colors.ink, 1 - fade);
-      if (byLevel[Lfill - 2]) strokeCells(ctx, byLevel[Lfill - 2], toPx, cullR, colors.ink, fade);
-
-      const shown = frac < 0.5 ? Lfill : Lfill - 1;
+      const shown = fadeB < 0.5 ? Lc : Lc + 1;
       if (shown !== levelRef.current) {
         levelRef.current = shown;
         setLevel(shown);
@@ -226,14 +233,14 @@ export default function ZoomHierarchy() {
   return (
     <Sketch
       label="sketch 09 · zoom the hierarchy"
-      animation={{ duration: 9000, render, slider: { label: "zoom out" } }}
+      animation={{ duration: 11000, render, slider: { label: "zoom in" } }}
     >
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "auto", aspectRatio: "1 / 1" }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch from the substitution engine, shown as a true zoom-out. The camera starts deep inside the tiling on the finest tiles, with their level-up supertiles drawn over them as bold ink outlines. Zooming out, the supertile outlines shrink to the size the small tiles had and fill in, becoming the new tiles, while the next level up appears in outline to take their place. The same two shapes recur at every scale, larger by the golden ratio each step, the tiling self-similar without end."
+        aria-label="A real Penrose patch from the substitution engine, shown as a deflation zoom-in. Colored tiles carry a white outline of their supertiles. Zooming in, the colors fade and the larger white overlay fades, the tiles themselves become white outlines with nothing behind, and finer colored tiles fade in underneath, each tile becoming the boundary of the finer tiles inside it. The same two shapes recur at every scale, smaller by the golden ratio each step, the tiling self-similar as the camera dives through five levels."
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono">
@@ -247,11 +254,10 @@ export default function ZoomHierarchy() {
           </span>
         </div>
         <p className="mt-2 opacity-70">
-          The bold outlines are the real level-up tiles, the same two shapes φ ≈{" "}
-          {PHI.toFixed(3)} times larger. Zoom out and they shrink into place and fill
-          in: each holds φ² ≈ {(PHI * PHI).toFixed(3)} of the tiles a level down.
-          Inflate or deflate forever and you stay on a valid Penrose tiling, a copy of
-          itself at every scale.
+          Each tile becomes the outline of the finer tiles inside it, the same two
+          shapes 1/φ ≈ {(1 / PHI).toFixed(3)} the size. Every supertile holds φ² ≈{" "}
+          {(PHI * PHI).toFixed(3)} of them. Inflate or deflate forever and you stay on
+          a valid Penrose tiling, a copy of itself at every scale.
         </p>
       </div>
     </Sketch>
