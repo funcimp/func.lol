@@ -28,12 +28,17 @@ const VB = 480;
 // Levels drawn. The current level walks MIN_C..MIN_C+STEPS as the camera zooms in.
 const MIN_C = 5;
 const STEPS = 4;
-const LO_LEVEL = MIN_C - 1; // 4
-const HI_LEVEL = MIN_C + STEPS + 1; // 10
-// One level wide each side: at a whole level only that grid shows (the layer alone),
-// halfway between two both show (the nesting). The beat lives in that contrast.
-const PROM = 1.0;
-const HOLD = 0.5; // fraction of each level's time the camera holds it alone, breathing
+const LO_LEVEL = MIN_C; // 5 (coarsest base)
+const HI_LEVEL = MIN_C + STEPS; // 9 (finest layer drawn out)
+// Each level gets a four-phase beat over its share of the timeline. The camera holds
+// still through phases 1-3 and only zooms in phase 4.
+//   [0, P1)   the layer alone (a breath)
+//   [P1, P2)  the finer layer draws out across the plane, no zoom
+//   [P2, P3)  both layers held, to let the nesting sink in
+//   [P3, 1]   zoom in so the finer layer reaches the base size, the base fading out
+const P1 = 0.2;
+const P2 = 0.5;
+const P3 = 0.68;
 
 // The camera dives toward VIEW_C, off the central five-fold star, staying inside the
 // unit-radius wheel. RHO_START is the view radius at the coarsest level; it shrinks by
@@ -73,6 +78,9 @@ type ToPx = (p: Pt) => [number, number];
 const colorForLevel = (level: number, colors: Colors) =>
   level % 2 === 0 ? colors.thick : colors.thin;
 
+// Stroke a level's edges. revealR + band let a layer "draw out" from the centre: a
+// tile fades in as the wavefront radius passes its centroid. Pass a revealR past the
+// cull radius (band 0) to draw the whole layer at once.
 function strokeLevel(
   ctx: CanvasRenderingContext2D,
   cells: Cell[],
@@ -81,16 +89,22 @@ function strokeLevel(
   color: string,
   width: number,
   alpha: number,
+  revealR: number,
+  band: number,
 ) {
   if (alpha <= 0.01) return;
   ctx.save();
-  ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.lineJoin = "round";
-  ctx.beginPath();
   for (const r of cells) {
-    if (Math.hypot(r.cx - VIEW_C[0], r.cy - VIEW_C[1]) > cullR) continue;
+    const rad = Math.hypot(r.cx - VIEW_C[0], r.cy - VIEW_C[1]);
+    if (rad > cullR) continue;
+    let a = alpha;
+    if (band > 0) a *= Math.max(0, Math.min(1, (revealR - rad) / band));
+    if (a <= 0.01) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
     const [x0, y0] = toPx(r.corners[0]);
     ctx.moveTo(x0, y0);
     for (let i = 1; i < 4; i++) {
@@ -98,8 +112,8 @@ function strokeLevel(
       ctx.lineTo(x, y);
     }
     ctx.closePath();
+    ctx.stroke();
   }
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -148,46 +162,46 @@ export default function ZoomHierarchy() {
         refreshColors();
       }
 
-      // t = 1: deepest zoom on the finest level. Lowering t zooms out one step at a
-      // time. Each level gets a beat: the camera holds it alone, then transitions.
-      const raw = t * STEPS;
-      const k = Math.min(STEPS - 1, Math.floor(raw));
-      const f = raw - k;
-      const uStepped = k + (f <= HOLD ? 0 : smooth(HOLD, 1, f));
-      const ideal = MIN_C + uStepped; // the current level, holding on whole numbers
-      const rho = RHO_START * Math.pow(PHI, -uStepped);
+      // t = 1: deepest zoom on the finest level. Each level cycle: hold it alone, draw
+      // out the finer layer, beat, then zoom so the finer layer becomes the new base.
+      const seg = t * STEPS;
+      const k = Math.min(STEPS - 1, Math.floor(seg));
+      const g = seg - k; // progress through this level's beat
+      const baseL = MIN_C + k;
+      const finerL = baseL + 1;
+
+      const drawOut = smooth(P1, P2, g); // the finer layer draws out in phase 2
+      const zoomFrac = smooth(P3, 1, g); // the camera zooms only in phase 4
+      const uZoom = k + zoomFrac; // holds through phases 1-3, then dives one level
+      const rho = RHO_START * Math.pow(PHI, -uZoom);
       const c = VB / 2 / rho;
       const toPx: ToPx = (p) => [
         VB / 2 + (p[0] - VIEW_C[0]) * c,
         VB / 2 - (p[1] - VIEW_C[1]) * c,
       ];
-      const cullR = rho * 1.5;
+      const cullR = rho * 1.6;
       const colors = colorsRef.current;
 
       ctx.clearRect(0, 0, VB, VB);
       ctx.fillStyle = colors.paper;
       ctx.fillRect(0, 0, VB, VB);
 
-      // Draw each nearby level as a line grid, coarse to fine, in its alternating
-      // colour. Prominence is a smooth triangle window around the current level, so
-      // grids rise and fall as the camera dives, with no pop and no level lost to fade.
-      const lo = Math.max(LO_LEVEL, Math.ceil(ideal - PROM));
-      const hi = Math.min(HI_LEVEL, Math.floor(ideal + PROM));
-      for (let L = lo; L <= hi; L++) {
-        const prom = Math.max(0, 1 - Math.abs(L - ideal) / PROM);
-        if (prom <= 0.01) continue;
-        strokeLevel(
-          ctx,
-          byLevel[L],
-          toPx,
-          cullR,
-          colorForLevel(L, colors),
-          0.8 + prom * 1.4,
-          0.25 + prom * 0.7,
-        );
+      // Base layer: full through the beats and the draw-out, fading as the zoom hands
+      // the plane over to the finer layer.
+      const baseAlpha = 0.92 * (1 - zoomFrac);
+      if (byLevel[baseL]) {
+        strokeLevel(ctx, byLevel[baseL], toPx, cullR, colorForLevel(baseL, colors), 1.7, baseAlpha, cullR + 1, 0);
+      }
+      // Finer layer: absent in phase 1, drawing out across the plane in phase 2, full
+      // from then on (and growing to the base size through the zoom).
+      if (byLevel[finerL] && drawOut > 0.001) {
+        const full = g >= P2;
+        const revealR = full ? cullR + 1 : drawOut * cullR;
+        const band = full ? 0 : cullR * 0.28;
+        strokeLevel(ctx, byLevel[finerL], toPx, cullR, colorForLevel(finerL, colors), 1.7, 0.92, revealR, band);
       }
 
-      const shown = Math.round(ideal);
+      const shown = zoomFrac < 0.5 ? baseL : finerL;
       if (shown !== levelRef.current) {
         levelRef.current = shown;
         setLevel(shown);
@@ -211,7 +225,7 @@ export default function ZoomHierarchy() {
   return (
     <Sketch
       label="sketch 09 · zoom the hierarchy"
-      animation={{ duration: 18000, render, slider: { label: "zoom in" } }}
+      animation={{ duration: 20000, render, slider: { label: "zoom in" } }}
     >
       <canvas
         ref={canvasRef}
