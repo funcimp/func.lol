@@ -263,10 +263,10 @@ export default function PenrosePage() {
           <p>
             Because every tile is the shadow of one lattice point, every tile
             carries that point as a name: five integers, exact, no two tiles
-            alike. And the five integers are not an arbitrary code. Each one
-            counts steps along one of five fixed directions, the very directions
-            the tile edges run along. Walk those steps out from the origin and you
-            arrive at the tile. The address is a path you can trace.
+            alike. And every edge of the tiling runs in one of five fixed
+            directions, so you can walk to any tile along its edges. Trace the
+            route below from a starting tile and watch it land on the addressed
+            tile, right on the real boundaries.
           </p>
         </div>
 

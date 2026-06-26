@@ -4,40 +4,35 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
 import { buildPatch, type SketchTile } from "./lib/cutProject";
-import { DIRS, pickAddressTile, type AddressTile } from "./lib/address";
+import { buildEdgeWalk, DIRS, type EdgeWalk } from "./lib/address";
 
 // "Every tile knows its address": the spine's section-8 sketch. The address is the
-// tile's ℤ⁵ coordinate, five integers, and each integer counts steps along one of
-// five fixed directions (the tile's own edge directions). Walking those steps from
-// the origin lands exactly on the tile's corner, so the address is a path you can
-// walk, not a label stuck on after.
+// tile's ℤ⁵ coordinate, five integers. Every edge of the tiling is a unit step in one
+// of five fixed directions, so you can WALK to any tile along its edges. The reveal:
+// first the blank route, tracing edge by edge from the origin tile to the target,
+// with the tiles hidden. Then the tiling fades in around it, and because the route ran
+// along real edges, it lines up exactly with the grid.
 //
-// The reveal: first the blank walk, just the five direction rays and the path
-// stepping out to the tile. Then the rest of the tiling fades in around it, so you
-// see where that one address sits in the whole grid, the path still drawn on top.
+// Bound to address.ts (and address.test.ts): the route is a breadth-first path on the
+// real edge graph of the cut-and-project patch; every segment is a genuine unit-edge
+// in one of the five directions, and it ends on the target tile's vertex.
 //
-// Bound to address.ts (and address.test.ts): the directions, the walk, and the tile
-// are real engine output, and the walk provably ends at physical(coord). The patch
-// that fades in is the same cut-and-project patch the explorer paints.
-//
-// Canvas: the harness drives render(t); t walks the path then fades in the tiling.
+// Canvas: the harness drives render(t); t traces the route then fades in the tiling.
 
 const VB_W = 620;
 const VB_H = 540;
-const PAD = 30;
+const PAD = 28;
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || fallback;
 }
 
 type Colors = { thick: string; thin: string; paper: string; ink: string };
 type Pt = readonly [number, number];
 
-function makeFit(tile: AddressTile, patch: SketchTile[]) {
+function makeFit(walk: EdgeWalk, patch: SketchTile[]) {
   let minX = 0;
   let minY = 0;
   let maxX = 0;
@@ -49,30 +44,15 @@ function makeFit(tile: AddressTile, patch: SketchTile[]) {
     maxY = Math.max(maxY, y);
   };
   for (const t of patch) for (const [x, y] of t.physical) note(x, y);
-  for (const [x, y] of tile.path) note(x, y);
+  for (const [x, y] of walk.path) note(x, y);
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
   const half = Math.max(maxX - minX, maxY - minY) / 2 + 0.4;
-  const s = Math.min(
-    (VB_W - 2 * PAD) / (2 * half),
-    (VB_H - 2 * PAD - 46) / (2 * half),
-  );
+  const s = Math.min((VB_W - 2 * PAD) / (2 * half), (VB_H - 2 * PAD - 40) / (2 * half));
   return (p: Pt): [number, number] => [
     VB_W / 2 + (p[0] - cx) * s,
-    VB_H / 2 + 22 - (p[1] - cy) * s, // leave room for the address row up top
+    VB_H / 2 + 18 - (p[1] - cy) * s, // room for the address row up top
   ];
-}
-
-type Range = { start: number; end: number; count: number } | null;
-function digitRanges(tile: AddressTile): Range[] {
-  const ranges: Range[] = [null, null, null, null, null];
-  let acc = 0;
-  for (const g of tile.groups) {
-    const len = Math.abs(g.count);
-    ranges[g.l] = { start: acc, end: acc + len, count: g.count };
-    acc += len;
-  }
-  return ranges;
 }
 
 function caption(
@@ -87,20 +67,14 @@ function caption(
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = ink;
-  ctx.font =
-    "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
+  ctx.font = "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, x, y);
   ctx.restore();
 }
 
-function arrowHead(
-  ctx: CanvasRenderingContext2D,
-  from: [number, number],
-  to: [number, number],
-  ink: string,
-) {
+function arrowHead(ctx: CanvasRenderingContext2D, from: [number, number], to: [number, number], ink: string) {
   const ang = Math.atan2(to[1] - from[1], to[0] - from[0]);
   const len = 9;
   ctx.save();
@@ -117,18 +91,17 @@ function arrowHead(
 function paint(
   ctx: CanvasRenderingContext2D,
   t: number,
-  tile: AddressTile,
+  walk: EdgeWalk,
   patch: SketchTile[],
-  ranges: Range[],
   colors: Colors,
 ) {
   const { thick, thin, paper, ink } = colors;
-  const fit = makeFit(tile, patch);
-  const T = tile.path.length - 1;
+  const fit = makeFit(walk, patch);
+  const E = walk.edgeDirs.length;
 
-  // Phase 1: walk the blank path. Phase 2: the tiling fades in around it.
+  // Phase 1: trace the route along edges. Phase 2: the tiling fades in around it.
   const walkP = Math.max(0, Math.min(1, t / 0.58));
-  const shown = Math.max(0, Math.min(T, Math.round(walkP * T)));
+  const shown = Math.max(0, Math.min(E, Math.round(walkP * E)));
   const fade = Math.max(0, Math.min(1, (t - 0.62) / 0.38));
 
   ctx.clearRect(0, 0, VB_W, VB_H);
@@ -155,12 +128,9 @@ function paint(
       ctx.stroke();
       ctx.restore();
     }
-  }
-
-  // The target tile, highlighted, sitting where the walk lands.
-  if (fade > 0) {
+    // The target tile, highlighted where the route lands.
     ctx.beginPath();
-    tile.corners.forEach((c, i) => {
+    walk.targetCorners.forEach((c, i) => {
       const [x, y] = fit(c);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -168,7 +138,7 @@ function paint(
     ctx.closePath();
     ctx.save();
     ctx.globalAlpha = fade;
-    ctx.fillStyle = tile.type === "thick" ? thick : thin;
+    ctx.fillStyle = walk.targetType === "thick" ? thick : thin;
     ctx.fill();
     ctx.lineWidth = 2.2;
     ctx.strokeStyle = ink;
@@ -176,33 +146,35 @@ function paint(
     ctx.restore();
   }
 
-  // The five direction rays from the origin, fading back as the tiling arrives.
-  const o = fit([0, 0]);
-  const rayA = 0.32 * (1 - fade * 0.7);
+  // The five direction rays from the start vertex: the edge directions the route uses.
+  const o = fit(walk.start.p);
+  const curDir = shown > 0 ? walk.edgeDirs[shown - 1] : -1;
   for (let l = 0; l < 5; l++) {
-    const tip = fit(DIRS[l]);
+    const tipData: Pt = [walk.start.p[0] + DIRS[l][0], walk.start.p[1] + DIRS[l][1]];
+    const tip = fit(tipData);
+    const lit = l === curDir && fade < 0.5;
     ctx.save();
-    ctx.globalAlpha = rayA;
+    ctx.globalAlpha = (lit ? 0.7 : 0.28) * (1 - fade * 0.7);
     ctx.strokeStyle = ink;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = lit ? 1.8 : 1;
+    ctx.setLineDash(lit ? [] : [3, 3]);
     ctx.beginPath();
     ctx.moveTo(o[0], o[1]);
     ctx.lineTo(tip[0], tip[1]);
     ctx.stroke();
     ctx.restore();
-    caption(ctx, String(l), tip[0] + (tip[0] - o[0]) * 0.18, tip[1] + (tip[1] - o[1]) * 0.18, ink, rayA * 1.3);
+    caption(ctx, String(l), tip[0] + (tip[0] - o[0]) * 0.18, tip[1] + (tip[1] - o[1]) * 0.18, ink, 0.45 * (1 - fade * 0.6));
   }
 
-  // The walk: a bold ink polyline with a paper casing so it reads over the tiles.
+  // The route: a bold ink polyline with a paper casing so it reads over the tiles.
   if (shown > 0) {
     for (const [w, col] of [[5.5, paper], [2.6, ink]] as const) {
       ctx.save();
       ctx.beginPath();
-      const p0 = fit(tile.path[0]);
+      const p0 = fit(walk.path[0]);
       ctx.moveTo(p0[0], p0[1]);
       for (let i = 1; i <= shown; i++) {
-        const [x, y] = fit(tile.path[i]);
+        const [x, y] = fit(walk.path[i]);
         ctx.lineTo(x, y);
       }
       ctx.lineWidth = w;
@@ -212,9 +184,9 @@ function paint(
       ctx.stroke();
       ctx.restore();
     }
-    arrowHead(ctx, fit(tile.path[shown - 1]), fit(tile.path[shown]), ink);
+    arrowHead(ctx, fit(walk.path[shown - 1]), fit(walk.path[shown]), ink);
     for (let i = 1; i <= shown; i++) {
-      const [x, y] = fit(tile.path[i]);
+      const [x, y] = fit(walk.path[i]);
       ctx.beginPath();
       ctx.arc(x, y, 2.6, 0, Math.PI * 2);
       ctx.fillStyle = ink;
@@ -222,7 +194,7 @@ function paint(
     }
   }
 
-  // Origin marker.
+  // Start marker.
   ctx.beginPath();
   ctx.arc(o[0], o[1], 3.4, 0, Math.PI * 2);
   ctx.fillStyle = ink;
@@ -232,24 +204,10 @@ function paint(
   ctx.lineWidth = 1.3;
   ctx.strokeStyle = paper;
   ctx.stroke();
-  caption(ctx, "origin", o[0], o[1] + 15, ink, 0.5 * (1 - fade * 0.5));
+  caption(ctx, "start", o[0], o[1] + 15, ink, 0.5 * (1 - fade * 0.4));
 
-  // Group labels: name each direction run, only while we are walking it.
-  if (fade < 0.4) {
-    for (let l = 0; l < 5; l++) {
-      const r = ranges[l];
-      if (!r || shown <= r.start) continue;
-      const midStep = Math.min(shown, (r.start + r.end) / 2);
-      const a = tile.path[Math.floor(midStep)];
-      const b = tile.path[Math.min(tile.path.length - 1, Math.ceil(midStep))];
-      const [mx, my] = fit([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
-      const sign = r.count < 0 ? "−" : "";
-      const mag = Math.abs(r.count) > 1 ? ` ×${Math.abs(r.count)}` : "";
-      caption(ctx, `${sign}d${l}${mag}`, mx, my - 12, ink, (1 - fade / 0.4) * 0.85);
-    }
-  }
-
-  // The address row, up top. Each digit lights as the walk reaches its direction.
+  // The address row, up top: the target tile's coordinate, lit once the route lands.
+  const addrAlpha = shown >= E ? 0.95 : 0.4;
   ctx.save();
   ctx.font = "15px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
   ctx.textBaseline = "middle";
@@ -258,32 +216,24 @@ function paint(
   const digitGap = 30;
   const startX = VB_W / 2 - (digitGap * 4) / 2;
   for (let l = 0; l < 5; l++) {
-    const r = ranges[l];
-    const alpha = r && shown >= r.start + 1 ? 0.95 : r ? 0.4 : 0.28;
-    const x = startX + l * digitGap;
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = addrAlpha;
     ctx.fillStyle = ink;
-    ctx.fillText(String(tile.coord[l]), x, 34);
-    if (r && shown > r.start && shown < r.end) {
-      ctx.globalAlpha = 0.8;
-      ctx.fillRect(x - 7, 45, 14, 1.5);
-    }
+    ctx.fillText(String(walk.targetCoord[l]), startX + l * digitGap, 34);
   }
   ctx.restore();
   ctx.globalAlpha = 1;
 
   // Bottom caption.
   if (fade > 0.2) {
-    caption(ctx, "the address names this tile in the whole grid", VB_W / 2, VB_H - 14, ink, fade * 0.8);
+    caption(ctx, "the route ran along real edges, so it lines up with the grid", VB_W / 2, VB_H - 14, ink, fade * 0.8);
   } else {
-    caption(ctx, "walk the address: a step along each direction, counted", VB_W / 2, VB_H - 14, ink, 0.72);
+    caption(ctx, "walk along the edges to the tile, each edge one of five directions", VB_W / 2, VB_H - 14, ink, 0.72);
   }
 }
 
 export default function AddressWalk() {
-  const tile = useMemo(() => pickAddressTile(), []);
+  const walk = useMemo(() => buildEdgeWalk(), []);
   const patch = useMemo(() => buildPatch(), []);
-  const ranges = useMemo(() => digitRanges(tile), [tile]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const colorsRef = useRef<Colors>({
     thick: "#C89B3C",
@@ -316,9 +266,9 @@ export default function AddressWalk() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      paint(ctx, t, tile, patch, ranges, colorsRef.current);
+      paint(ctx, t, walk, patch, colorsRef.current);
     },
-    [refreshColors, tile, patch, ranges],
+    [refreshColors, walk, patch],
   );
 
   useEffect(() => {
@@ -333,7 +283,7 @@ export default function AddressWalk() {
     return () => observer.disconnect();
   }, [refreshColors, render]);
 
-  const addr = tile.coord.join(", ");
+  const addr = walk.targetCoord.join(", ");
 
   return (
     <Sketch
@@ -349,20 +299,19 @@ export default function AddressWalk() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label={`A ${tile.type} tile's address is the five integers [${addr}]. Each integer counts steps along one of five fixed directions, the tile's own edge directions, drawn as labeled rays from the origin. The walk steps out from the origin, one ray at a time, and lands exactly on the tile's corner. Then the rest of the tiling fades in around it, showing where that one address sits in the whole grid, with the path still drawn on top. The address is a walk from the origin to the tile, the same coordinate the explorer reads under your cursor.`}
+        aria-label={`Every Penrose tile has a five-integer address, its coordinate. The tiling's edges all run in one of five fixed directions, drawn as labeled rays from the start vertex. The animation traces a route from the start tile to a target tile, edge by edge along those directions, with the tiles hidden. Then the surrounding tiling fades in, and because the route ran along real tile edges it lines up exactly with the grid. The target tile's address is [${addr}], the same coordinate the explorer reads under your cursor.`}
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
-          Address <span className="font-mono">[{addr}]</span>. Read it as a walk:
-          each number is how many steps to take along one of five fixed directions,
-          the tile&#39;s own edge directions. Start at the origin, take the steps,
-          and you arrive at this {tile.type} tile. Negative means step the other way.
+          Address <span className="font-mono">[{addr}]</span>. Every edge of the
+          tiling runs in one of five fixed directions, so you can walk to any tile
+          along its edges. Trace the route from the start tile and you arrive here,
+          on the boundaries of the real tiles.
         </p>
         <p className="mt-2 opacity-70">
-          Then the rest of the tiling fills in around it. Every tile gets five
-          integers like this, an exact name on a floor with no edges. That is the
-          coordinate the explorer reads under your cursor, and a shared link is just
-          these five numbers.
+          Every tile gets five integers like this, an exact name on a floor with no
+          edges. That is the coordinate the explorer reads under your cursor, and a
+          shared link is just these five numbers.
         </p>
       </div>
     </Sketch>

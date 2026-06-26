@@ -1,21 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { inWindow, physical, type Vec5 } from "../../explore/lib/cap";
-import { WINDOW_CENTER } from "../../explore/lib/pentagrid";
-import {
-  DIRS,
-  pickAddressTile,
-  walkExtent,
-  walkPath,
-} from "./address";
+import { physical, type Vec5 } from "../../explore/lib/cap";
+import { buildEdgeWalk, DIRS } from "./address";
 
-const [VX, VY] = WINDOW_CENTER;
-
-// This BINDS the address sketch to the engine. The sketch claims a tile's five-integer
-// address is a walk from the origin along five fixed directions that lands exactly on
-// the tile's corner. Every claim is a test: the directions are unit vectors 72 degrees
-// apart, the walk reconstructs physical(coord), and the chosen tile is a real accepted
-// tile of the actual tiling. If the walk ever drifts from the projection, this fails.
+// This BINDS the address sketch to the engine. The sketch claims you can walk to any
+// tile along the tiling's own edges, each edge one of five fixed directions, and that
+// the route lines up with the grid. Every claim is a test: the directions are unit
+// vectors 72 degrees apart, and every segment of the route is a genuine unit-length
+// tile edge in one of those directions, ending on the target tile's vertex. If the
+// route ever leaves the edges, it would not line up, and this fails.
 
 describe("the five directions are the pentagon edge directions", () => {
   test("each is a unit vector", () => {
@@ -31,67 +24,32 @@ describe("the five directions are the pentagon edge directions", () => {
   });
 });
 
-describe("the address is a walk that lands on the tile", () => {
-  const coords: number[][] = [
-    [1, 0, 0, 0, 0],
-    [1, 1, 1, 0, -1],
-    [0, -1, 1, 1, 1],
-    [2, 0, -1, 0, 1],
-  ];
+describe("the edge walk lies on real tile edges (it lines up with the grid)", () => {
+  const w = buildEdgeWalk();
 
-  for (const coord of coords) {
-    test(`walk to [${coord.join(",")}] ends at physical(coord)`, () => {
-      const path = walkPath(coord);
-      const end = path[path.length - 1];
-      const [px, py] = physical(coord as never);
-      expect(end[0]).toBeCloseTo(px, 12);
-      expect(end[1]).toBeCloseTo(py, 12);
-    });
+  test("the route is non-trivial and ends at the target vertex", () => {
+    expect(w.path.length).toBeGreaterThan(6);
+    expect(w.edgeDirs.length).toBe(w.path.length - 1);
+    const end = w.path[w.path.length - 1];
+    const [px, py] = physical(w.targetCoord as unknown as Vec5);
+    expect(end[0]).toBeCloseTo(px, 9);
+    expect(end[1]).toBeCloseTo(py, 9);
+  });
 
-    test(`walk to [${coord.join(",")}] has one point per unit step`, () => {
-      const steps = coord.reduce((a, n) => a + Math.abs(n), 0);
-      expect(walkPath(coord).length).toBe(steps + 1);
-    });
-  }
-
-  test("physical(coord) is exactly the sum of n_l * d_l", () => {
-    for (const coord of coords) {
-      let x = 0;
-      let y = 0;
-      for (let l = 0; l < 5; l++) {
-        x += coord[l] * DIRS[l][0];
-        y += coord[l] * DIRS[l][1];
-      }
-      const [px, py] = physical(coord as never);
-      expect(x).toBeCloseTo(px, 12);
-      expect(y).toBeCloseTo(py, 12);
+  test("every segment is a unit-length tile edge in one of the five directions", () => {
+    for (let i = 1; i < w.path.length; i++) {
+      const a = w.path[i - 1];
+      const b = w.path[i];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      expect(len).toBeCloseTo(1, 6); // a real unit edge, so it lines up with the tiles
+      const dir = w.edgeDirs[i - 1];
+      expect(dir).toBeGreaterThanOrEqual(0);
+      expect(dir).toBeLessThanOrEqual(4);
+      // the segment runs parallel to its named edge direction
+      const dx = (b[0] - a[0]) / len;
+      const dy = (b[1] - a[1]) / len;
+      const dot = Math.abs(dx * DIRS[dir][0] + dy * DIRS[dir][1]);
+      expect(dot).toBeCloseTo(1, 6);
     }
-  });
-});
-
-describe("the representative is a real, accepted tile", () => {
-  const tile = pickAddressTile();
-
-  test("its anchor coord is an accepted vertex at the tiling's center", () => {
-    // buildPatch only emits a tile when all four corners pass inWindow; the anchor
-    // coord is one of them, so an accepted address is a real vertex of the tiling.
-    expect(inWindow(tile.coord as unknown as Vec5, VX, VY)).toBe(true);
-  });
-
-  test("its groups reconstruct the coordinate exactly", () => {
-    const rebuilt = [0, 0, 0, 0, 0];
-    for (const g of tile.groups) rebuilt[g.l] = g.count;
-    expect(rebuilt).toEqual(tile.coord);
-  });
-
-  test("the path ends at the tile's projection", () => {
-    const end = tile.path[tile.path.length - 1];
-    const [px, py] = physical(tile.coord as never);
-    expect(end[0]).toBeCloseTo(px, 12);
-    expect(end[1]).toBeCloseTo(py, 12);
-  });
-
-  test("the walk stays inside the drawn patch (bounded extent)", () => {
-    expect(walkExtent(tile.coord)).toBeLessThan(4.6);
   });
 });

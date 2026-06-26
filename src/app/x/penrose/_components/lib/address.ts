@@ -1,9 +1,9 @@
 // Data for the "every tile knows its address" sketch (spine section 8). The address
-// is the tile's ℤ⁵ coordinate, and the five integers are literally step counts along
-// the five pentagon directions: physical(n) = sum_l n_l * d_l, where d_l is the unit
-// vector at angle 72*l degrees, the same five directions the tile edges run along. So
-// the address is a walk from the lattice origin straight to the tile's corner. Bound
-// to the real engine (cap.ts, buildPatch) by address.test.ts.
+// is the tile's ℤ⁵ coordinate. Every edge of the tiling is a unit step in one of five
+// fixed directions (the tile edge directions), so you can WALK to any tile along its
+// edges. This module builds the patch's edge graph and a breadth-first route from the
+// origin tile to a target, so the route lies on REAL edges and lines up with the grid
+// when the tiles are drawn. Bound to the engine (cap.ts, buildPatch) by address.test.ts.
 
 import { PCOS, PSIN, type Pt } from "../../explore/lib/cap";
 import { buildPatch } from "./cutProject";
@@ -11,88 +11,117 @@ import { buildPatch } from "./cutProject";
 // The five physical edge directions, d_l at angle 72*l degrees.
 export const DIRS: Pt[] = PCOS.map((c, l) => [c, PSIN[l]] as Pt);
 
-export type WalkGroup = { l: number; count: number };
-export type AddressTile = {
-  coord: number[];
-  type: "thick" | "thin";
-  corners: Pt[]; // the tile's physical corners
-  groups: WalkGroup[]; // the nonzero directions, in index order
-  path: Pt[]; // origin, then the point after each unit step; last = the tile corner
+// ---------------------------------------------------------------------------
+// The edge walk: a route to a tile along REAL tile edges, so it lines up with the
+// grid when the tiles are revealed. Every tiling edge is a unit step in one of the
+// five directions, so the walk is still "steps along the five directions," now along
+// edges the tiles actually share. Bound by address.test.ts.
+// ---------------------------------------------------------------------------
+
+export type EdgeWalk = {
+  start: { coord: number[]; p: Pt }; // the vertex nearest the origin
+  targetCoord: number[]; // the tile we walk to (its anchor vertex's coordinate)
+  targetType: "thick" | "thin";
+  targetCorners: Pt[]; // the target tile, to highlight
+  path: Pt[]; // physical points along the route, start..target vertex
+  edgeDirs: number[]; // direction index 0..4 of each edge (length path.length - 1)
 };
 
-// The straight walk, direction by direction in index order: |n_l| unit steps along
-// (or against, if n_l < 0) each d_l. path[0] is the origin, path.at(-1) is the corner.
-export function walkPath(coord: readonly number[]): Pt[] {
-  const path: Pt[] = [[0, 0]];
-  let x = 0;
-  let y = 0;
-  for (let l = 0; l < 5; l++) {
-    const step = Math.sign(coord[l]);
-    for (let s = 0; s < Math.abs(coord[l]); s++) {
-      x += step * DIRS[l][0];
-      y += step * DIRS[l][1];
-      path.push([x, y]);
+// Build the patch's edge graph and shortest-route to a clear, mid-distance target.
+export function buildEdgeWalk(): EdgeWalk {
+  const patch = buildPatch();
+  const vert = new Map<string, { coord: number[]; p: Pt }>();
+  const adj = new Map<string, { k: string; dir: number }[]>();
+  const link = (ak: string, bk: string, dir: number) => {
+    const a = adj.get(ak) ?? adj.set(ak, []).get(ak)!;
+    if (!a.some((e) => e.k === bk)) a.push({ k: bk, dir });
+  };
+  for (const t of patch) {
+    const cc = t.cornerCoords as unknown as number[][];
+    const pp = t.physical;
+    for (let i = 0; i < 4; i++) {
+      const a = cc[i];
+      const b = cc[(i + 1) % 4];
+      const ak = a.join(",");
+      const bk = b.join(",");
+      vert.set(ak, { coord: [...a], p: [pp[i][0], pp[i][1]] });
+      vert.set(bk, { coord: [...b], p: [pp[(i + 1) % 4][0], pp[(i + 1) % 4][1]] });
+      let dir = 0;
+      for (let l = 0; l < 5; l++) if (b[l] !== a[l]) { dir = l; break; }
+      link(ak, bk, dir);
+      link(bk, ak, dir);
     }
   }
-  return path;
-}
 
-// How far the walk strays from the origin, so the sketch can frame it.
-export function walkExtent(coord: readonly number[]): number {
-  let m = 0;
-  for (const [x, y] of walkPath(coord)) m = Math.max(m, Math.hypot(x, y));
-  return m;
-}
+  // Start: the accepted vertex nearest the physical origin.
+  let startK = "";
+  let bestD = Infinity;
+  for (const [k, v] of vert) {
+    const d = Math.hypot(v.p[0], v.p[1]);
+    if (d < bestD) {
+      bestD = d;
+      startK = k;
+    }
+  }
 
-const nonzero = (c: readonly number[]) => c.filter((n) => n !== 0).length;
-const stepCount = (c: readonly number[]) =>
-  c.reduce((a, n) => a + Math.abs(n), 0);
+  // Breadth-first distances and parents from the start vertex.
+  const parent = new Map<string, { k: string; dir: number } | null>();
+  const dist = new Map<string, number>();
+  parent.set(startK, null);
+  dist.set(startK, 0);
+  const queue = [startK];
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi];
+    const d = dist.get(cur)!;
+    for (const e of adj.get(cur) ?? []) {
+      if (!dist.has(e.k)) {
+        dist.set(e.k, d + 1);
+        parent.set(e.k, { k: cur, dir: e.dir });
+        queue.push(e.k);
+      }
+    }
+  }
 
-// How far the walk may stray and still sit inside the drawn patch.
-const EXT_MAX = 4.6;
-
-// Deterministic representative: a real accepted tile with a long, rich walk, one that
-// uses as many of the five directions as possible and as many steps as possible while
-// staying inside the patch. Tie-break to the lexicographically greatest coord so
-// positive steps lead. Bound to buildPatch, so it is a genuine tile of the real
-// tiling, and the walk lands inside the tile set that fades in around it.
-export function pickAddressTile(): AddressTile {
-  const patch = buildPatch();
-  const byCoord = new Map<string, (typeof patch)[number]>();
+  // Target: a tile sitting well inside the patch (so it is not cut by the patch
+  // edge), reaching to the side so the route spans the view. Deterministic: among
+  // reachable tiles with anchor radius in [3.8, 4.8], the rightmost, tie-broken by
+  // coordinate. The breadth-first route to it is a real edge path (~8-11 edges).
+  let targetTile = patch[0];
+  let best = -Infinity;
   for (const t of patch) {
-    const k = (t.coord as number[]).join(",");
-    if (!byCoord.has(k)) byCoord.set(k, t);
+    const k = (t.cornerCoords[0] as unknown as number[]).join(",");
+    if (!dist.has(k)) continue;
+    const v = vert.get(k)!;
+    const r = Math.hypot(v.p[0], v.p[1]);
+    if (r < 3.8 || r > 4.8) continue;
+    const score = v.p[0] * 1000 + v.p[1];
+    if (score > best) {
+      best = score;
+      targetTile = t;
+    }
   }
-  const tiles = [...byCoord.values()];
-  const pool = tiles.filter((t) => {
-    const c = t.coord as number[];
-    return nonzero(c) >= 3 && walkExtent(c) <= EXT_MAX;
-  });
-  const ranked = (pool.length ? pool : tiles).slice().sort((a, b) => {
-    const ca = a.coord as number[];
-    const cb = b.coord as number[];
-    const dn = nonzero(cb) - nonzero(ca); // more directions first
-    if (dn !== 0) return dn;
-    const ds = stepCount(cb) - stepCount(ca); // longer walk first
-    if (ds !== 0) return ds;
-    const ea = walkExtent(ca);
-    const eb = walkExtent(cb);
-    if (Math.abs(ea - eb) > 1e-9) return ea - eb; // tighter walk
-    for (let i = 0; i < 5; i++) if (ca[i] !== cb[i]) return cb[i] - ca[i];
-    return 0;
-  });
-  const best = ranked[0];
-  // Normalize any -0 the enumerator produced to +0 so the address reads cleanly.
-  const coord = (best.coord as number[]).map((n) => (n === 0 ? 0 : n));
-  const groups: WalkGroup[] = [];
-  for (let l = 0; l < 5; l++) {
-    if (coord[l] !== 0) groups.push({ l, count: coord[l] });
+  const targetK = (targetTile.cornerCoords[0] as unknown as number[]).join(",");
+
+  // Reconstruct the route start..target.
+  const keys: string[] = [];
+  const dirs: number[] = [];
+  let cur: string | undefined = targetK;
+  while (cur) {
+    keys.push(cur);
+    const par = parent.get(cur);
+    if (!par) break;
+    dirs.push(par.dir);
+    cur = par.k;
   }
+  keys.reverse();
+  dirs.reverse();
+
   return {
-    coord,
-    type: best.type,
-    corners: best.physical.map(([x, y]) => [x, y] as Pt),
-    groups,
-    path: walkPath(coord),
+    start: vert.get(startK)!,
+    targetCoord: [...(targetTile.coord as number[])],
+    targetType: targetTile.type,
+    targetCorners: targetTile.physical.map(([x, y]) => [x, y] as Pt),
+    path: keys.map((k) => vert.get(k)!.p),
+    edgeDirs: dirs,
   };
 }
