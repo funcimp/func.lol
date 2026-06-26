@@ -208,15 +208,14 @@ export default function PenrosePage() {
             two lengths are already a hint of the two tiles to come.
           </p>
           <p>
-            Penrose is this same construction one stage up, and the panel at the
-            foot of the sketch shows it running. The grid is the integer lattice
-            ℤ⁵, five dimensions. The line becomes our plane, and the strip becomes
-            a window shaped like nested pentagons. A tile exists exactly when its
-            5D shadow lands in that window, a test you run on one point alone, with
-            no backtracking. Each tile is decided on its own, so the plane is{" "}
-            <em>computed</em>, never assembled, and it can never dead-end. Scan the
-            strip across the grid below: the line fills as it crosses points, and the
-            plane is computed outward from its centre. This is what the explorer runs.
+            Penrose is this same construction one stage up. The grid is the integer
+            lattice ℤ⁵, five dimensions. The line becomes our plane, and the strip
+            becomes a window shaped like nested pentagons. A tile exists exactly when
+            its 5D shadow lands in that window, a test you run on one point alone,
+            with no backtracking. Each tile is decided on its own, so the plane is{" "}
+            <em>computed</em>, never assembled, and it can never dead-end. The next
+            sketches show how that plays out on the plane. This is what the explorer
+            runs.
           </p>
         </div>
 

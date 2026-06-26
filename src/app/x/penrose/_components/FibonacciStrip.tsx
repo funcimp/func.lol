@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import Sketch from "./Sketch";
 import {
@@ -12,36 +12,31 @@ import {
   SHORT,
   WINDOW_W,
 } from "./lib/fibonacci";
-import { facesInViewport, GAMMA } from "../explore/lib/pentagrid";
-import type { RenderFace } from "../explore/lib/patch";
 
 // "Cut and project, where you can see it": the spine's section-6 lead-in. The same
 // construction one dimension lower, fully visible. A square integer lattice, a line at
 // the golden slope, and a strip (the window) around it. A scan sweeps ALONG the line:
 // the points it crosses inside the strip drop onto the line and grow the Fibonacci
-// chain, long and short intervals, ratio phi, never repeating. Below, the real 2D
-// Penrose tiling, the same cut and project one stage up (5D -> 2D), builds in the same
-// sweep, and a pointer tracks from the scan's point on the line to the tile filling in
-// at that moment. Cut is the strip, project is the drop, and the same method one stage
-// up gives the tiles on the grid.
+// chain, long and short intervals, ratio phi, never repeating. Cut is the strip,
+// project is the drop. This is the cut-and-project method made visible; Penrose is the
+// same method one dimension up (5D -> 2D), which the next sketches show on the plane.
 //
 // Bound to fibonacci.ts (and fibonacci.test.ts): every accepted point and every
-// long/short gap is computed, not drawn by hand. The Penrose patch is real enumerator
-// output (facesInViewport). The pointer is an analogy in step (both quasicrystals have
-// two prototiles, built by the same window test), not a tile-by-tile map across the
-// dimensions.
+// long/short gap is computed, not drawn by hand. This sketch shows ONLY the 1D
+// construction, which is fully traceable on its own (lattice point -> its drop -> the
+// interval it bounds). It does not claim to draw the 2D Penrose tiles, which come from
+// a different lattice (the pentagrid / cut-and-project sketches handle those).
 //
 // Canvas: the harness drives render(t); t is the scan position. Theme colours are read
-// live. Reduced motion mounts at t = 1, the finished frame (scan and pointer gone).
+// live. Reduced motion mounts at t = 1, the finished chain (scan gone).
 
-const VB_W = 720;
-const VB_H = 712;
+const VB_W = 680;
+const VB_H = 380;
 const PAD = 30;
 
-const TOP = { x: PAD, y: 26, w: VB_W - 2 * PAD, h: 214 };
-const CHAIN_Y = 288;
-const CHAIN_H = 16;
-const PEN = { x: PAD, y: 350, w: VB_W - 2 * PAD, h: 330 };
+const TOP = { x: PAD, y: 26, w: VB_W - 2 * PAD, h: 230 };
+const CHAIN_Y = 304;
+const CHAIN_H = 18;
 
 // How much of the lattice to show. The line of slope 1/phi runs across this box.
 const VIEW_M = 7;
@@ -49,30 +44,10 @@ const VIEW_N = 5;
 const S_EXT = 16; // half-length of the drawn line/strip in data units (overshoots view)
 const OFFSET0 = 0.05; // the fixed window offset (centres the strip on the line)
 
-// The Penrose patch: the same cut and project, one stage up.
-const PEN_PX = 8.5; // physical half-width shown
-const PEN_PY = (PEN_PX * PEN.h) / PEN.w; // matched to the panel aspect
-const PEN_SCALE = Math.min(PEN.w / (2 * PEN_PX), PEN.h / (2 * PEN_PY));
-const PEN_VIEW = {
-  minX: -PEN_PX - 0.8,
-  maxX: PEN_PX + 0.8,
-  minY: -PEN_PY - 0.8,
-  maxY: PEN_PY + 0.8,
-};
-
 type V2 = readonly [number, number];
 const add = (a: V2, b: V2): V2 => [a[0] + b[0], a[1] + b[1]];
 const scale = (k: number, v: V2): V2 => [k * v[0], k * v[1]];
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-
-// A tile plus its physical radius, so the plane can be computed outward from the
-// centre (each tile from its own coordinate) as the scan runs above it.
-type Cell2D = { f: RenderFace; r: number };
-
-const penToPx = ([x, y]: V2): [number, number] => [
-  PEN.x + PEN.w / 2 + x * PEN_SCALE,
-  PEN.y + PEN.h / 2 - y * PEN_SCALE,
-];
 
 // Data (m,n) plane -> pixels, equal scale so the lattice stays square, y flipped.
 const SCALE = Math.min(TOP.w / (2 * VIEW_M), TOP.h / (2 * VIEW_N));
@@ -113,33 +88,7 @@ function caption(
   ctx.restore();
 }
 
-function arrowHead(
-  ctx: CanvasRenderingContext2D,
-  from: [number, number],
-  to: [number, number],
-  color: string,
-  alpha: number,
-) {
-  const ang = Math.atan2(to[1] - from[1], to[0] - from[0]);
-  const len = 9;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(to[0], to[1]);
-  ctx.lineTo(to[0] - len * Math.cos(ang - 0.4), to[1] - len * Math.sin(ang - 0.4));
-  ctx.lineTo(to[0] - len * Math.cos(ang + 0.4), to[1] - len * Math.sin(ang + 0.4));
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function paint(
-  ctx: CanvasRenderingContext2D,
-  t: number,
-  colors: Colors,
-  cells: Cell2D[],
-) {
+function paint(ctx: CanvasRenderingContext2D, t: number, colors: Colors) {
   const { thick, thin, paper, ink } = colors;
   const gamma = OFFSET0 - WINDOW_W / 2; // centre the window on the line
 
@@ -159,26 +108,15 @@ function paint(
   const physMin = accepted.length ? accepted[0].phys : -1;
   const physMax = accepted.length ? accepted[accepted.length - 1].phys : 1;
 
-  // The scan: a position that sweeps ALONG the line, from one end of the view to the
-  // other, as t goes 0 -> 1. Points are revealed as the scan crosses them (directional,
-  // not from the centre), so the strip genuinely traverses the grid.
+  // The scan sweeps ALONG the line, from one end to the other, as t goes 0 -> 1.
   const SW0 = physMin - 1;
   const SW1 = physMax + 1;
   const sweep = SW0 + t * (SW1 - SW0);
   const BAND = 0.7;
-  const reveal1 = (phys: number) => clamp01((sweep - phys) / BAND);
-  // The scan head and the pointer fade out at the very end for a clean finished frame.
-  const scanFade = 1 - clamp01((t - 0.92) / 0.08);
+  const reveal = (phys: number) => clamp01((sweep - phys) / BAND);
+  const scanFade = 1 - clamp01((t - 0.92) / 0.08); // scan head gone at the finished frame
 
-  // The plane is computed OUTWARD from the origin, each tile from its own coordinate,
-  // so where the tiles come from is clear: the centre, growing out. sqrt(t) so the
-  // count (area ~ radius squared) grows evenly across the slider.
-  let maxR = 0;
-  for (const c of cells) if (c.r > maxR) maxR = c.r;
-  const revealR = Math.sqrt(Math.max(0, t)) * (maxR + 1);
-  const reveal2 = (r: number) => clamp01((revealR - r) / 1.2);
-
-  // --- top lattice panel, clipped --------------------------------------------
+  // --- lattice panel, clipped -----------------------------------------------
   ctx.save();
   ctx.beginPath();
   ctx.rect(TOP.x, TOP.y, TOP.w, TOP.h);
@@ -220,10 +158,9 @@ function paint(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Lattice points the scan has crossed: rejected faint, accepted dropped onto the line.
   for (const p of all) {
     if (p.accepted) continue;
-    const ap = reveal1(p.phys);
+    const ap = reveal(p.phys);
     if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
     ctx.beginPath();
@@ -234,7 +171,7 @@ function paint(
   }
   ctx.globalAlpha = 1;
   for (const p of accepted) {
-    const ap = reveal1(p.phys);
+    const ap = reveal(p.phys);
     if (ap <= 0.01) continue;
     const foot = scale(physical(p.m, p.n), D);
     const [pxx, pyy] = fitD([p.m, p.n]);
@@ -249,7 +186,7 @@ function paint(
   }
   ctx.globalAlpha = 1;
   for (const p of accepted) {
-    const ap = reveal1(p.phys);
+    const ap = reveal(p.phys);
     if (ap <= 0.01) continue;
     const [px, py] = fitD([p.m, p.n]);
     ctx.globalAlpha = ap;
@@ -265,8 +202,7 @@ function paint(
   }
   ctx.globalAlpha = 1;
 
-  // The scan head: a bright line perpendicular to the strip at the sweep position,
-  // travelling along the diagonal.
+  // The scan head: a bright line perpendicular to the strip, travelling along it.
   if (scanFade > 0.01 && sweep > SW0 && sweep < SW1) {
     const a = add(scale(sweep, D), scale(gamma - 0.5, DPERP));
     const b = add(scale(sweep, D), scale(gamma + WINDOW_W + 0.5, DPERP));
@@ -287,14 +223,14 @@ function paint(
   ctx.restore(); // end clip
 
   // --- the 1D chain bar ------------------------------------------------------
-  const x0 = PAD + 8;
-  const x1 = VB_W - PAD - 8;
-  const barX = (phys: number) =>
-    x0 + ((phys - physMin) / (physMax - physMin || 1)) * (x1 - x0);
   if (accepted.length >= 2) {
+    const x0 = PAD + 8;
+    const x1 = VB_W - PAD - 8;
+    const barX = (phys: number) =>
+      x0 + ((phys - physMin) / (physMax - physMin || 1)) * (x1 - x0);
     const mid = (LONG + SHORT) / 2;
     for (const p of accepted) {
-      const ap = reveal1(p.phys);
+      const ap = reveal(p.phys);
       if (ap <= 0.01) continue;
       const foot = scale(physical(p.m, p.n), D);
       const [, fy] = fitD(foot);
@@ -309,7 +245,7 @@ function paint(
     }
     ctx.globalAlpha = 1;
     for (let i = 1; i < accepted.length; i++) {
-      if (accepted[i].phys > sweep) continue; // a gap shows once the scan has passed it
+      if (accepted[i].phys > sweep) continue;
       const gap = accepted[i].phys - accepted[i - 1].phys;
       const isLong = gap > mid;
       const xa = barX(accepted[i - 1].phys);
@@ -318,7 +254,7 @@ function paint(
       ctx.fillRect(xa, CHAIN_Y - CHAIN_H / 2, xb - xa - 1.5, CHAIN_H);
     }
     for (const p of accepted) {
-      const ap = reveal1(p.phys);
+      const ap = reveal(p.phys);
       if (ap <= 0.01) continue;
       const bx = barX(p.phys);
       ctx.beginPath();
@@ -334,7 +270,7 @@ function paint(
       ctx,
       "the chain on the line: long and short, ratio φ, never repeating",
       VB_W / 2,
-      CHAIN_Y + CHAIN_H / 2 + 22,
+      CHAIN_Y + CHAIN_H / 2 + 24,
       ink,
       0.78,
     );
@@ -344,122 +280,9 @@ function paint(
     ctx,
     "points inside the strip drop onto the line as the scan passes",
     VB_W / 2,
-    TOP.y + TOP.h + 16,
+    TOP.y + TOP.h + 18,
     ink,
     0.7,
-  );
-
-  // --- the real Penrose tiling, the same method one stage up, swept in step --------
-  caption(
-    ctx,
-    "THE SAME METHOD, ONE STAGE UP · 5D → 2D · REAL PENROSE TILES",
-    PEN.x,
-    PEN.y - 14,
-    ink,
-    0.55,
-    "left",
-  );
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(PEN.x, PEN.y, PEN.w, PEN.h);
-  ctx.clip();
-  ctx.lineJoin = "round";
-  for (const { f, r } of cells) {
-    const appear = reveal2(r);
-    if (appear <= 0.01) continue;
-    ctx.beginPath();
-    f.corners.forEach((c, i) => {
-      const [px, py] = penToPx([c[0], c[1]]);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
-    ctx.globalAlpha = appear * 0.9;
-    ctx.fillStyle = f.type === "thick" ? thick : thin;
-    ctx.fill();
-    ctx.globalAlpha = appear * 0.5;
-    ctx.lineWidth = 0.8;
-    ctx.strokeStyle = ink;
-    ctx.stroke();
-  }
-  // The build wavefront: a faint ring at the current reach, so the tiles read as
-  // appearing from the centre outward.
-  if (scanFade > 0.01 && revealR < maxR + 0.5) {
-    const [ox, oy] = penToPx([0, 0]);
-    ctx.globalAlpha = 0.3 * scanFade;
-    ctx.setLineDash([4, 5]);
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = ink;
-    ctx.beginPath();
-    ctx.arc(ox, oy, revealR * PEN_SCALE, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  // --- the pointer: this interval on the line points to a tile of its kind ----------
-  // The two lengths correspond to the two tiles: a long interval to a fat (gold) tile,
-  // a short interval to a thin (blue) tile. The pointer leaves the interval the scan
-  // just crossed, coloured to match, and points to a central tile of that kind. This is
-  // the prototile correspondence, not a coordinate map (1D and 2D are different lattices).
-  if (scanFade > 0.02 && accepted.length >= 2) {
-    let fatC: V2 | null = null;
-    let thinC: V2 | null = null;
-    let fatR = Infinity;
-    let thinR = Infinity;
-    for (const { f, r } of cells) {
-      if (r > revealR) continue;
-      if (f.type === "thick") {
-        if (r < fatR) { fatR = r; fatC = [f.centroid[0], f.centroid[1]]; }
-      } else if (r < thinR) { thinR = r; thinC = [f.centroid[0], f.centroid[1]]; }
-    }
-    const mid = (LONG + SHORT) / 2;
-    let segMid: number | null = null;
-    let segLong = false;
-    for (let i = 1; i < accepted.length; i++) {
-      if (accepted[i].phys > sweep) break; // the most recent interval the scan crossed
-      segMid = (barX(accepted[i - 1].phys) + barX(accepted[i].phys)) / 2;
-      segLong = accepted[i].phys - accepted[i - 1].phys > mid;
-    }
-    const target = segLong ? fatC : thinC;
-    if (segMid != null && target) {
-      const color = segLong ? thick : thin;
-      const fromY = CHAIN_Y + CHAIN_H / 2 + 4;
-      const to = penToPx(target);
-      ctx.save();
-      ctx.globalAlpha = scanFade * 0.85;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(segMid, fromY);
-      ctx.lineTo(to[0], to[1]);
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(segMid, fromY, 2.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      arrowHead(ctx, [segMid, fromY], to, color, scanFade * 0.9);
-      caption(
-        ctx,
-        segLong ? "long → fat" : "short → thin",
-        (segMid + to[0]) / 2 + 16,
-        (fromY + to[1]) / 2,
-        color,
-        scanFade * 0.85,
-        "left",
-      );
-    }
-  }
-
-  caption(
-    ctx,
-    "the line scans the grid; the plane is computed outward, the same method one stage up",
-    VB_W / 2,
-    PEN.y + PEN.h + 18,
-    ink,
-    0.72,
   );
 }
 
@@ -472,17 +295,6 @@ export default function FibonacciStrip() {
     ink: "#ede9d8",
   });
   const dprRef = useRef(0);
-
-  // Precompute the fixed Penrose patch once, each tile tagged with its physical radius
-  // so the plane can be computed outward from the centre.
-  const cells = useMemo<Cell2D[]>(
-    () =>
-      facesInViewport(PEN_VIEW, GAMMA).map((f) => ({
-        f,
-        r: Math.hypot(f.centroid[0], f.centroid[1]),
-      })),
-    [],
-  );
 
   const refreshColors = useCallback(() => {
     colorsRef.current = {
@@ -507,9 +319,9 @@ export default function FibonacciStrip() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      paint(ctx, t, colorsRef.current, cells);
+      paint(ctx, t, colorsRef.current);
     },
-    [refreshColors, cells],
+    [refreshColors],
   );
 
   useEffect(() => {
@@ -531,7 +343,7 @@ export default function FibonacciStrip() {
   return (
     <Sketch
       label="sketch 04 · cut and project, in a dimension you can see"
-      animation={{ duration: 9000, render, slider: { label: "scan" } }}
+      animation={{ duration: 8000, render, slider: { label: "scan" } }}
     >
       <canvas
         ref={canvasRef}
@@ -542,7 +354,7 @@ export default function FibonacciStrip() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. A scan line sweeps along the strip; the ${accepted} lattice points it crosses inside the strip drop a perpendicular onto the line, and those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. Below is a real two-dimensional Penrose tiling produced by the same cut and project one stage up, from five dimensions to two; it is computed outward from its centre as the scan runs, so where the tiles come from is clear. A colour-matched pointer leaves the interval the scan just crossed and points to a central tile of the same kind: a long interval to a fat tile, a short interval to a thin tile, the two lengths corresponding to the two tiles.`}
+        aria-label={`The cut-and-project method shown one dimension down, fully visible. A square integer lattice, a straight line through the origin at the golden slope, and a strip of one-cell width around it forming the acceptance window. A scan line sweeps along the strip; the ${accepted} lattice points it crosses inside the strip drop a perpendicular onto the line, and those feet, laid flat below, form the Fibonacci chain of long and short intervals whose lengths are in ratio phi and whose order never repeats. This is the cut-and-project method made visible in a dimension you can see; Penrose tilings are the same method one dimension up, from five dimensions to two, shown in the sketches that follow.`}
       />
     </Sketch>
   );
