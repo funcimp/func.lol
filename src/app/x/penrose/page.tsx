@@ -295,10 +295,10 @@ export default function PenrosePage() {
             φ. You can do this forever in either direction.
           </p>
           <p>
-            Count the fat tiles and the thin ones and divide. Below, a ruler marks
-            φ, and each level&#39;s ratio is a dot on it. Step the level deeper and
-            watch the dot march in on φ, the same golden ratio that set the angles
-            in the first place.
+            Count the fat tiles and the thin ones and stack them up. Below, the gold
+            stack grows out to φ times the blue as you deflate, landing on the
+            golden-ratio mark. The count of fat to thin tiles is the golden ratio,
+            the same φ that set the angles in the first place.
           </p>
         </div>
 

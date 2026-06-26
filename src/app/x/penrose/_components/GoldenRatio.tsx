@@ -13,35 +13,42 @@ import {
   type Rhombus,
 } from "./lib/scaling";
 
-// "The golden ratio appears": the spine's section-9 sketch one. The question it
-// answers: count the fat and thin rhombi in a Penrose patch, take their ratio, and
-// what number is it? Deflate deeper and the ratio chases the golden ratio φ. The top
-// panel is the real patch at the chosen level (the tiles being counted); the line
-// below is a ruler with φ marked, and the ratio for each level is a dot on it. As the
-// level climbs, the dot marches in on φ. That convergence IS the point.
+// "The golden ratio appears": the spine's section-9 sketch one. Count the fat tiles
+// and the thin tiles in a Penrose patch and lay them out as two stacks, gold for
+// thick and blue for thin. Deflate deeper and the gold stack grows out to exactly φ
+// times the blue stack: the ratio of the counts is the golden ratio. The patch above
+// is the real tiling being counted; the stacks below settle on the φ mark as the
+// level climbs.
 //
 // HONEST BY CONSTRUCTION. Counts and geometry are deflate() output (lib/scaling.ts
 // and its test): the thick:thin numbers equal faces.ts substitutionFaces at every
-// level, the ratio shown is exactly thick/thin, and the gap to φ shrinks as the level
-// climbs. Nothing is hand-placed on the ruler.
+// level, the stack lengths are in exact thick:thin proportion, and the gap to φ
+// shrinks as the level climbs.
 //
 // Canvas: the harness drives render(t); the slider scrubs the level (levels crossfade
 // gradually). Theme colours are read live. Reduced motion mounts at t = 1, the
-// deepest level, the dot sitting on φ.
+// deepest level, the gold stack on the φ mark.
 
-const VB = 460; // the patch square
-const VB_H = 560; // plus the convergence ruler below
+const VB = 460;
+const VB_H = 448;
 const MARGIN = 12;
 
 const MIN_LEVEL = 1;
 const MAX_LEVEL = 8;
 
-// The ruler. Ratios run 1.0 (low levels) up past φ; frame [0.95, 1.72] with φ inside.
-const R_MIN = 0.95;
-const R_MAX = 1.72;
-const AX0 = 52;
-const AX1 = VB - 46;
-const AXIS_Y = 506;
+// The patch, centred in the top region.
+const PATCH_CY = 138;
+const PATCH_H = 268;
+
+// The two stacks. Blue is the unit; gold runs blue * (thick/thin), reaching the φ
+// mark at blue * φ. As the ratio climbs to φ the gold stack grows out to that mark.
+const BAR_X0 = 80;
+const BLUE_LEN = 188;
+const GOLD_Y = 332;
+const BLUE_Y = 374;
+const MARK_H = 26;
+const MARK_W = 12;
+const PITCH = 15; // centre-to-centre spacing of the tile marks
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -56,8 +63,8 @@ const smooth = (e0: number, e1: number, x: number): number => {
   return u * u * (3 - 2 * u);
 };
 
-// Draw one level's rhombi at a shared scale and a given opacity. No clear, so two
-// adjacent levels can be composited into a single crossfade frame.
+// Draw one level's rhombi at a shared scale and a given opacity, centred in the patch
+// region. No clear, so two adjacent levels can be composited into a crossfade frame.
 function drawPatch(
   ctx: CanvasRenderingContext2D,
   rhombi: readonly Rhombus[],
@@ -67,8 +74,8 @@ function drawPatch(
 ) {
   if (alpha <= 0.01 || rhombi.length === 0) return;
   const { thick, thin, ink } = colors;
-  const s = (VB - 2 * MARGIN) / (2 * half);
-  const toPx = (p: Pt): [number, number] => [VB / 2 + p[0] * s, VB / 2 - p[1] * s];
+  const s = (PATCH_H - 2 * MARGIN) / (2 * half);
+  const toPx = (p: Pt): [number, number] => [VB / 2 + p[0] * s, PATCH_CY - p[1] * s];
   const edge = Math.max(0.3, Math.min(1, 18 / Math.sqrt(rhombi.length)));
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -91,84 +98,102 @@ function drawPatch(
   ctx.restore();
 }
 
-const xForRatio = (r: number) =>
-  AX0 + ((Math.max(R_MIN, Math.min(R_MAX, r)) - R_MIN) / (R_MAX - R_MIN)) * (AX1 - AX0);
-
-// The convergence ruler: a line from 1 to ~1.72 with φ marked, one dot per level, the
-// current level lit. The dots march in on φ as the level climbs.
-function drawRuler(
+// A stack: a row of small rhombus marks from x0 to x1, clipped, so the stack reads as
+// a run of tiles. The number of marks tracks the length, so gold has phi times as many
+// as blue at the deepest levels.
+function drawStack(
   ctx: CanvasRenderingContext2D,
-  series: Counts[],
-  shown: number,
-  colors: Colors,
+  x0: number,
+  x1: number,
+  y: number,
+  color: string,
+  ink: string,
 ) {
-  const { thick, ink, paper } = colors;
   ctx.save();
-  ctx.font = "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
-  ctx.textBaseline = "middle";
+  ctx.beginPath();
+  ctx.rect(x0 - 1, y - MARK_H / 2 - 1, x1 - x0 + 2, MARK_H + 2);
+  ctx.clip();
+  for (let cx = x0 + MARK_W / 2; cx - MARK_W / 2 < x1 - 0.5; cx += PITCH) {
+    ctx.beginPath();
+    ctx.moveTo(cx - MARK_W / 2, y);
+    ctx.lineTo(cx, y - MARK_H / 2);
+    ctx.lineTo(cx + MARK_W / 2, y);
+    ctx.lineTo(cx, y + MARK_H / 2);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
 
-  // baseline
-  ctx.globalAlpha = 0.35;
+function label(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  ink: string,
+  alpha: number,
+  align: CanvasTextAlign,
+  size = 11,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = ink;
+  ctx.font = `${size}px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace`;
+  ctx.textAlign = align;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawStacks(ctx: CanvasRenderingContext2D, counts: Counts, colors: Colors) {
+  const { thick, thin, ink } = colors;
+  const ratio = counts.ratio;
+  const eqX = BAR_X0 + BLUE_LEN; // where blue ends, and gold ends if the ratio were 1
+  const phiX = BAR_X0 + BLUE_LEN * PHI; // the golden-ratio mark
+  const goldX1 = BAR_X0 + BLUE_LEN * ratio;
+  const yTop = GOLD_Y - MARK_H / 2 - 14;
+  const yBot = BLUE_Y + MARK_H / 2 + 6;
+
+  // the "x1" reference (ratio of one) and the golden mark
+  ctx.save();
+  ctx.globalAlpha = 0.25;
   ctx.strokeStyle = ink;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(AX0, AXIS_Y);
-  ctx.lineTo(AX1, AXIS_Y);
+  ctx.moveTo(eqX, yTop);
+  ctx.lineTo(eqX, yBot);
   ctx.stroke();
+  ctx.restore();
+  label(ctx, "×1", eqX, yBot + 12, ink, 0.45, "center");
 
-  // the φ mark
-  const xphi = xForRatio(PHI);
+  ctx.save();
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = thick;
   ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
   ctx.beginPath();
-  ctx.moveTo(xphi, AXIS_Y - 34);
-  ctx.lineTo(xphi, AXIS_Y + 8);
+  ctx.moveTo(phiX, yTop - 6);
+  ctx.lineTo(phiX, yBot);
   ctx.stroke();
-  ctx.fillStyle = thick;
-  ctx.textAlign = "center";
-  ctx.fillText("φ = 1.618", xphi, AXIS_Y - 44);
-
-  // faint trend line through the level dots
-  ctx.globalAlpha = 0.3;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  series.forEach((c, i) => {
-    const x = xForRatio(c.ratio);
-    if (i === 0) ctx.moveTo(x, AXIS_Y);
-    else ctx.lineTo(x, AXIS_Y);
-  });
-  ctx.stroke();
-
-  // a dot per level; the current level lit and labelled
-  for (const c of series) {
-    const x = xForRatio(c.ratio);
-    const cur = c.level === shown;
-    ctx.globalAlpha = cur ? 1 : 0.4;
-    ctx.beginPath();
-    ctx.arc(x, AXIS_Y, cur ? 5 : 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = ink;
-    ctx.fill();
-    if (cur) {
-      ctx.beginPath();
-      ctx.arc(x, AXIS_Y, 5, 0, Math.PI * 2);
-      ctx.lineWidth = 1.4;
-      ctx.strokeStyle = paper;
-      ctx.stroke();
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = ink;
-      ctx.textAlign = "center";
-      ctx.fillText(`level ${c.level}: ${c.ratio.toFixed(3)}`, x, AXIS_Y + 22);
-    }
-  }
-
-  // end ticks
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = ink;
-  ctx.textAlign = "left";
-  ctx.fillText("1.0", AX0 - 4, AXIS_Y + 22);
+  ctx.setLineDash([]);
   ctx.restore();
+  label(ctx, "× φ = 1.618", phiX, yTop - 14, thick, 0.95, "center");
+
+  // the two stacks
+  drawStack(ctx, BAR_X0, goldX1, GOLD_Y, thick, ink);
+  drawStack(ctx, BAR_X0, eqX, BLUE_Y, thin, ink);
+
+  // row labels and counts
+  label(ctx, "thick", BAR_X0 - 10, GOLD_Y, ink, 0.7, "right");
+  label(ctx, "thin", BAR_X0 - 10, BLUE_Y, ink, 0.7, "right");
+  label(ctx, counts.thick.toLocaleString(), goldX1 + 8, GOLD_Y, ink, 0.85, "left");
+  label(ctx, counts.thin.toLocaleString(), eqX + 8, BLUE_Y, ink, 0.85, "left");
 }
 
 export default function GoldenRatio() {
@@ -231,7 +256,7 @@ export default function GoldenRatio() {
       ctx.fillRect(0, 0, VB, VB_H);
       drawPatch(ctx, patches[lo], commonHalf, colors, 1 - fade);
       drawPatch(ctx, patches[hi], commonHalf, colors, fade);
-      drawRuler(ctx, series, shown, colors);
+      drawStacks(ctx, series[shown - 1], colors);
 
       if (shown !== levelRef.current) {
         levelRef.current = shown;
@@ -265,7 +290,7 @@ export default function GoldenRatio() {
         style={{ width: "100%", height: "auto", aspectRatio: `${VB} / ${VB_H}` }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch from the substitution engine at the chosen deflation level, in gold thick and teal thin rhombi. Below it is a ruler marked with the golden ratio phi at 1.618, and a dot for each level placed at that level's ratio of thick to thin tiles. As the level climbs, the dots march in on phi: the count ratio of fat to thin rhombi converges to the golden ratio, the same ratio that set the tile angles."
+        aria-label="A real Penrose patch from the substitution engine at the chosen deflation level, in gold thick and teal thin rhombi. Below it, the count of thick tiles and thin tiles are laid out as two stacks of tile marks, gold and blue. The blue stack is the unit; the gold stack runs thick-to-thin times as long, reaching the golden-ratio mark at phi times the blue. As the level climbs the gold stack grows out to that mark: the ratio of fat to thin tiles is the golden ratio, about 1.618, the same ratio that set the tile angles."
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 font-mono">
@@ -287,10 +312,10 @@ export default function GoldenRatio() {
           </span>
         </div>
         <p className="mt-2 opacity-70">
-          Count the fat tiles and the thin tiles, and divide. Off φ ≈ {PHI.toFixed(4)}{" "}
-          by <span className="font-mono">{gap.toFixed(4)}</span> here. Deflate deeper
-          and the ratio keeps closing on the golden ratio, the same φ that set the tile
-          angles in the first place.
+          Count the fat tiles and the thin ones and stack them. The gold stack runs φ ≈{" "}
+          {PHI.toFixed(4)} times the blue, off by{" "}
+          <span className="font-mono">{gap.toFixed(4)}</span> here. Deflate deeper and
+          it lands on the golden ratio, the same φ that set the tile angles.
         </p>
       </div>
     </Sketch>
