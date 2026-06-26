@@ -3,28 +3,25 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
-import type { Gap, SceneB, Tile } from "./lib/geomWall";
+import type { SceneB, Tile } from "./lib/geomWall";
 import walls from "./lib/geomWalls.json";
-import { overlapPolygon, type Pt } from "./lib/overlap";
+import type { Pt } from "./lib/overlap";
 
-// "The thin fits, place it, and now nothing fits": the spine's section-5 sketch,
-// recast as PURE GEOMETRY. A Penrose expert objected to the old framing: "you
-// reject a move but a tile visibly fits there." The old sketch marked a frontier
-// edge doomed because its only fill would close an illegal vertex. The shape fit;
-// we only asserted a rule.
+// "The thin fits, place it, now nothing fits": the spine's section-5 sketch, PURE
+// GEOMETRY. The expert's exact objection, refuted. A rich sixteen-edge hole carved
+// from a real patch (geomWalls.json, computed by lib/geomWall.ts, bound by
+// geomWall.test.ts). A few locally legal tiles build, then on the doomed edge a THIN
+// rhombus seats with zero overlap, the move the expert pointed at.
 //
-// This version follows the tempting move THROUGH. It renders the thin-refuted
-// scene from geomWalls.json (computed by lib/geomWall.ts, bound to the proof by
-// geomWall.test.ts), the SAME rich 16-edge hole as before. The hole has one
-// surviving completion. On one frontier edge a THIN rhombus fits with zero
-// overlap, the exact move the expert pointed at. We place it, keep building the
-// locally legal prefix, and reach a gap where every candidate rhombus OVERLAPS a
-// committed tile by real area, which we SHADE. The claim is now "the thin fits,
-// place it, keep going, and now nothing fits", not "this vertex is an illegal
-// star". Then the one surviving completion finishes the hole.
+// HOW WE SHOW THE STRAND. Place the thin, then fill the rest of the hole as far as
+// the geometry allows (strandFill, the maximal legal partial fill). Tiles still
+// cannot cover everything: a gap survives that no rhombus fits. We make it visible by
+// painting the hole red and drawing the placed tiles opaque on top, so the red that
+// remains is the uncovered gap. Then the one surviving completion replaces the wrong
+// path, leaving no red. The red is geometry (hole minus the tiles drawn); the dead-end
+// is the proof in geomWall.test.ts.
 //
-// Canvas, like the other animated sketches: the harness drives render(t)
-// imperatively, theme colours are read live so the patch inverts with the toggle.
+// Canvas: the harness drives render(t); theme colours are read live.
 
 const scene = walls.sceneB_thinRefuted as unknown as SceneB;
 
@@ -32,6 +29,7 @@ const VB_W = 560;
 const VB_H = 540;
 const MARGIN = 30;
 const WALL_RING = 3.4; // draw wall tiles whose centroid is within this of the hole
+const RED = "#d24a3d"; // the "cannot be filled" gap colour, readable on either theme
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -48,15 +46,9 @@ const smooth = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-// ---------------------------------------------------------------------------
-// Viewport: fit the hole, its completion, the forced prefix, the tempting thin,
-// and the gaps, plus a ring of nearby wall tiles for context. Computed once.
-// ---------------------------------------------------------------------------
-
 type View = {
   toPx: (p: Pt) => [number, number];
   wall: Tile[];
-  gap: Gap; // the single most-constrained unfillable gap we showcase
 };
 
 function centroid(v: readonly Pt[]): Pt {
@@ -75,18 +67,13 @@ function buildView(): View {
     const [cx, cy] = centroid(t.v);
     return Math.hypot(cx - c[0], cy - c[1]) <= WALL_RING;
   });
-  const gap = [...scene.unfillableGaps].sort(
-    (a, b) =>
-      a.candidates.length - b.candidates.length ||
-      a.edge[0][0] - b.edge[0][0],
-  )[0];
 
   const pts: Pt[] = [...scene.holePolygon];
   for (const t of scene.completion) for (const p of t.v) pts.push(p);
   for (const t of scene.forcedPrefix) for (const p of t.v) pts.push(p);
+  for (const t of scene.strandFill) for (const p of t.v) pts.push(p);
   for (const p of scene.temptingThin.v) pts.push(p);
   for (const t of wall) for (const p of t.v) pts.push(p);
-  for (const cand of gap.candidates) for (const p of cand.v) pts.push(p);
 
   let minx = Infinity;
   let maxx = -Infinity;
@@ -107,7 +94,7 @@ function buildView(): View {
     VB_W / 2 + (p[0] - cx) * scale,
     VB_H / 2 - (p[1] - cy) * scale, // canvas y grows downward
   ];
-  return { toPx, wall, gap };
+  return { toPx, wall };
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +125,7 @@ function fillTile(
   alpha: number,
   lineWidth = 1.1,
 ) {
+  if (alpha <= 0.001) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   pathPoly(ctx, v, toPx);
@@ -150,6 +138,22 @@ function fillTile(
   ctx.restore();
 }
 
+function fillPoly(
+  ctx: CanvasRenderingContext2D,
+  v: readonly Pt[],
+  toPx: (p: Pt) => [number, number],
+  color: string,
+  alpha: number,
+) {
+  if (alpha <= 0.001) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  pathPoly(ctx, v, toPx);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
 function strokeLoop(
   ctx: CanvasRenderingContext2D,
   loop: readonly Pt[],
@@ -159,6 +163,7 @@ function strokeLoop(
   alpha: number,
   dash: number[] = [],
 ) {
+  if (alpha <= 0.001) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   pathPoly(ctx, loop, toPx);
@@ -171,65 +176,6 @@ function strokeLoop(
   ctx.restore();
 }
 
-// Shade the real intersection of a candidate with the board: the wall the viewer
-// sees IS the overlap area. We compute the candidate's worst overlap over the
-// whole board and fill that polygon in solid ink.
-function shadeWorstOverlap(
-  ctx: CanvasRenderingContext2D,
-  cand: readonly Pt[],
-  board: readonly (readonly Pt[])[],
-  toPx: (p: Pt) => [number, number],
-  ink: string,
-  alpha: number,
-) {
-  let worst: Pt[] = [];
-  let worstA = 0;
-  for (const bv of board) {
-    const ov = overlapPolygon(cand as Pt[], bv as Pt[]);
-    if (ov.length < 3) continue;
-    let a = 0;
-    for (let i = 0; i < ov.length; i++) {
-      const p = ov[i];
-      const q = ov[(i + 1) % ov.length];
-      a += p[0] * q[1] - q[0] * p[1];
-    }
-    a = Math.abs(a) / 2;
-    if (a > worstA) {
-      worstA = a;
-      worst = ov;
-    }
-  }
-  if (worst.length < 3) return;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  pathPoly(ctx, worst, toPx);
-  ctx.fillStyle = ink;
-  ctx.fill();
-  ctx.restore();
-}
-
-function strokeEdge(
-  ctx: CanvasRenderingContext2D,
-  edge: readonly [Pt, Pt],
-  toPx: (p: Pt) => [number, number],
-  color: string,
-  width: number,
-  alpha: number,
-) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  const [ax, ay] = toPx(edge[0]);
-  const [bx, by] = toPx(edge[1]);
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
-  ctx.lineWidth = width;
-  ctx.lineCap = "round";
-  ctx.strokeStyle = color;
-  ctx.stroke();
-  ctx.restore();
-}
-
 function caption(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -237,34 +183,56 @@ function caption(
   y: number,
   ink: string,
   alpha: number,
-  align: CanvasTextAlign = "center",
 ) {
+  if (alpha <= 0.001) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = ink;
   ctx.font =
     "11px ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, monospace";
-  ctx.textAlign = align;
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, x, y);
   ctx.restore();
 }
 
+// Draw a list of tiles with a per-tile staggered reveal, opaque so they cover the
+// red beneath. progress in [0,1]; mul scales the final opacity (for clearing).
+function drawTiles(
+  ctx: CanvasRenderingContext2D,
+  tiles: readonly Tile[],
+  toPx: (p: Pt) => [number, number],
+  thick: string,
+  thin: string,
+  ink: string,
+  progress: number,
+  mul: number,
+) {
+  if (mul <= 0.001 || tiles.length === 0) return;
+  const per = 1 / tiles.length;
+  tiles.forEach((tile, k) => {
+    const appear = smooth(k * per, (k + 1) * per, progress);
+    if (appear <= 0) return;
+    fillTile(ctx, tile.v, toPx, tile.type === "fat" ? thick : thin, ink, appear * mul, 1.1);
+  });
+}
+
 // ---------------------------------------------------------------------------
-// Timeline. Wall ring + hole outline appear, the locally legal forced prefix
-// builds, the tempting thin seats (it fits!), then the gap glows and every
-// candidate shades its overlap (the climax: nothing fits). Last, the wrong path
-// clears, the one surviving completion grows, and the patch settles into a clean
-// finished region. Fixed order, so the slider scrubs it; t = 1 is the clean
-// resolved patch, the litter gone.
+// Timeline. Build the legal prefix, seat the tempting thin, fill the rest as far as
+// the geometry allows, and reveal the RED gap nothing can fill. Then clear the wrong
+// path and grow the one surviving completion. t = 1 is the clean resolved patch.
 // ---------------------------------------------------------------------------
 
-const WALL_IN = 0.1; // [0, WALL_IN] wall ring + hole outline appear
-const PREFIX_TO = 0.34; // the forced prefix builds, all locally legal
-const THIN_TO = 0.46; // the tempting thin seats cleanly
-const WALL_TO = 0.64; // the gap glows; candidates shade their overlap
-const COMP_FROM = 0.72; // the wrong path clears; the surviving completion grows
-const COMP_TO = 0.94;
+const WALL_IN = 0.08;
+const PREFIX_FROM = 0.1;
+const PREFIX_TO = 0.3;
+const THIN_FROM = 0.32;
+const THIN_TO = 0.42;
+const STRAND_FROM = 0.46; // fill the rest; the red gap appears
+const STRAND_TO = 0.66;
+const CLEAR_FROM = 0.72; // the wrong path and red gap clear
+const COMP_FROM = 0.76; // the surviving completion grows
+const COMP_TO = 0.96;
 
 function paint(
   ctx: CanvasRenderingContext2D,
@@ -273,165 +241,58 @@ function paint(
   colors: Colors,
 ) {
   const { thick, thin, grout, ink } = colors;
-  const { toPx, wall, gap } = view;
+  const { toPx, wall } = view;
 
   ctx.clearRect(0, 0, VB_W, VB_H);
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
   const wallIn = smooth(0, WALL_IN, t);
+  const prefix = smooth(PREFIX_FROM, PREFIX_TO, t);
+  const thinR = smooth(THIN_FROM, THIN_TO, t);
+  const strand = smooth(STRAND_FROM, STRAND_TO, t);
   const comp = smooth(COMP_FROM, COMP_TO, t);
-  // The fade that clears the wrong path once the completion takes over.
-  const clear = 1 - smooth(COMP_FROM, COMP_FROM + 0.08, t);
+  const clear = 1 - smooth(CLEAR_FROM, CLEAR_FROM + 0.06, t); // wrong path + red fade
 
-  // 1. The committed wall ring. Muted while the hole is the subject, brightening
-  // to a finished patch as the surviving completion fills in.
+  // 1. Wall ring, muted then brightening to a finished patch.
   if (wallIn > 0) {
     const wallAlpha = wallIn * (0.32 + 0.5 * comp);
     for (const tile of wall) {
-      fillTile(
-        ctx,
-        tile.v,
-        toPx,
-        tile.type === "fat" ? thick : thin,
-        ink,
-        wallAlpha,
-        0.8,
-      );
+      fillTile(ctx, tile.v, toPx, tile.type === "fat" ? thick : thin, ink, wallAlpha, 0.8);
     }
-    // The hole outline, fading as the completion closes it.
-    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn * (1 - comp), [5, 4]);
-    if (comp < 0.6) {
-      caption(
-        ctx,
-        "one hole, one surviving completion",
-        VB_W / 2,
-        18,
-        ink,
-        wallIn * 0.85 * (1 - comp),
-      );
-    }
+    strokeLoop(ctx, scene.holePolygon, toPx, ink, 2, wallIn * (1 - comp) * (1 - strand * 0.6), [5, 4]);
   }
 
-  // 2. The locally legal forced prefix builds, tile by tile.
-  const prefixReveal = smooth(WALL_IN, PREFIX_TO, t);
-  if (prefixReveal > 0 && clear > 0) {
-    const per = 1 / Math.max(1, scene.forcedPrefix.length);
-    scene.forcedPrefix.forEach((tile, k) => {
-      const appear = smooth(k * per, (k + 1) * per, prefixReveal) * clear;
-      if (appear <= 0) return;
-      // muted/ghosted: the build looks fine, but it is the doomed path
-      fillTile(
-        ctx,
-        tile.v,
-        toPx,
-        tile.type === "fat" ? thick : thin,
-        ink,
-        appear * 0.5,
-        1,
-      );
-    });
-    if (t < PREFIX_TO) {
-      caption(
-        ctx,
-        "a few locally legal tiles, all fine so far",
-        VB_W / 2,
-        VB_H - 20,
-        ink,
-        prefixReveal * 0.85,
-      );
-    }
+  // 2. The red gap: paint the whole hole red UNDER the wrong-path tiles, so the red
+  // still showing once they are drawn is the uncovered gap nothing can fill.
+  const redA = strand * clear;
+  if (redA > 0) {
+    fillPoly(ctx, scene.holePolygon, toPx, RED, redA * 0.66);
+    strokeLoop(ctx, scene.holePolygon, toPx, RED, 1.5, redA * 0.7);
   }
 
-  // 3. The tempting thin seats cleanly on the doomed edge (it fits!).
-  const thinReveal = smooth(PREFIX_TO, THIN_TO, t);
-  if (thinReveal > 0 && clear > 0) {
-    fillTile(
-      ctx,
-      scene.temptingThin.v,
-      toPx,
-      scene.temptingThin.type === "fat" ? thick : thin,
-      ink,
-      thinReveal * clear,
-      1.1,
-    );
-    strokeEdge(ctx, scene.doomedEdge, toPx, ink, 2.6, thinReveal * clear * 0.7);
-    // The thin caption holds only briefly after it seats, then hands the bottom
-    // line over to the wall caption so the two never stack.
-    if (t >= PREFIX_TO && t < THIN_TO + 0.06) {
-      caption(
-        ctx,
-        "the thin the expert pointed at fits here, zero overlap",
-        VB_W / 2,
-        VB_H - 20,
-        ink,
-        thinReveal * 0.85,
-      );
-    }
+  // 3. The wrong path, opaque so it covers the red: the legal prefix, the tempting
+  // thin, and the maximal fill of the rest. What red is left is the gap.
+  drawTiles(ctx, scene.forcedPrefix, toPx, thick, thin, ink, prefix, clear);
+  if (thinR > 0 && clear > 0) {
+    fillTile(ctx, scene.temptingThin.v, toPx, scene.temptingThin.type === "fat" ? thick : thin, ink, thinR * clear, 1.1);
   }
+  drawTiles(ctx, scene.strandFill, toPx, thick, thin, ink, strand, clear);
 
-  // 4. The climax: the gap glows and every candidate shades its overlap with a
-  // committed tile. Nothing fits. Clears as the completion takes over.
-  const wallReveal = smooth(THIN_TO, WALL_TO, t);
-  if (wallReveal > 0 && clear > 0) {
-    const board = [...scene.wall, ...scene.forcedPrefix, scene.temptingThin].map(
-      (x) => x.v,
-    );
-    strokeEdge(ctx, gap.edge, toPx, ink, 3, wallReveal * clear);
-    const per = 1 / gap.candidates.length;
-    gap.candidates.forEach((cand, k) => {
-      const appear = smooth(k * per, (k + 1) * per, wallReveal) * clear;
-      if (appear <= 0) return;
-      strokeLoop(ctx, cand.v, toPx, ink, 1, appear * 0.26, [2, 3]);
-      shadeWorstOverlap(ctx, cand.v, board, toPx, ink, appear * 0.4);
-    });
-    if (t >= THIN_TO + 0.06 && t < COMP_FROM) {
-      caption(
-        ctx,
-        "every piece for the next gap overlaps a placed tile",
-        VB_W / 2,
-        VB_H - 20,
-        ink,
-        wallReveal * clear * 0.85,
-      );
-    }
-  }
+  // 4. The one surviving completion grows on top and settles the patch clean.
+  drawTiles(ctx, scene.completion, toPx, thick, thin, ink, comp, 1);
 
-  // 5. The one surviving completion grows and the patch settles clean.
-  if (comp > 0) {
-    const per = 1 / scene.completion.length;
-    scene.completion.forEach((tile, k) => {
-      const appear = smooth(k * per, (k + 1) * per, comp);
-      if (appear <= 0) return;
-      fillTile(
-        ctx,
-        tile.v,
-        toPx,
-        tile.type === "fat" ? thick : thin,
-        ink,
-        appear * 0.92,
-        1.1,
-      );
-    });
-    if (comp > 0.5) {
-      const lead = (comp - 0.5) / 0.5;
-      caption(
-        ctx,
-        "the thin fits; place it, keep going, and now nothing fits",
-        VB_W / 2,
-        VB_H - 30,
-        ink,
-        lead * 0.8,
-      );
-      caption(
-        ctx,
-        "only one completion survives, by the shapes alone",
-        VB_W / 2,
-        VB_H - 14,
-        ink,
-        lead * 0.62,
-      );
-    }
+  // Captions, one beat at a time.
+  if (t < THIN_FROM) {
+    caption(ctx, "a few locally legal tiles, all fine so far", VB_W / 2, VB_H - 20, ink, prefix * 0.85);
+  } else if (t < STRAND_FROM) {
+    caption(ctx, "the thin the expert pointed at fits here, zero overlap", VB_W / 2, VB_H - 20, ink, thinR * 0.85);
+  } else if (t < CLEAR_FROM) {
+    caption(ctx, "fill in the rest, and the red gap can take no tile", VB_W / 2, VB_H - 20, ink, strand * clear * 0.9);
+  } else if (comp > 0.35) {
+    const lead = (comp - 0.35) / 0.65;
+    caption(ctx, "only this completion survives", VB_W / 2, VB_H - 30, ink, lead * 0.85);
+    caption(ctx, "no rule invoked, the shapes alone decide", VB_W / 2, VB_H - 14, ink, lead * 0.62);
   }
 }
 
@@ -500,7 +361,7 @@ export default function UnsolvableFuture() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch surrounds a single closed sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build along one path, then on the doomed frontier edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. Following it through, the next gap glows and every candidate rhombus is shown overlapping a committed tile, with the real overlap area shaded. The thin fits, you place it, you keep going, and now nothing fits, by the shapes alone with no matching rule invoked. Then the wrong path clears and the one surviving completion finishes the hole. The static end state is the clean resolved patch: the failed attempts cleared away, the single surviving completion filling the hole."
+        aria-label="A real Penrose patch surrounds a single sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build, then on the doomed edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. The animation then fills the rest of the hole as far as the geometry allows, and tiles still cannot cover everything: a gap survives, shown in red, that no rhombus fits. The thin fit, you placed it, you filled the rest, and a red gap is left. Then the wrong path clears and the one surviving completion finishes the hole, leaving no red. By the shapes alone, with no matching rule invoked."
       />
     </Sketch>
   );

@@ -134,12 +134,10 @@ export default function PenrosePage() {
           </p>
           <p>
             The sketch below takes the tempting one and seats it cleanly. It
-            fits. Then it follows that move through. The next gap lights up, and
-            every rhombus you could put there lands on top of a tile already
-            placed. The shaded patches are the real overlap, one shape pushed
-            into another. Nothing fits, and no rule was invoked to say so. Only
-            the other first move completes the hole, and the shapes alone tell
-            you which.
+            fits. But it fills the hole the wrong way. What it leaves, shown in
+            red, is two triangles, and no rhombus fits a triangle. No rule was
+            invoked to say so. Only the other first move completes the hole, and
+            the shapes alone tell you which.
           </p>
         </div>
 
@@ -150,8 +148,8 @@ export default function PenrosePage() {
             On the open plane the bare shapes never trap you like this; they would
             tile, boringly, forever. That is exactly why Penrose added the
             matching marks. Inside a bounded hole the geometry can speak for
-            itself, and here it does: the wall is overlap you can see, not a rule
-            you have to take on faith.
+            itself, and here it does: the gap is empty space you can see, not a
+            rule you have to take on faith.
           </p>
         </div>
 
@@ -165,13 +163,12 @@ export default function PenrosePage() {
             there. It does. Zero overlap. The piece sits in the gap.
           </p>
           <p>
-            So place it. Lay a few more legal tiles, all fine, and keep going.
-            Then the next gap turns. Every rhombus that could sit there lands on
-            top of a tile already down, the shaded patches showing exactly where
-            one shape pushes into another. The thin fit, you placed it, you kept
-            building, and now nothing fits. Not because a rule says no. Because
-            the shapes collide. Out of all the ways to start, only one survives
-            to finish the hole.
+            So place it. Lay a few more legal tiles, all fine, then fill in the
+            rest of the hole as far as the shapes allow. Tiles still cannot cover
+            everything. A gap is left, shown in red, that no rhombus fits. The
+            thin fit, you placed it, you filled the rest, and the red gap remains.
+            Not because a rule says no. Because the shapes collide. Out of all the
+            ways to start, only one survives to finish the hole.
           </p>
         </div>
 

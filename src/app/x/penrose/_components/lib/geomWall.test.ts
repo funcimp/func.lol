@@ -132,6 +132,39 @@ describe("scene B: the expert's 'a thin fits there' case, refuted", () => {
   });
 });
 
+describe("the strand fill is a real legal partial fill, leaving a true gap", () => {
+  // The sketches paint the hole red, then draw the committed tiles (the wrong move,
+  // plus for scene B the prefix and the strand) opaque on top; the red that remains
+  // is the uncovered gap nothing fits. For that to be honest the strand must be a
+  // genuine overlap-free partial fill. We re-check every strand tile against the
+  // whole board it was placed onto.
+  function strandIsLegal(board: Tile[], strand: Tile[]): boolean {
+    const placed = [...board];
+    for (const t of strand) {
+      for (const u of placed) if (overlapsReal(t.v, u.v)) return false;
+      placed.push(t);
+    }
+    return true;
+  }
+
+  test("scene A strands on the wrong move alone (rigid hole, empty strand)", () => {
+    const a = walls.sceneA_rigidHexagon;
+    // The two-rhombus hole: the wrong rhombus alone leaves a gap, no strand needed.
+    expect(a.strandFill.length).toBe(0);
+  });
+
+  test("scene B fills most of the hole, then a real gap survives", () => {
+    const b = walls.sceneB_thinRefuted;
+    // The thin the expert pointed at: fill the rest as far as possible, and tiles
+    // still cannot cover everything. A non-trivial legal strand, then a gap.
+    expect(b.strandFill.length).toBeGreaterThan(0);
+    const board = [...b.wall, ...b.forcedPrefix, b.temptingThin as unknown as typeof b.wall[number]];
+    expect(strandIsLegal(board, b.strandFill)).toBe(true);
+    // Even after the strand, the hole is not complete: the gap is real.
+    expect(b.geomCompletionsAfterThin).toBe(0);
+  });
+});
+
 describe("the committed geomWalls.json matches the live computation", () => {
   // The sketches render geomWalls.json. This asserts the committed snapshot is
   // exactly what the search produces now, so the shipped data cannot drift from

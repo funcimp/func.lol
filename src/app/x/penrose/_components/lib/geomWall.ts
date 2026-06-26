@@ -277,6 +277,46 @@ function unfillableGaps(all: Tile[], poly: Pt[]): Gap[] {
     .map((e) => enumGap(all, e.a, e.bb));
 }
 
+// "Fill the rest as far as the geometry allows." A bounded backtracking search for
+// the LARGEST legal partial fill: drive the most-constrained frontier edge that
+// still admits a tile, try each of its geometry-legal fills, and recurse, keeping
+// the deepest fill found anywhere. Doomed (zero-fill) edges are simply left, so the
+// search keeps filling around them; when no edge admits a tile the branch is stuck.
+// Every placed tile is overlap-free against the whole board, so the result is a real
+// partial fill, and what it cannot cover is the smallest gap the geometry forces, the
+// triangle no rhombus fits. Deterministic (fixed frontier and candidate order); the
+// finiteness bound guards the recursion.
+function maximalGeomFill(fixed: Tile[], poly: Pt[]): Tile[] {
+  const cap = Math.ceil(polyArea(poly) / SIN36) + 6;
+  let best: Tile[] = [];
+  const extra: Tile[] = [];
+
+  function rec(): void {
+    if (extra.length > best.length) best = [...extra];
+    if (extra.length >= cap) return;
+    const all = [...fixed, ...extra];
+    const front = holeFrontier(boardFrom(all), poly);
+    let edge: { a: Pt; bb: Pt } | null = null;
+    let fills: Tile[] = [];
+    for (const e of front) {
+      const f = geomFills(all, e.a, e.bb);
+      if (f.length === 0) continue; // doomed edge: leave it, fill around it
+      if (edge === null || f.length < fills.length) {
+        edge = e;
+        fills = f;
+      }
+    }
+    if (edge === null) return; // nothing fillable remains: this branch is stuck
+    for (const cand of fills) {
+      extra.push(cand);
+      rec();
+      extra.pop();
+    }
+  }
+  rec();
+  return best;
+}
+
 // ---------------------------------------------------------------------------
 // Scene A: the rigid hexagon.
 // ---------------------------------------------------------------------------
@@ -296,6 +336,10 @@ export type SceneA = {
   // The tempting wrong move: it fits the constrained edge with zero overlap, then
   // strands. (The correct move is uniqueCompletion[0].)
   wrongMove: { type: "fat" | "thin"; corner: number | null; v: [Pt, Pt, Pt, Pt] };
+  // The maximal legal partial fill placed after the wrong move before nothing fits.
+  // What the hole keeps uncovered after the wrong move and this strand is the gap no
+  // tile can fill (for the rigid hexagon this is empty: the wrong move alone strands).
+  strandFill: Tile[];
   // Every gap left unfillable after the wrong move, with full overlap evidence.
   unfillableGaps: Gap[];
   // Always 0: after the wrong move the hole has no geometry-only completion.
@@ -343,6 +387,7 @@ function computeSceneA(): SceneA {
   if (!wrong) throw new Error("geomWall sceneA: no stranding wrong move found");
 
   const after = [...kept, wrong];
+  const afterSearch = geomSearch(after, poly, true);
   const gaps = unfillableGaps(after, poly);
 
   return {
@@ -361,8 +406,9 @@ function computeSceneA(): SceneA {
       corner: cornerAt(wrong, edgeKeyHead(edge.a, edge.bb)),
       v: wrong.v,
     },
+    strandFill: maximalGeomFill(after, poly),
     unfillableGaps: gaps,
-    geomCompletionsAfterWrong: 0,
+    geomCompletionsAfterWrong: afterSearch.completions,
   };
 }
 
@@ -388,6 +434,10 @@ export type SceneB = {
   // That tempting thin tile. It fits (penetration < TOUCH_EPS), the move the
   // objection is about. Place it anyway.
   temptingThin: { type: "fat" | "thin"; corner: number | null; v: [Pt, Pt, Pt, Pt] };
+  // The maximal legal partial fill placed after the thin before nothing fits: "fill
+  // the rest as far as you can." What stays uncovered after the prefix, the thin, and
+  // this strand is the triangular gap no rhombus fits.
+  strandFill: Tile[];
   // Every gap left unfillable after placing the thin, with full overlap evidence.
   unfillableGaps: Gap[];
   // Always 0: after the thin the hole has no geometry-only completion.
@@ -417,7 +467,8 @@ function computeSceneB(): SceneB {
   }
 
   const after = [...base, thin];
-  const completions = geomSearch(after, poly, true).completions;
+  const afterSearch = geomSearch(after, poly, true);
+  const completions = afterSearch.completions;
   const gaps = unfillableGaps(after, poly);
 
   return {
@@ -436,6 +487,7 @@ function computeSceneB(): SceneB {
       corner: cornerAt(thin, edgeKeyHead(a, bb)),
       v: thin.v,
     },
+    strandFill: maximalGeomFill(after, poly),
     unfillableGaps: gaps,
     geomCompletionsAfterThin: completions,
   };

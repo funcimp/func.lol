@@ -144,7 +144,9 @@ export default function GoldenRatio() {
       const lo = MIN_LEVEL + Math.floor(f);
       const hi = Math.min(MAX_LEVEL, lo + 1);
       const frac = f - Math.floor(f);
-      const fade = lo === hi ? 0 : smooth(0.35, 0.65, frac);
+      // A long, gentle crossfade across nearly the whole slider segment, so levels
+      // dissolve into each other gradually instead of snapping.
+      const fade = lo === hi ? 0 : smooth(0.05, 0.95, frac);
       const commonHalf = Math.max(halves[lo], halves[hi]);
 
       const colors = colorsRef.current;
