@@ -213,9 +213,10 @@ export default function PenrosePage() {
             ℤ⁵, five dimensions. The line becomes our plane, and the strip becomes
             a window shaped like nested pentagons. A tile exists exactly when its
             5D shadow lands in that window, a test you run on one point alone, with
-            no backtracking. So the plane is <em>built outward</em>, tile by tile,
-            each one decided on its own. It is <em>computed</em>, never assembled,
-            so it can never dead-end. This is what the explorer runs.
+            no backtracking. Each tile is decided on its own, so the plane is{" "}
+            <em>computed</em>, never assembled, and it can never dead-end. Scan the
+            strip across the grid below and the line and the plane fill in step. This
+            is what the explorer runs.
           </p>
         </div>
 
