@@ -1,62 +1,83 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Sketch from "./Sketch";
-import { buildOverlay, type Pt } from "./lib/overlay";
+import { facesInViewport, GAMMA, type Rect } from "../explore/lib/pentagrid";
+import type { Pt } from "./lib/overlay";
 
 // "Slide one over another": the spine's section-7 sketch, Penrose's overhead-projector
-// demo. Two copies of the SAME real Penrose tiling are drawn as line work in ONE colour;
-// turn or drag the top copy and the places where the two disagree organise into
-// five-fold rosettes that bloom and drift. One colour is the point: the interference is
-// emergent, read as varying line density where the two meshes agree or fight, not as two
-// tinted layers laid on top of each other.
+// demo, done honestly for a five-fold tiling. The only meaningful relative rotations are
+// the tiling's own symmetry rotations, so the frame is centred on a SUN (five fat rhombi
+// meeting at their 72-degree corners) and the top copy turns in 72-degree steps about it.
+// At each step the sun stays identical while the rest no longer matches, so interference
+// blooms outward from the sun. A small offset (drag, or the play-loop orbit) shifts the
+// registry and makes the patterns drift. Both copies are one colour, so the moiré reads
+// as line density, not two tinted layers.
 //
-// HONEST BY CONSTRUCTION. Both layers are the SAME enumerator patch (lib/overlay.ts and
-// its test); nothing is tinted, the moiré is just two real tilings overlapping. Drawn as
-// crisp SVG: each layer is one <path> of the patch's deduped edges (shared edges drawn
-// once, so overlaps never double-darken). The top layer is a separate SVG transformed
-// with a GPU-composited CSS transform, so a rigid turn or slide stays sharp and smooth.
+// HONEST BY CONSTRUCTION. Both layers are the SAME real enumerator tiling, centred on a
+// real sun vertex found in that tiling. A 72-degree turn about the sun leaves its flower
+// invariant and creates the moiré elsewhere (verified: a solid invariant core plus broad
+// islands of agreement and veins of mismatch). Nothing is tinted; the pattern is two real
+// Penrose tilings overlapping. Drawn as crisp SVG with a non-scaling stroke; the edges are
+// defined once and instanced by both layers via <use>.
 //
-// The harness drives render(t): play runs a seamless loop where the turn breathes and the
-// slide orbits, so the rosettes bloom and drift; reset/mount rest on a calm mid state.
-// Pointer drag adds a manual slide on top. Stroke colour is a CSS var, so it inverts with
-// the theme for free.
+// The harness drives render(t): play runs a seamless offset-orbit (the bloom/drift), reset
+// returns to the sun-aligned state. The five-stop control picks the discrete turn. Stroke
+// colour is a CSS var, so it inverts with the theme.
 
-const VIEW_HALF = 36; // data half-width shown in the frame (zoomed out: tiles ~half size)
-const OFFSET_MAX = 8; // how far the top layer may be dragged, in tile-edge units
-// The play loop drives a seamless moiré: the turn BREATHES through a small range so the
-// rosettes bloom from broad to fine and back, while the slide ORBITS so the registry
-// knots drift. Both are periodic in t and return to the start, so play loops forever and
-// reset/mount land on a calm mid state with the interference already visible.
-const TURN_MID = (18 * Math.PI) / 180; // resting turn (degrees -> rad)
-const TURN_AMP = (16 * Math.PI) / 180; // breathe +-16 deg, so the turn ranges ~2..34 deg
-const DRIFT_R = 3.5; // slide-orbit radius, in tile-edge units
-// Each layer SVG is bigger than the frame and centred, so the off-frame tiling rotates
-// or slides into view while the frame (overflow hidden) clips the layer's square edge.
-// It must hold everything a turn + drag + orbit can bring into the frame.
+const VIEW_HALF = 24; // data half-width shown in the frame
+const OFFSET_MAX = 8; // manual drag range, in tile-edge units
+const DRIFT_R = 3; // play-loop offset-orbit radius, in tile-edge units
+const STEP = (2 * Math.PI) / 5; // 72 degrees: the sun's symmetry rotation
+const STEPS = [0, 1, 2, 3, 4]; // the five meaningful turns, k * 72 degrees
+const DEFAULT_STEP = 1; // mount on a turned (interfering) state, not the coincident one
+// The layer SVG is bigger than the frame and centred on the sun, so turning + offsetting
+// pulls off-frame tiling into view; the frame (overflow hidden) clips the layer's edge.
 const R_PATH = Math.ceil(VIEW_HALF * Math.SQRT2 + OFFSET_MAX + DRIFT_R * 2 + 2);
-const OVER = R_PATH / VIEW_HALF; // layer size as a multiple of the frame
-const LAYER_OFFSET_PCT = ((1 - OVER) / 2) * 100; // centre the oversized layer
-const GEN_HALF = R_PATH + 4;
+const OVER = R_PATH / VIEW_HALF;
+const LAYER_OFFSET_PCT = ((1 - OVER) / 2) * 100;
 
 const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+const keyP = (p: Pt) => `${Math.round(p[0] * 1000)},${Math.round(p[1] * 1000)}`;
 
-// One <path> of the patch's edges, deduped (shared edges once), y flipped for SVG.
-function buildEdgePath(): string {
-  const faces = buildOverlay(GEN_HALF).a;
+// Find a sun (five thick rhombi at one vertex) near the origin, then build one <path> of
+// the surrounding tiling's deduped edges in coordinates centred on that sun (y flipped).
+function buildScene(): string {
+  const seek = facesInViewport({ minX: -10, minY: -10, maxX: 10, maxY: 10 }, GAMMA);
+  const inc = new Map<string, { pos: Pt; thick: number; total: number }>();
+  for (const f of seek) {
+    for (const c of f.corners as readonly Pt[]) {
+      const k = keyP(c);
+      const e = inc.get(k) ?? { pos: c, thick: 0, total: 0 };
+      e.total++;
+      if (f.type === "thick") e.thick++;
+      inc.set(k, e);
+    }
+  }
+  const suns = [...inc.values()]
+    .filter((e) => e.total === 5 && e.thick === 5)
+    .sort((a, b) =>
+      Math.hypot(a.pos[0], a.pos[1]) - Math.hypot(b.pos[0], b.pos[1]) ||
+      a.pos[0] - b.pos[0] || a.pos[1] - b.pos[1]);
+  const S: Pt = suns.length ? suns[0].pos : [0, 0];
+
+  const view: Rect = { minX: S[0] - R_PATH - 2, minY: S[1] - R_PATH - 2, maxX: S[0] + R_PATH + 2, maxY: S[1] + R_PATH + 2 };
+  const faces = facesInViewport(view, GAMMA);
   const seen = new Set<string>();
   const parts: string[] = [];
   const r = (v: number) => Math.round(v * 1000);
   for (const f of faces) {
-    if (Math.hypot(f.centroid[0], f.centroid[1]) > R_PATH + 1) continue;
-    const c = f.corners;
-    for (let i = 0; i < c.length; i++) {
-      const a = c[i] as Pt, b = c[(i + 1) % c.length] as Pt;
+    const rel = (f.corners as readonly Pt[]).map((c) => [c[0] - S[0], c[1] - S[1]] as Pt);
+    const cx = (rel[0][0] + rel[1][0] + rel[2][0] + rel[3][0]) / 4;
+    const cy = (rel[0][1] + rel[1][1] + rel[2][1] + rel[3][1]) / 4;
+    if (Math.hypot(cx, cy) > R_PATH + 1) continue;
+    for (let i = 0; i < rel.length; i++) {
+      const a = rel[i], b = rel[(i + 1) % rel.length];
       const ka = `${r(a[0])},${r(a[1])}`, kb = `${r(b[0])},${r(b[1])}`;
-      const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
       parts.push(`M${a[0].toFixed(3)} ${(-a[1]).toFixed(3)}L${b[0].toFixed(3)} ${(-b[1]).toFixed(3)}`);
     }
   }
@@ -64,15 +85,15 @@ function buildEdgePath(): string {
 }
 
 export default function InterferenceOverlay() {
-  const path = useMemo(() => buildEdgePath(), []);
+  const path = useMemo(() => buildScene(), []);
   const containerRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<SVGSVGElement>(null);
-  const twistRef = useRef(TURN_MID); // resting turn (t = 0 and t = 1)
-  const driftRef = useRef<[number, number]>([0, 0]); // the play-loop orbit
-  const manualRef = useRef<[number, number]>([0, 0]); // the user's drag, added on top
+  const [step, setStep] = useState(DEFAULT_STEP);
+  const stepRef = useRef(DEFAULT_STEP);
+  const driftRef = useRef<[number, number]>([0, 0]); // play-loop orbit
+  const manualRef = useRef<[number, number]>([0, 0]); // user drag, added on top
 
-  // Apply the current turn + slide to the top layer as a composited CSS transform. The
-  // slide is the play-loop orbit plus whatever the user has dragged.
+  // Apply the current turn (k * 72 deg about the sun = frame centre) plus the slide.
   const applyTransform = useCallback(() => {
     const top = topRef.current, c = containerRef.current;
     if (!top || !c) return;
@@ -80,21 +101,27 @@ export default function InterferenceOverlay() {
     const pxPerUnit = w / (2 * VIEW_HALF);
     const ox = driftRef.current[0] + manualRef.current[0];
     const oy = driftRef.current[1] + manualRef.current[1];
-    const deg = (twistRef.current * 180) / Math.PI;
+    const deg = (stepRef.current * STEP * 180) / Math.PI;
     top.style.transform = `translate(${ox * pxPerUnit}px, ${-oy * pxPerUnit}px) rotate(${deg}deg)`;
   }, []);
 
+  const setTurn = useCallback((k: number) => {
+    stepRef.current = k;
+    setStep(k);
+    applyTransform();
+  }, [applyTransform]);
+
+  // play loops a seamless offset-orbit at the current turn: the patterns bloom and drift.
   const render = useCallback(
     (t: number) => {
       const a = 2 * Math.PI * t;
-      twistRef.current = TURN_MID + TURN_AMP * Math.sin(a); // breathe the turn
-      driftRef.current = [DRIFT_R * (Math.cos(a) - 1), DRIFT_R * Math.sin(a)]; // orbit the slide
+      driftRef.current = [DRIFT_R * (Math.cos(a) - 1), DRIFT_R * Math.sin(a)];
       applyTransform();
     },
     [applyTransform],
   );
 
-  // Pointer drag slides the top layer; pixel deltas convert to tile-edge units.
+  // Pointer drag adds a manual slide; pixel deltas convert to tile-edge units.
   const dragging = useRef(false);
   const last = useRef<[number, number]>([0, 0]);
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -128,15 +155,14 @@ export default function InterferenceOverlay() {
   }, [applyTransform]);
 
   const viewBox = `${-R_PATH} ${-R_PATH} ${2 * R_PATH} ${2 * R_PATH}`;
-  // Each layer SVG is OVER times the frame, centred, so the frame (overflow hidden) clips it.
   const layer: React.CSSProperties = { position: "absolute", left: `${LAYER_OFFSET_PCT}%`, top: `${LAYER_OFFSET_PCT}%`, width: `${OVER * 100}%`, height: `${OVER * 100}%`, pointerEvents: "none" };
+
   return (
     <Sketch
       label="sketch 08 · two tilings, one turned over the other"
-      animation={{ duration: 15000, render, loop: true, slider: { label: "phase" } }}
+      animation={{ duration: 13000, render, loop: true, slider: { label: "offset" } }}
     >
-      {/* The edges are defined once and instanced by both layers, so the big path data
-          lives in the DOM a single time. */}
+      {/* edges defined once, instanced by both layers, so the path data lives once */}
       <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
         <defs>
           <path
@@ -161,7 +187,7 @@ export default function InterferenceOverlay() {
         className="relative w-full overflow-hidden bg-paper"
         style={{ aspectRatio: "1 / 1", touchAction: "none", cursor: "grab" }}
         role="img"
-        aria-label="Two copies of the same real Penrose tiling drawn as line work in one colour and overlaid. The turn control rotates the top copy across one fifth of a turn, the fundamental range for a five-fold tiling, and dragging slides it. Where the two copies disagree the mismatch organises into five-fold rosettes that bloom and drift; where they agree the lines coincide. Drawn in a single colour so the interference reads as varying line density rather than two separate layers. Any two Penrose tilings share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
+        aria-label="Two copies of the same real Penrose tiling, one colour, overlaid and centred on a sun (five fat rhombi meeting at one vertex). The top copy turns in 72-degree steps about the sun. At each step the sun stays identical while the surrounding tiling no longer matches, so interference blooms outward: broad regions agree, veins of mismatch run between them, all five-fold. A small offset drag or the play-loop orbit shifts the registry and makes the patterns drift. Any two Penrose tilings share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
       >
         <svg style={layer} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <use href="#ov-edges" />
@@ -169,11 +195,36 @@ export default function InterferenceOverlay() {
         <svg ref={topRef} style={{ ...layer, transformOrigin: "center", willChange: "transform" }} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <use href="#ov-edges" />
         </svg>
+
+        {/* the five meaningful turns: 72-degree pivots about the sun */}
+        <div className="pointer-events-auto absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/40 bg-paper/70 px-3 py-1 backdrop-blur-sm">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-55">sun turn</span>
+          {STEPS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTurn(k)}
+              aria-label={`turn ${k * 72} degrees`}
+              aria-pressed={step === k}
+              title={`${k * 72}°`}
+              className="grid h-4 w-4 place-items-center"
+            >
+              <span
+                className="block h-2.5 w-2.5 rounded-full border border-ink transition-colors"
+                style={{ backgroundColor: step === k ? "var(--color-ink)" : "transparent" }}
+              />
+            </button>
+          ))}
+          <span className="font-mono text-[10px] tabular-nums opacity-70" style={{ minWidth: "2.4em", textAlign: "right" }}>
+            {step * 72}°
+          </span>
+        </div>
+
         <div
           className="pointer-events-none absolute inset-x-0 bottom-2 text-center font-mono text-[11px] opacity-70"
           style={{ color: "var(--color-ink)" }}
         >
-          press play to watch the rosettes bloom and drift · drag to slide
+          pick a 72° turn · press play to drift the offset · drag to slide
         </div>
       </div>
     </Sketch>
