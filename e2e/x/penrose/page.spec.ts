@@ -43,7 +43,7 @@ const unsolvableFigure = (page: import("@playwright/test").Page) =>
     .locator("figure")
     .filter({
       has: page.getByRole("img", {
-        name: /single closed sixteen-edge hole with exactly one surviving completion/i,
+        name: /sixteen-edge hole with exactly one surviving completion/i,
       }),
     });
 
@@ -77,7 +77,7 @@ test("the unsolvable-future sketch mounts its animated canvas and controls", asy
   const figure = unsolvableFigure(page);
   await expect(
     figure.getByRole("img", {
-      name: /single closed sixteen-edge hole with exactly one surviving completion/i,
+      name: /sixteen-edge hole with exactly one surviving completion/i,
     }),
   ).toBeVisible();
   await expect(
@@ -107,7 +107,7 @@ test("the unsolvable-future sketch loads at its stationary end state", async ({
 const overlayFigure = (page: import("@playwright/test").Page) =>
   page.locator("figure").filter({
     has: page.getByRole("img", {
-      name: /Two real Penrose tilings overlaid/i,
+      name: /two copies of the same real Penrose tiling/i,
     }),
   });
 
@@ -117,7 +117,7 @@ test("the interference-overlay sketch mounts its animated canvas and controls", 
   await page.goto("/x/penrose");
   const figure = overlayFigure(page);
   await expect(
-    figure.getByRole("img", { name: /Two real Penrose tilings overlaid/i }),
+    figure.getByRole("img", { name: /two copies of the same real Penrose tiling/i }),
   ).toBeVisible();
   await expect(
     figure.getByRole("button", { name: "play", exact: true }),
@@ -125,7 +125,7 @@ test("the interference-overlay sketch mounts its animated canvas and controls", 
   await expect(figure.getByRole("button", { name: "step" })).toBeVisible();
   await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
   // The projector motion is the slider: it scrubs the turn of the top layer.
-  await expect(figure.getByRole("slider", { name: "turn" })).toBeVisible();
+  await expect(figure.getByRole("slider", { name: "scrub" })).toBeVisible();
 });
 
 test("the interference-overlay sketch loads at its stationary end state", async ({
@@ -174,7 +174,7 @@ test("the cut-and-project sketch renders and links its two panels on hover", asy
 const goldenFigure = (page: import("@playwright/test").Page) =>
   page.locator("figure").filter({
     has: page.getByRole("img", {
-      name: /running count of thick to thin tiles/i,
+      name: /the ratio of fat to thin tiles is the golden ratio/i,
     }),
   });
 
@@ -184,7 +184,7 @@ test("the golden-ratio sketch mounts its animated canvas, level slider, and coun
   await page.goto("/x/penrose");
   const figure = goldenFigure(page);
   await expect(
-    figure.getByRole("img", { name: /running count of thick to thin tiles/i }),
+    figure.getByRole("img", { name: /the ratio of fat to thin tiles is the golden ratio/i }),
   ).toBeVisible();
   await expect(
     figure.getByRole("button", { name: "play", exact: true }),
@@ -216,7 +216,7 @@ test("the golden-ratio sketch loads at its stationary deepest level", async ({
 const hierarchyFigure = (page: import("@playwright/test").Page) =>
   page.locator("figure").filter({
     has: page.getByRole("img", {
-      name: /supertiles the small rhombi compose into/i,
+      name: /deflation zoom-in drawn as nested line grids/i,
     }),
   });
 
@@ -226,7 +226,7 @@ test("the zoom-hierarchy sketch mounts its animated canvas and depth slider", as
   await page.goto("/x/penrose");
   const figure = hierarchyFigure(page);
   await expect(
-    figure.getByRole("img", { name: /supertiles the small rhombi compose into/i }),
+    figure.getByRole("img", { name: /deflation zoom-in drawn as nested line grids/i }),
   ).toBeVisible();
   await expect(
     figure.getByRole("button", { name: "play", exact: true }),
@@ -234,8 +234,8 @@ test("the zoom-hierarchy sketch mounts its animated canvas and depth slider", as
   await expect(figure.getByRole("button", { name: "step" })).toBeVisible();
   await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
   // The depth is the slider; the readout names the supertiles.
-  await expect(figure.getByRole("slider", { name: "depth" })).toBeVisible();
-  await expect(figure.getByText(/supertiles/i).first()).toBeVisible();
+  await expect(figure.getByRole("slider", { name: "zoom in" })).toBeVisible();
+  await expect(figure.getByText(/supertile/i).first()).toBeVisible();
 });
 
 test("the zoom-hierarchy sketch loads at its stationary deepest depth", async ({

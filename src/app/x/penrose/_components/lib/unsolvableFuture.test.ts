@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { isCompleteStar } from "./naiveSolver";
 import committed from "./scene.json";
+import { firstDrift } from "./snapshotClose";
 import {
   computeScene,
   isGenuinelyDoomed,
@@ -118,11 +119,13 @@ describe("every dead-end's doomed edge is genuinely unsolvable (the honesty lock
 
 describe("the committed scene.json matches the live computation", () => {
   // The sketch renders scene.json. This asserts the committed snapshot is exactly
-  // what the search produces now, so the shipped data cannot drift from the
-  // proof. Serialise both through JSON so number formatting is identical.
-  test("scene.json equals computeScene() byte-for-byte", () => {
+  // what the search produces now, so the shipped data cannot drift from the proof.
+  // Structure is compared exactly; trig-derived floats only within a tight tolerance,
+  // because their last bit differs between CPU architectures (snapshot generated on
+  // one machine, CI runs on another). See snapshotClose.ts.
+  test("scene.json matches computeScene() (structure exact, floats to 1e-9)", () => {
     const live = JSON.parse(JSON.stringify(scene));
-    expect(committed).toEqual(live);
+    expect(firstDrift(committed, live)).toBeNull();
   });
 });
 

@@ -9,6 +9,7 @@ import {
   type Gap,
   type GeomWalls,
 } from "./geomWall";
+import { firstDrift } from "./snapshotClose";
 
 // This test BINDS both geometry-only sketches to the proof. The sketches render
 // geomWalls.json; this test re-runs the overlap-only search that produced it and
@@ -168,9 +169,11 @@ describe("the strand fill is a real legal partial fill, leaving a true gap", () 
 describe("the committed geomWalls.json matches the live computation", () => {
   // The sketches render geomWalls.json. This asserts the committed snapshot is
   // exactly what the search produces now, so the shipped data cannot drift from
-  // the proof. Serialise both through JSON so number formatting is identical.
-  test("geomWalls.json equals computeGeomWalls() byte-for-byte", () => {
+  // the proof. Structure is compared exactly; trig-derived floats only within a
+  // tight tolerance, because their last bit differs between CPU architectures
+  // (snapshot generated on one machine, CI runs on another). See snapshotClose.ts.
+  test("geomWalls.json matches computeGeomWalls() (structure exact, floats to 1e-9)", () => {
     const live = JSON.parse(JSON.stringify(walls));
-    expect(committed).toEqual(live);
+    expect(firstDrift(committed, live)).toBeNull();
   });
 });
