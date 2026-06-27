@@ -31,7 +31,10 @@ const OFFSET_MAX = 8; // manual drag range, in tile-edge units
 const DRIFT_R = 3; // play-loop offset-orbit radius, in tile-edge units
 const STEP = (2 * Math.PI) / 5; // 72 degrees: the sun's symmetry rotation
 const STEPS = [0, 1, 2, 3, 4]; // the five meaningful turns, k * 72 degrees
-const DEFAULT_STEP = 1; // mount on a turned (interfering) state, not the coincident one
+// Open on a found state: 288 deg (= -72) turned about the sun, nudged down a hair so the
+// sun-core registry breaks and the whole field falls into a rich agree/disagree moire.
+const DEFAULT_STEP = 4;
+const DEFAULT_OFFSET: [number, number] = [0, -0.4]; // tile-edge units; negative y = down
 // The layer SVG is bigger than the frame and centred on the sun, so turning + offsetting
 // pulls off-frame tiling into view; the frame (overflow hidden) clips the layer's edge.
 const R_PATH = Math.ceil(VIEW_HALF * Math.SQRT2 + OFFSET_MAX + DRIFT_R * 2 + 2);
@@ -91,7 +94,7 @@ export default function InterferenceOverlay() {
   const [step, setStep] = useState(DEFAULT_STEP);
   const stepRef = useRef(DEFAULT_STEP);
   const driftRef = useRef<[number, number]>([0, 0]); // play-loop orbit
-  const manualRef = useRef<[number, number]>([0, 0]); // user drag, added on top
+  const manualRef = useRef<[number, number]>([DEFAULT_OFFSET[0], DEFAULT_OFFSET[1]]); // user drag, added on top
 
   // Apply the current turn (k * 72 deg about the sun = frame centre) plus the slide.
   const applyTransform = useCallback(() => {
