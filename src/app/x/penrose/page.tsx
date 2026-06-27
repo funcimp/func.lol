@@ -296,8 +296,9 @@ export default function PenrosePage() {
             Large regions snap into agreement, the two patterns locking tile for
             tile. Between those islands run shifting veins where they disagree,
             and the whole map is organized by the same five-fold symmetry that
-            built the tiles. Press play below to turn and drift the top layer over
-            the other, or drag it around yourself, and watch the rosettes bloom.
+            built the tiles. Press play below: the two start in perfect overlap,
+            the top turns a fifth about a sun and slides a hair, and the veins where
+            they disagree light up.
           </p>
         </div>
 
