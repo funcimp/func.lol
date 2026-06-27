@@ -266,7 +266,7 @@ export default function GoldenRatio() {
 
   return (
     <Sketch
-      label="sketch 09 · the golden ratio appears"
+      label="sketch 10 · the golden ratio appears"
       animation={{ duration: 7000, render, slider: { label: "level" } }}
     >
       <canvas

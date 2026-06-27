@@ -13,6 +13,7 @@ import MeetTheTiles from "./_components/MeetTheTiles";
 import PentaGrid from "./_components/PentaGrid";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
+import WindowStrand from "./_components/WindowStrand";
 import ZoomHierarchy from "./_components/ZoomHierarchy";
 
 export const metadata: Metadata = {
@@ -263,6 +264,28 @@ export default function PenrosePage() {
             read off the crossings of its shadow. Both compute the same plane.
           </p>
         </div>
+
+        {/* 6c. The dead-ends, explained: the window region collapses. */}
+        <h2 className={H2}>Why a piece can fit and still strand you</h2>
+        <div className={PROSE}>
+          <p>
+            Now look back at the dead-ends with the window in hand. Each tile you place
+            is a constraint on where a single consistent window could sit: it must
+            accept that tile&#39;s corners. Lay correct tiles and the set of windows
+            still consistent shrinks, but never empties. It always holds the tiling&#39;s
+            true window, so you could still finish.
+          </p>
+          <p>
+            A tempting tile can fit with no overlap and still be fatal. Watch the right
+            panel: when it lands, the consistent-window region collapses to nothing. No
+            window accepts the patch, so it can never be completed. That is the dead-end
+            of the earlier sketches, seen from the inside. Cut and project never strands
+            because it fixes the window first and tests each tile against it, so the
+            region is never in doubt.
+          </p>
+        </div>
+
+        <WindowStrand />
 
         {/* 7. The overlay. */}
         <h2 className={H2}>Slide one over another</h2>
