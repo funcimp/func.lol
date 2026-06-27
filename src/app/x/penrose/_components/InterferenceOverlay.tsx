@@ -21,13 +21,16 @@ import { buildOverlay, type Pt } from "./lib/overlay";
 // The harness drives render(t) for the turn (one fifth, looping); pointer drag slides the
 // top layer. Stroke colour is a CSS var, so it inverts with the theme for free.
 
-const VIEW_HALF = 18; // data half-width shown in the frame (zoomed in so lines resolve)
-const OFFSET_MAX = 9; // how far the top layer may be dragged, in tile-edge units
+const VIEW_HALF = 36; // data half-width shown in the frame (zoomed out: tiles ~half size)
+const OFFSET_MAX = 8; // how far the top layer may be dragged, in tile-edge units
 const TURN_MAX = (2 * Math.PI) / 5; // a fifth of a turn is the whole story for five-fold
-// Each layer SVG is 2x the frame and centred, so the off-frame tiling rotates/slides into
-// view while the frame (overflow hidden) clips the layer's own square edge away.
-const R_PATH = 2 * VIEW_HALF;
-const GEN_HALF = 40;
+// Each layer SVG is bigger than the frame and centred, so the off-frame tiling rotates
+// or slides into view while the frame (overflow hidden) clips the layer's square edge.
+// It must hold everything a turn + drag can bring into the frame.
+const R_PATH = Math.ceil(VIEW_HALF * Math.SQRT2 + OFFSET_MAX + 2);
+const OVER = R_PATH / VIEW_HALF; // layer size as a multiple of the frame
+const LAYER_OFFSET_PCT = ((1 - OVER) / 2) * 100; // centre the oversized layer
+const GEN_HALF = R_PATH + 4;
 
 const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
 
@@ -113,23 +116,29 @@ export default function InterferenceOverlay() {
 
   const viewBox = `${-R_PATH} ${-R_PATH} ${2 * R_PATH} ${2 * R_PATH}`;
   // Each layer SVG is 2x the frame, offset -50% so it is centred; the frame clips it.
-  const layer: React.CSSProperties = { position: "absolute", left: "-50%", top: "-50%", width: "200%", height: "200%", pointerEvents: "none" };
-  const pathProps = {
-    d: path,
-    fill: "none",
-    stroke: "var(--color-ink)",
-    strokeWidth: 0.75,
-    strokeOpacity: 0.8,
-    strokeLinejoin: "round" as const,
-    strokeLinecap: "round" as const,
-    vectorEffect: "non-scaling-stroke" as const,
-  };
-
+  const layer: React.CSSProperties = { position: "absolute", left: `${LAYER_OFFSET_PCT}%`, top: `${LAYER_OFFSET_PCT}%`, width: `${OVER * 100}%`, height: `${OVER * 100}%`, pointerEvents: "none" };
   return (
     <Sketch
       label="sketch 08 · two tilings, one turned over the other"
       animation={{ duration: 7000, render, slider: { label: "turn" } }}
     >
+      {/* The edges are defined once and instanced by both layers, so the big path data
+          lives in the DOM a single time. */}
+      <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
+        <defs>
+          <path
+            id="ov-edges"
+            d={path}
+            fill="none"
+            stroke="var(--color-ink)"
+            strokeWidth={0.75}
+            strokeOpacity={0.8}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </defs>
+      </svg>
       <div
         ref={containerRef}
         onPointerDown={onPointerDown}
@@ -139,13 +148,13 @@ export default function InterferenceOverlay() {
         className="relative w-full overflow-hidden bg-paper"
         style={{ aspectRatio: "1 / 1", touchAction: "none", cursor: "grab" }}
         role="img"
-        aria-label="Two copies of the same real Penrose tiling drawn as line work in one colour and overlaid, zoomed in. The turn control rotates the top copy across one fifth of a turn, the fundamental range for a five-fold tiling, and dragging slides it. Where the two copies disagree the mismatch organises into five-fold rosettes that bloom and drift; where they agree the lines coincide. Drawn in a single colour so the interference reads as varying line density rather than two separate layers. Any two Penrose tilings share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
+        aria-label="Two copies of the same real Penrose tiling drawn as line work in one colour and overlaid. The turn control rotates the top copy across one fifth of a turn, the fundamental range for a five-fold tiling, and dragging slides it. Where the two copies disagree the mismatch organises into five-fold rosettes that bloom and drift; where they agree the lines coincide. Drawn in a single colour so the interference reads as varying line density rather than two separate layers. Any two Penrose tilings share every finite patch yet never line up everywhere at once, which is what Penrose saw on his overhead projector."
       >
         <svg style={layer} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-          <path {...pathProps} />
+          <use href="#ov-edges" />
         </svg>
         <svg ref={topRef} style={{ ...layer, transformOrigin: "center", willChange: "transform" }} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-          <path {...pathProps} />
+          <use href="#ov-edges" />
         </svg>
         <div
           className="pointer-events-none absolute inset-x-0 bottom-2 text-center font-mono text-[11px] opacity-70"
