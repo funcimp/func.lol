@@ -196,8 +196,14 @@ export default function InterferenceOverlay() {
           <use href="#ov-edges" />
         </svg>
 
-        {/* the five meaningful turns: 72-degree pivots about the sun */}
-        <div className="pointer-events-auto absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/40 bg-paper/70 px-3 py-1 backdrop-blur-sm">
+        {/* the five meaningful turns: 72-degree pivots about the sun. Stop pointer events
+            here so the container's drag/pointer-capture doesn't swallow the clicks. */}
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerMove={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          className="pointer-events-auto absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/40 bg-paper/70 px-3 py-1 backdrop-blur-sm"
+        >
           <span className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-55">sun turn</span>
           {STEPS.map((k) => (
             <button
