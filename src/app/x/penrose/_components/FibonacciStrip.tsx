@@ -315,7 +315,7 @@ export default function FibonacciStrip() {
 
   return (
     <Sketch
-      label="sketch 04 · cut and project, in a dimension you can see"
+      label="sketch 05 · cut and project, in a dimension you can see"
       animation={{ duration: 8000, render, slider: { label: "slide" } }}
     >
       <canvas

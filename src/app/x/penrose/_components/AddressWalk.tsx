@@ -297,7 +297,7 @@ export default function AddressWalk() {
 
   return (
     <Sketch
-      label="sketch 09 · every tile knows its address"
+      label="sketch 10 · every tile knows its address"
       animation={{ duration: 6500, render, slider: { label: "walk" } }}
     >
       <canvas

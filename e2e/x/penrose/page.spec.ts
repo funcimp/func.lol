@@ -27,6 +27,43 @@ test("hovering a tile surfaces its golden-ratio detail", async ({ page }) => {
   await expect(page.getByText(/long diagonal is exactly/i)).toBeVisible();
 });
 
+const ribbonsFigure = (page: import("@playwright/test").Page) =>
+  page.locator("figure").filter({
+    has: page.getByRole("img", {
+      name: /five families of bands hidden in the tiling/i,
+    }),
+  });
+
+test("the hidden-bands sketch mounts its canvas, controls, and direction picker", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  const figure = ribbonsFigure(page);
+  await expect(
+    figure.getByRole("img", { name: /five families of bands hidden in the tiling/i }),
+  ).toBeVisible();
+  await expect(
+    figure.getByRole("button", { name: "play", exact: true }),
+  ).toBeVisible();
+  await expect(figure.getByRole("button", { name: "reset" })).toBeVisible();
+  await expect(figure.getByRole("slider", { name: "reveal" })).toBeVisible();
+  // the five direction pips
+  await expect(figure.getByRole("button", { name: /band direction 1 of 5/i })).toBeVisible();
+  await expect(figure.getByRole("button", { name: /band direction 5 of 5/i })).toBeVisible();
+});
+
+test("the hidden-bands sketch loads at its stationary end state", async ({
+  page,
+}) => {
+  await page.goto("/x/penrose");
+  const figure = ribbonsFigure(page);
+  const reset = figure.getByRole("button", { name: "reset" });
+  const step = figure.getByRole("button", { name: "step" });
+  await reset.scrollIntoViewIfNeeded();
+  await expect(reset).toBeEnabled();
+  await expect(step).toBeDisabled();
+});
+
 // Each animated sketch carries its own control bar, so button locators must be
 // scoped to the sketch's figure (the page has more than one animated sketch).
 const solverFigure = (page: import("@playwright/test").Page) =>

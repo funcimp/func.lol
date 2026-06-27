@@ -128,7 +128,7 @@ export default function CutAndProject() {
     : "hover a tile";
 
   return (
-    <Sketch label="sketch 05 · cut and project from ℤ⁵">
+    <Sketch label="sketch 06 · cut and project from ℤ⁵">
       <svg
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         xmlns="http://www.w3.org/2000/svg"

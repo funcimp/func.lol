@@ -11,6 +11,7 @@ import GoldenRatio from "./_components/GoldenRatio";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import PentaGrid from "./_components/PentaGrid";
+import Ribbons from "./_components/Ribbons";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
 import WindowStrand from "./_components/WindowStrand";
@@ -124,6 +125,28 @@ export default function PenrosePage() {
         </div>
 
         <MeetTheTiles />
+
+        {/* 3b. Lay them into a tiling: the hidden bands (a higher-order pattern). */}
+        <h2 className={H2}>Lay them into a tiling</h2>
+        <div className={PROSE}>
+          <p>
+            Drop the two tiles together by the thousands and you get a Penrose
+            tiling: never repeating, yet never a gap. Look closely and a
+            higher-order pattern surfaces. The plane is threaded by long{" "}
+            <strong>bands</strong> of tiles running clear across it in five
+            directions, one for each edge direction the tiles share.
+          </p>
+          <p>
+            Pick a direction below and its bands light up. Every tile sits on
+            exactly two of them, one per axis, and they never line up the same way
+            twice. These bands are the skeleton the famous <strong>Ammann bars</strong>{" "}
+            trace, five families of straight lines hidden in any Penrose tiling,
+            spaced in a long/short rhythm you will meet again as the cut-and-project
+            strip.
+          </p>
+        </div>
+
+        <Ribbons />
 
         {/* 4. A geometric dead-end: a piece fits, then strands you. */}
         <h2 className={H2}>A piece fits, and still strands you</h2>
