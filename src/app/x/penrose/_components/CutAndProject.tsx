@@ -43,8 +43,12 @@ const PANEL_W = (VB_W - GUTTER) / 2;
 const pointsAttr = (pts: readonly Pt[]) => pts.map(([x, y]) => `${x},${y}`).join(" ");
 
 // A fit: map a data-space box into a panel box, y flipped (SVG y grows down),
-// preserving aspect so circles stay circles.
+// preserving aspect so circles stay circles. Coordinates are rounded to 0.001 px: they
+// derive from Math.cos/sin/sqrt, whose last bit differs between the SSR runtime (Node)
+// and the browser (V8), and an unrounded value in an SVG attribute is a hydration
+// mismatch. Sub-pixel rounding is invisible and makes server and client byte-identical.
 type Fit = (p: Pt) => [number, number];
+const px3 = (n: number) => Math.round(n * 1000) / 1000;
 function makeFit(
   data: { cx: number; cy: number; half: number },
   panel: { x: number; y: number; w: number; h: number },
@@ -52,7 +56,7 @@ function makeFit(
   const s = Math.min(panel.w, panel.h) / (2 * data.half);
   const px0 = panel.x + panel.w / 2;
   const py0 = panel.y + panel.h / 2;
-  return ([x, y]) => [px0 + (x - data.cx) * s, py0 - (y - data.cy) * s];
+  return ([x, y]) => [px3(px0 + (x - data.cx) * s), px3(py0 - (y - data.cy) * s)];
 }
 
 // Left panel: the physical patch. Fit its corner extent into the left box.
