@@ -90,7 +90,8 @@ function Controls({ animation }: { animation: SketchAnimation }) {
   const reduced = usePrefersReducedMotion();
 
   const [playing, setPlaying] = useState(false);
-  const [t, setT] = useState(1); // start at the representative end state
+  const [t, setT] = useState(1); // SSR-safe default; the resting-frame effect adjusts it
+  const touched = useRef(false); // the viewer has taken control (play/step/reset/scrub)
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number>(0); // wall-clock anchor for the current run
   const tAtStartRef = useRef<number>(1);
@@ -100,9 +101,18 @@ function Controls({ animation }: { animation: SketchAnimation }) {
   const renderRef = useRef(render);
   renderRef.current = render;
 
-  // Paint the end state once on mount and whenever the render fn identity is
-  // refreshed while paused. This satisfies "render the end state, never move on
-  // load": the first frame the user sees is t = 1, stationary.
+  // Resting frame. Motion viewers start at the beginning (t = 0) so a single "play" runs
+  // forward and the slider sits at the left; reduced-motion viewers keep the representative
+  // end state (t = 1), since play is disabled for them and a blank start would show nothing.
+  // Set once the motion preference is known, and only until the viewer takes control.
+  useEffect(() => {
+    if (touched.current) return;
+    setT(reduced ? 1 : 0);
+  }, [reduced]);
+
+  // Paint the resting frame on mount and whenever t changes while paused. Nothing ever
+  // autoplays: the first frame is stationary, the start for motion viewers and the end
+  // for reduced-motion viewers.
   useEffect(() => {
     if (!playing) renderRef.current(t);
   }, [playing, t]);
@@ -140,21 +150,26 @@ function Controls({ animation }: { animation: SketchAnimation }) {
   }, [playing, duration, loop]);
 
   const onStep = useCallback(() => {
+    touched.current = true;
     setPlaying(false);
-    setT((cur) => {
-      const next = Math.min(1, cur + 0.05);
-      return next;
-    });
+    setT((cur) => Math.min(1, cur + 0.05));
   }, []);
 
   const onReset = useCallback(() => {
+    touched.current = true;
     setPlaying(false);
     setT(0);
   }, []);
 
   const onScrub = useCallback((value: number) => {
+    touched.current = true;
     setPlaying(false);
     setT(value);
+  }, []);
+
+  const onPlay = useCallback(() => {
+    touched.current = true;
+    setPlaying((p) => !p);
   }, []);
 
   const btn =
@@ -165,7 +180,7 @@ function Controls({ animation }: { animation: SketchAnimation }) {
       <button
         type="button"
         className={btn}
-        onClick={() => setPlaying((p) => !p)}
+        onClick={onPlay}
         disabled={reduced && !playing}
         aria-pressed={playing}
         title={reduced ? "motion reduced — scrub or step instead" : undefined}

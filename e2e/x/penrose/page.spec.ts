@@ -89,6 +89,7 @@ const unsolvableFigure = (page: import("@playwright/test").Page) =>
 test("the geometry-only dead-end sketch mounts and honours the reduced-motion contract", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/x/penrose");
   const figure = solverFigure(page);
   await expect(
@@ -96,9 +97,9 @@ test("the geometry-only dead-end sketch mounts and honours the reduced-motion co
       name: /small six-edge hole carved from a real Penrose patch/i,
     }),
   ).toBeVisible();
-  // The harness mounts at the stationary end state, so reset is enabled and step
-  // is disabled until the viewer rewinds. This is the reduced-motion contract
-  // observed from outside.
+  // Under reduced motion the harness mounts at the stationary end state, so reset is
+  // enabled and step is disabled until the viewer rewinds. (Motion viewers start at
+  // t = 0.) This is the reduced-motion contract observed from outside.
   const reset = figure.getByRole("button", { name: "reset" });
   const step = figure.getByRole("button", { name: "step" });
   await reset.scrollIntoViewIfNeeded();
@@ -129,9 +130,11 @@ test("the unsolvable-future sketch mounts its animated canvas and controls", asy
 test("the unsolvable-future sketch loads at its stationary end state", async ({
   page,
 }) => {
+  // Reduced-motion viewers get the representative end state (t = 1); motion viewers
+  // start at t = 0. Emulate reduce to assert the end-state contract.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/x/penrose");
-  // Same harness contract: mounts at t = 1 (end state), so reset is enabled and
-  // step is disabled until the viewer rewinds.
+  // mounts at t = 1, so reset is enabled and step is disabled until the viewer rewinds.
   const figure = unsolvableFigure(page);
   const reset = figure.getByRole("button", { name: "reset" });
   const step = figure.getByRole("button", { name: "step" });
@@ -141,6 +144,17 @@ test("the unsolvable-future sketch loads at its stationary end state", async ({
   await reset.click();
   await expect(step).toBeEnabled();
   await expect(reset).toBeDisabled();
+});
+
+test("motion viewers mount at the start, so one play runs forward", async ({ page }) => {
+  // The default (motion) timeline rests at the left: reset is disabled (already at the
+  // start) and step/play are ready, so a single play click animates forward.
+  await page.goto("/x/penrose");
+  const figure = unsolvableFigure(page);
+  await figure.getByRole("button", { name: "play", exact: true }).scrollIntoViewIfNeeded();
+  await expect(figure.getByRole("button", { name: "reset" })).toBeDisabled();
+  await expect(figure.getByRole("button", { name: "step" })).toBeEnabled();
+  await expect(figure.getByRole("button", { name: "play", exact: true })).toBeEnabled();
 });
 
 const overlayFigure = (page: import("@playwright/test").Page) =>
@@ -170,9 +184,10 @@ test("the interference-overlay sketch mounts its animated canvas and controls", 
 test("the interference-overlay sketch loads at its stationary end state", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/x/penrose");
-  // Same harness contract: mounts at t = 1 (the representative islands-and-veins
-  // frame), so reset is enabled and step is disabled until the viewer rewinds.
+  // Reduced-motion mounts at t = 1 (the representative islands-and-veins frame), so
+  // reset is enabled and step is disabled until the viewer rewinds.
   const figure = overlayFigure(page);
   const reset = figure.getByRole("button", { name: "reset" });
   const step = figure.getByRole("button", { name: "step" });
@@ -238,9 +253,10 @@ test("the golden-ratio sketch mounts its animated canvas, level slider, and coun
 test("the golden-ratio sketch loads at its stationary deepest level", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/x/penrose");
-  // Same harness contract: mounts at t = 1 (the deepest level, ratio nearest phi),
-  // so reset is enabled and step is disabled until the viewer rewinds.
+  // Reduced-motion mounts at t = 1 (the deepest level, ratio nearest phi), so reset is
+  // enabled and step is disabled until the viewer rewinds.
   const figure = goldenFigure(page);
   const reset = figure.getByRole("button", { name: "reset" });
   const step = figure.getByRole("button", { name: "step" });
@@ -280,9 +296,10 @@ test("the zoom-hierarchy sketch mounts its animated canvas and depth slider", as
 test("the zoom-hierarchy sketch loads at its stationary deepest depth", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/x/penrose");
-  // Same harness contract: mounts at t = 1 (the deepest depth, where the self-
-  // similarity reads hardest), so reset is enabled and step is disabled.
+  // Reduced-motion mounts at t = 1 (the deepest depth, where the self-similarity reads
+  // hardest), so reset is enabled and step is disabled.
   const figure = hierarchyFigure(page);
   const reset = figure.getByRole("button", { name: "reset" });
   const step = figure.getByRole("button", { name: "step" });
