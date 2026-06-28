@@ -265,7 +265,7 @@ export default function WindowStrand() {
 
   return (
     <Sketch
-      label="sketch 08 · the dead-ends, seen in the window"
+      label="sketch 09 · the dead-ends, seen in the window"
       animation={{ duration: 13000, render, slider: { label: "place" } }}
     >
       <canvas
@@ -284,7 +284,7 @@ export default function WindowStrand() {
           region collapses to nothing.
         </p>
         <p className="mt-2 opacity-70">
-          That is the dead-end of sketches 03 and 04, seen from the inside. Tiling by
+          That is the dead-end of sketches 04 and 05, seen from the inside. Tiling by
           hand gropes for a consistent window one move at a time, and a move can leave
           none. Cut and project picks the window first and tests every tile against it,
           so the region is never in doubt and the plane never strands.

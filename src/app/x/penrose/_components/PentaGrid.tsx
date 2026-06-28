@@ -472,7 +472,7 @@ export default function PentaGrid() {
 
   return (
     <Sketch
-      label="sketch 07 · the pentagrid"
+      label="sketch 08 · the pentagrid"
       animation={{ duration: 14000, render, slider: { label: "build" } }}
     >
       <canvas

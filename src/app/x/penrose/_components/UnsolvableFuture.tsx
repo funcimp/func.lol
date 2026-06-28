@@ -349,7 +349,7 @@ export default function UnsolvableFuture() {
 
   return (
     <Sketch
-      label="sketch 04 · the thin fits, place it, now nothing fits"
+      label="sketch 05 · the thin fits, place it, now nothing fits"
       animation={{ duration: 9000, render, slider: { label: "search" } }}
     >
       <canvas

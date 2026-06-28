@@ -6,13 +6,14 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { experimentNumber } from "../page";
 import AddressWalk from "./_components/AddressWalk";
 import CutAndProject from "./_components/CutAndProject";
+import EmergentPatterns from "./_components/EmergentPatterns";
 import FibonacciStrip from "./_components/FibonacciStrip";
 import GoldenRatio from "./_components/GoldenRatio";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import PentaGrid from "./_components/PentaGrid";
-import Ribbons from "./_components/Ribbons";
 import StopTilingByHand from "./_components/StopTilingByHand";
+import TilingIntro from "./_components/TilingIntro";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
 import WindowStrand from "./_components/WindowStrand";
 import ZoomHierarchy from "./_components/ZoomHierarchy";
@@ -126,27 +127,43 @@ export default function PenrosePage() {
 
         <MeetTheTiles />
 
-        {/* 3b. Lay them into a tiling: the hidden bands (a higher-order pattern). */}
+        {/* 3b. Lay them into a tiling: gentle on-ramp, proper colours, no structure. */}
         <h2 className={H2}>Lay them into a tiling</h2>
         <div className={PROSE}>
           <p>
-            Drop the two tiles together by the thousands and you get a Penrose
-            tiling: never repeating, yet never a gap. Look closely and a
-            higher-order pattern surfaces. The plane is threaded by long{" "}
-            <strong>bands</strong> of tiles running clear across it in five
-            directions, one for each edge direction the tiles share.
+            Drop the two tiles together by the thousands and they cover the plane:
+            no gaps, every edge meeting an edge. Gold is the thick tile, teal the
+            thin one, the colours we keep for the rest of the page. Hover any tile to
+            check which it is.
           </p>
           <p>
-            Pick a direction below and its bands light up. Every tile sits on
-            exactly two of them, one per axis, and they never line up the same way
-            twice. These bands are the skeleton the famous <strong>Ammann bars</strong>{" "}
-            trace, five families of straight lines hidden in any Penrose tiling,
-            spaced in a long/short rhythm you will meet again as the cut-and-project
-            strip.
+            The catch is what is missing. There is no repeat. Slide this tiling any
+            distance in any direction and it never lands back on itself. That is a
+            Penrose tiling.
           </p>
         </div>
 
-        <Ribbons />
+        <TilingIntro />
+
+        {/* 3c. Patterns surface: rosettes and ribbons, on the same coloured tiling. */}
+        <h2 className={H2}>Patterns start to surface</h2>
+        <div className={PROSE}>
+          <p>
+            Sit with that tiling and patterns begin to surface. First the{" "}
+            <strong>rosettes</strong>: five-petal suns, where five thick tiles meet,
+            scattered through the plane. Then the <strong>ribbons</strong>: long bands
+            of tiles running clear across it in five directions, one per edge direction
+            the tiles share.
+          </p>
+          <p>
+            Switch between them below. The bands are lit by dimming the rest of the
+            tiling, so each one stays real tiles in their true colours. They are the
+            skeleton the famous <strong>Ammann bars</strong> trace, the straight lines
+            hidden in any Penrose tiling.
+          </p>
+        </div>
+
+        <EmergentPatterns />
 
         {/* 4. A geometric dead-end: a piece fits, then strands you. */}
         <h2 className={H2}>A piece fits, and still strands you</h2>

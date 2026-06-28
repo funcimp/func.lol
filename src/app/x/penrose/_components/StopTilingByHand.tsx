@@ -343,7 +343,7 @@ export default function StopTilingByHand() {
 
   return (
     <Sketch
-      label="sketch 03 · a piece fits, and still strands you"
+      label="sketch 04 · a piece fits, and still strands you"
       animation={{ duration: 7000, render, slider: { label: "build" } }}
     >
       <canvas
