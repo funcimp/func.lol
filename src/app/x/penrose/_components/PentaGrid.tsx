@@ -253,7 +253,9 @@ export default function PentaGrid() {
       const band = 0.14;
       const sweep = clamp01((t - 0.12) / (0.9 - 0.12));
       const scanR = sweep * (1 + band + 0.05);
-      const lineAlpha = smooth(0, 0.1, t);
+      // The five line families are scaffold: drawn from the resting frame (t = 0) so the
+      // panel is never blank. The radial sweep reveals the crossings and rhombi on top.
+      const lineAlpha = 1;
       // The highlighted crossing is whatever the cursor is over, else the default
       // featured one. Hover a tile or a crossing and its partner lights up.
       const hovering = hoverRef.current;
@@ -337,7 +339,9 @@ export default function PentaGrid() {
       // default featured tile or whatever the cursor is over.
       if (highlight) {
         const col = colorFor(highlight.face.type);
-        const hiAlpha = hovering ? 1 : smooth(0.12, 0.3, t);
+        // The featured crossing and its linked tile are the resting-frame teaser, fully
+        // lit from t = 0: one worked "crossing → tile" before the sweep fills the rest.
+        const hiAlpha = 1;
         const hiLines = linesFor(view, highlight);
 
         const dot = view.leftToPx(highlight.z);

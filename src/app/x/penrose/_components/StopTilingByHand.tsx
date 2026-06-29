@@ -205,7 +205,6 @@ function caption(
 // filling. t = 1 is the clean resolved patch.
 // ---------------------------------------------------------------------------
 
-const HOLE_IN = 0.1;
 const SEAT_FROM = 0.16;
 const SEAT_TO = 0.34;
 const GAP_FROM = 0.42; // the red, unfillable triangles appear
@@ -227,7 +226,9 @@ function paint(
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
-  const wallIn = smooth(0, HOLE_IN, t);
+  // The wall ring and the empty dashed hole are the resting frame: the puzzle is posed
+  // before play, never a blank panel. Play seats the tempting tile from there.
+  const wallIn = 1;
   const seat = smooth(SEAT_FROM, SEAT_TO, t);
   const gap = smooth(GAP_FROM, GAP_TO, t);
   const comp = smooth(COMP_FROM, COMP_TO, t);

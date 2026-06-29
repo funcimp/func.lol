@@ -223,7 +223,6 @@ function drawTiles(
 // path and grow the one surviving completion. t = 1 is the clean resolved patch.
 // ---------------------------------------------------------------------------
 
-const WALL_IN = 0.08;
 const PREFIX_FROM = 0.1;
 const PREFIX_TO = 0.3;
 const THIN_FROM = 0.32;
@@ -247,7 +246,9 @@ function paint(
   ctx.fillStyle = grout;
   ctx.fillRect(0, 0, VB_W, VB_H);
 
-  const wallIn = smooth(0, WALL_IN, t);
+  // The wall ring and the empty dashed sixteen-edge hole are the resting frame: the
+  // richer puzzle is posed before play, never a blank panel. Play runs the search.
+  const wallIn = 1;
   const prefix = smooth(PREFIX_FROM, PREFIX_TO, t);
   const thinR = smooth(THIN_FROM, THIN_TO, t);
   const strand = smooth(STRAND_FROM, STRAND_TO, t);

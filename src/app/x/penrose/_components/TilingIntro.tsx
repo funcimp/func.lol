@@ -20,6 +20,10 @@ import type { RenderFace, Pt } from "../explore/lib/patch";
 const VB = 480;
 const PAD = 16;
 const VIEW_R = 7;
+// The resting frame (motion viewers sit at t = 0) already shows the central cluster of
+// this radius, so the sketch invites a play press instead of starting blank; play
+// settles the rest of the patch in from there outward.
+const SEED_R = 2.6;
 
 function readVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
@@ -97,7 +101,7 @@ export default function TilingIntro() {
       ctx.fillRect(0, 0, VB, VB);
       ctx.lineJoin = "round";
 
-      const front = t * (scene.maxR + 1); // settle in from the centre outward
+      const front = SEED_R + t * (scene.maxR + 1 - SEED_R); // settle in from the centre outward
       const hov = hoverRef.current;
       for (const f of scene.faces) {
         const r = Math.hypot(f.centroid[0], f.centroid[1]);

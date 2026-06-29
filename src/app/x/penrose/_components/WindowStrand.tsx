@@ -150,7 +150,9 @@ export default function WindowStrand() {
 
       // phase + counts
       const buildProg = clamp01(t / BUILD_END);
-      const fb = buildProg * B;
+      // Rest with the first tile down and its full consistent-window region drawn, so
+      // neither panel is blank before play; play lays the rest and then collapses it.
+      const fb = 1 + buildProg * (B - 1);
       const placed = Math.min(B, Math.floor(fb));
       const fadingFrac = fb - placed;
       const wp = clamp01((t - BUILD_END) / (WRONG_END - BUILD_END));
