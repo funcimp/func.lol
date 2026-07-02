@@ -97,6 +97,11 @@ export default function PenrosePage() {
             dug in and built this sketch to explore the topic and share what
             I&#39;ve learned.
           </p>
+          <p>
+            So here&#39;s the question. Is there a set of tiles that covers the
+            whole plane but <em>never</em> repeats? For a long time, nobody
+            knew.
+          </p>
         </div>
 
         <div className="mt-6">
@@ -106,16 +111,6 @@ export default function PenrosePage() {
           >
             open explorer →
           </Link>
-        </div>
-
-        {/* 1. The question. */}
-        <h2 className={H2}>The question</h2>
-        <div className={PROSE}>
-          <p>
-            So here&#39;s the question. Is there a set of tiles that covers the
-            whole plane but <em>never</em> falls into that march? For a long
-            time, nobody knew.
-          </p>
         </div>
 
         {/* 2. The history. */}
