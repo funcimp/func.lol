@@ -283,20 +283,15 @@ export default function EmergentPatterns() {
       </div>
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
-          The same tiling, same colours. Now look for the patterns inside it.{" "}
-          <strong>Rosettes</strong> are the five-petal suns, where five thick tiles meet,
-          the motif the eye catches first. <strong>Ribbons</strong> are long bands of
-          tiles running clear across the plane in five directions, lit here by dimming the
-          rest so each band stays real tiles, not paint. <strong>Arcs</strong> are the
-          matching rule itself: every tile carries its two rule arcs, and because this
-          tiling is legal everywhere, they flow across every edge unbroken.
+          <strong>Rosettes</strong>: the five-petal suns where five thick tiles meet.{" "}
+          <strong>Ribbons</strong>: bands of real tiles, lit by dimming the rest,
+          running across the plane in one of five directions.{" "}
+          <strong>Arcs</strong>: the matching rule from sketch 01 on every tile at
+          once; on a legal tiling they cross every edge unbroken.
         </p>
         <p className="mt-2 opacity-70">
-          Every tile sits on exactly two ribbons, one per axis, and the bands never line
-          up the same way twice. They are the skeleton the famous Ammann bars, the straight
-          lines hidden in any Penrose tiling, idealise. And the little arcs from sketch 01
-          join into winding strands and closed loops you could trace for as long as you
-          care to follow them.
+          Every tile sits on exactly two ribbons, one per axis. The arcs join into
+          winding strands and closed loops.
         </p>
       </div>
     </Sketch>

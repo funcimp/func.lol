@@ -215,16 +215,11 @@ export default function PenrosePage() {
         <h2 className={H2}>Hidden patterns</h2>
         <div className={PROSE}>
           <p>
-            Sit with that tiling for a minute and patterns start to surface.{" "}
-            <strong>Rosettes</strong>: five-petal suns where five thick tiles
-            meet. <strong>Ribbons</strong>: long bands running clear across the
-            plane in five directions, one per edge direction the tiles share.
-          </p>
-          <p>
-            Switch between them below, then try <strong>arcs</strong>: the
-            matching rule drawn on every tile at once, running across the edges
-            unbroken and joining into long winding strands. The ribbons are the
-            skeleton the famous{" "}
+            The tiling hides structure you can surface one layer at a time.{" "}
+            <strong>Rosettes</strong> are the five-petal suns where five thick
+            tiles meet. <strong>Ribbons</strong> are bands of tiles that run
+            across the whole plane, one family per edge direction, the skeleton
+            the famous{" "}
             <a
               href="https://en.wikipedia.org/wiki/Robert_Ammann"
               target="_blank"
@@ -233,7 +228,13 @@ export default function PenrosePage() {
             >
               Ammann bars
             </a>{" "}
-            trace, the straight lines hidden in any Penrose tiling.
+            trace. <strong>Arcs</strong> are the matching rule itself, drawn on
+            every tile at once.
+          </p>
+          <p>
+            Use the picker below to switch between the three. Watch the arcs
+            especially: they cross every edge unbroken, proof at a glance that
+            the whole patch is legal.
           </p>
         </div>
 
