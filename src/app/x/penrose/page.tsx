@@ -95,7 +95,12 @@ export default function PenrosePage() {
             </a>{" "}
             more than once, and I knew that I had so much more to learn. So I
             dug in and built this sketch to explore the topic and share what
-            I&#39;ve learned.
+            I&#39;ve learned. And if you&#39;re just here to wander the tiling,
+            jump straight to{" "}
+            <Link href="/x/penrose/explore" className="underline">
+              the explorer
+            </Link>
+            .
           </p>
         </div>
 
