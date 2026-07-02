@@ -244,20 +244,18 @@ export default function PenrosePage() {
         <h2 className={H2}>Two examples of dead-ends</h2>
         <div className={PROSE}>
           <p>
-            So far you&#39;ve only watched finished floors. Now try to lay one
-            yourself, because this is where it gets sneaky. Carve a small hole
-            out of a real patch, six edges, and try to fill it back. This hole
-            has exactly one filling. One. Yet on the constrained edge, two
-            different rhombi fit with no overlap at all. Both look fine.
+            Now try laying tiles yourself. The first sketch carves a small
+            hole, six edges, out of a real patch. This hole has exactly one
+            correct filling, yet two different rhombi fit its constrained edge
+            with no overlap. Both look fine.
           </p>
           <p>
-            The sketch below seats the tempting one cleanly. It fits, but it
-            fills the hole the wrong way: what it leaves, shown in red, is two
-            triangles, and no rhombus fits a triangle. No rule was invoked to
-            say so; the shapes alone decide. And watch the arcs when the red
-            appears: no marking of the tempting piece can continue its
-            neighbours&#39; arcs, while the right filling lets them flow
-            straight through.
+            Press play and the sketch seats the tempting one. It fits, but what
+            it leaves, shown in red, is two triangles, and no rhombus fits a
+            triangle. No rule was invoked; the shapes alone decide. The arcs
+            agree: no marking of the tempting piece continues its
+            neighbours&#39; arcs, while the correct filling lets them flow
+            through.
           </p>
         </div>
 
@@ -265,26 +263,26 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            Out on the open plane the bare shapes never have to strand: the
-            boring repeating pattern is always an escape, which is exactly why
-            Penrose added the marks to outlaw it. Inside a bounded hole, the
-            geometry speaks for itself: the gap is empty space you can see, not
-            a rule you take on faith.
+            On the open plane the bare shapes never have to strand: the plain
+            repeating pattern is always an escape, which is why Penrose added
+            the marks to outlaw it. Inside a bounded hole, the geometry speaks
+            for itself: the gap is empty space you can see, not a rule you take
+            on faith.
           </p>
         </div>
 
         {/* 5. Deeper: the move an expert says fits, followed through. */}
         <div className={`${PROSE} mt-4`}>
           <p>
-            Here&#39;s the hard one, and it answers the obvious objection. Take
-            a bigger hole, sixteen edges. A Penrose expert looks at one edge and
-            says, rightly, a thin rhombus fits there. It does. Zero overlap.
+            The second sketch answers the obvious objection with a bigger hole,
+            sixteen edges. An expert looks at one edge and says, rightly, that a
+            thin rhombus fits there. It does, with zero overlap.
           </p>
           <p>
-            So place it. Fill in the rest as far as the shapes allow, and a gap
-            remains, shown in red, that no rhombus fits. Not because a rule says
-            no. Because the shapes collide. Out of all the ways to start, only
-            one survives to finish the hole.
+            Place it, fill in the rest as far as the shapes allow, and a red gap
+            remains that no rhombus fits. Not because a rule says no, but
+            because the shapes collide. Of all the ways to start, only one
+            finishes the hole.
           </p>
         </div>
 
@@ -293,8 +291,8 @@ export default function PenrosePage() {
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
             A move can fit and still doom you, and nothing local warns you. The
-            fix isn&#39;t a smarter local move. It&#39;s to stop tiling by hand
-            and compute the plane globally.
+            fix isn&#39;t a smarter local move: it&#39;s to stop tiling by hand
+            and compute the whole plane at once.
           </p>
         </div>
 
@@ -302,11 +300,12 @@ export default function PenrosePage() {
         <h2 className={H2}>Cut and project</h2>
         <div className={PROSE}>
           <p>
-            The trick is a method called <strong>cut and project</strong>:
-            compute the whole plane at once. It&#39;s easiest to see one
-            dimension down. Take the integer grid, draw a line through it at the
-            golden slope, and a thin strip along the line. Keep the points
-            inside the strip and drop each one perpendicularly onto the line.
+            The method is called <strong>cut and project</strong>, and the
+            sketch below shows it one dimension down. Take the integer grid,
+            draw a line through it at the golden slope, and keep only the
+            points inside a thin strip around the line. Each kept point drops
+            perpendicularly onto the line. Slide the strip and watch the
+            selection change.
           </p>
         </div>
 
@@ -316,8 +315,8 @@ export default function PenrosePage() {
           <p>
             The dropped points tile the line with two gaps, long and short, in
             ratio φ, in an order that never repeats. <em>Cut</em> is the strip,{" "}
-            <em>project</em> is the drop, and the two lengths are already a hint
-            of the two tiles to come.
+            <em>project</em> is the drop, and the two lengths are a hint of the
+            two tiles to come.
           </p>
           <p>
             Here&#39;s the part I love: Penrose is this exact construction, one
@@ -326,7 +325,8 @@ export default function PenrosePage() {
             A corner exists exactly when its 5D shadow lands in the window; a
             tile exists exactly when all four of its corners do. Every tile is
             decided on its own, no backtracking, so the plane is{" "}
-            <em>computed</em>, never assembled, and it can never dead-end.
+            <em>computed</em>, never assembled, and it can never dead-end. Hover
+            a tile below to watch its four corners land in the window.
           </p>
         </div>
 
@@ -349,12 +349,12 @@ export default function PenrosePage() {
             clue: it must be somewhere that accepts every tile placed so far.
           </p>
           <p>
-            Below, tiles go down by hand on the left; on the right, the shaded
-            region is every place the window could still sit. Correct tiles
-            shrink it but never empty it. Then the tempting tile lands, the one
-            that fits with no overlap, and the region collapses to nothing.
-            That&#39;s what stranding is. Cut and project never gets trapped
-            because it fixes the window first.
+            Press play below: tiles go down by hand on the left, while on the
+            right the shaded region is every place the window could still sit.
+            Correct tiles shrink it but never empty it. Then the tempting tile
+            lands, the one that fits with no overlap, and the region collapses
+            to nothing. That&#39;s what stranding is. Cut and project never gets
+            trapped because it fixes the window first.
           </p>
         </div>
 
@@ -381,8 +381,8 @@ export default function PenrosePage() {
           <p>
             It&#39;s the same five dimensions from the other side: each crossing
             is one square face of the 5D lattice, and the rhombus is that
-            face&#39;s shadow. Below, the grid on the left, the tiling on the
-            right, one rhombus per crossing.
+            face&#39;s shadow. Press play below and watch every crossing on the
+            left become its tile on the right.
           </p>
         </div>
 
@@ -424,7 +424,7 @@ export default function PenrosePage() {
         <h2 className={H2}>Every tile has an address</h2>
         <div className={PROSE}>
           <p>
-            Every tile is the shadow of one little square face of the lattice,
+            Every tile is the shadow of one square face of the lattice,
             so every tile carries a name: the five integers of its base corner
             plus which two directions span it. No two tiles share it. And since
             every edge runs in one of five fixed directions, you can walk to any
@@ -448,17 +448,17 @@ export default function PenrosePage() {
         <h2 className={H2}>Self-similarity</h2>
         <div className={PROSE}>
           <p>
-            One more piece of magic. Cut each tile into smaller rhombi by a
-            fixed rule and you get another valid Penrose tiling, finer by φ. Run
-            the rule backward and tiles fuse into a coarser one. You can do this
-            forever in either direction.
+            Cut each tile into smaller rhombi by a fixed rule and you get
+            another valid Penrose tiling, finer by a factor of φ. Run the rule
+            backward and tiles fuse into a coarser one. It works forever in
+            both directions.
           </p>
           <p>
-            Count fat and thin tiles as you deflate: below, the gold stack grows
-            out to φ times the teal. In the infinite tiling the ratio is exactly
-            φ, and that&#39;s its own small proof of no-repeat: a repeating
+            The first sketch counts tiles as you deflate: the gold stack grows
+            out to φ times the teal. In the infinite tiling the ratio is
+            exactly φ, which is its own proof of non-periodicity: a periodic
             tiling repeats some finite block, so its ratio would be a fraction,
-            and φ is famously not.
+            and φ is not.
           </p>
         </div>
 
@@ -466,10 +466,10 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p>
-            Below, each deflation level is drawn as a grid in its own colour.
-            Zoom in and a finer grid nests inside every tile, the same two
-            shapes 1/φ the size, diving level after level. The pattern that
-            never repeats is, at every scale, a copy of itself.
+            The second sketch draws each deflation level as a grid in its own
+            colour. Zoom in and a finer grid nests inside every tile, the same
+            two shapes at 1/φ the size, level after level: the pattern is, at
+            every scale, a copy of itself.
           </p>
         </div>
 
