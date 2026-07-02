@@ -287,7 +287,7 @@ function paint(
   if (t < THIN_FROM) {
     caption(ctx, "a few locally legal tiles, all fine so far", VB_W / 2, VB_H - 20, ink, prefix * 0.85);
   } else if (t < STRAND_FROM) {
-    caption(ctx, "the thin the expert pointed at fits here, zero overlap", VB_W / 2, VB_H - 20, ink, thinR * 0.85);
+    caption(ctx, "this thin rhombus fits here, zero overlap", VB_W / 2, VB_H - 20, ink, thinR * 0.85);
   } else if (t < CLEAR_FROM) {
     caption(ctx, "fill in the rest, and the red gap can take no tile", VB_W / 2, VB_H - 20, ink, strand * clear * 0.9);
   } else if (comp > 0.35) {
@@ -362,7 +362,7 @@ export default function UnsolvableFuture() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A real Penrose patch surrounds a single sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build, then on the doomed edge a thin rhombus, the exact piece a Penrose expert said fits there, seats with zero overlap. The animation then fills the rest of the hole as far as the geometry allows, and tiles still cannot cover everything: a gap survives, shown in red, that no rhombus fits. The thin fit, you placed it, you filled the rest, and a red gap is left. Then the wrong path clears and the one surviving completion finishes the hole, leaving no red. By the shapes alone, with no matching rule invoked."
+        aria-label="A real Penrose patch surrounds a single sixteen-edge hole with exactly one surviving completion. A few locally legal tiles build, then a thin rhombus seats on one edge with zero overlap, a move that looks fine. The animation then fills the rest of the hole as far as the geometry allows, and tiles still cannot cover everything: a gap survives, shown in red, that no rhombus fits. Then the wrong path clears and the one surviving completion finishes the hole, leaving no red. By the shapes alone, with no matching rule invoked."
       />
     </Sketch>
   );

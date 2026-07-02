@@ -270,18 +270,18 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 5. Deeper: the move an expert says fits, followed through. */}
+        {/* 5. Deeper: a move that looks fine, followed through to the trap. */}
         <div className={`${PROSE} mt-4`}>
           <p>
-            The second sketch answers the obvious objection with a bigger hole,
-            sixteen edges. An expert looks at one edge and says, rightly, that a
-            thin rhombus fits there. It does, with zero overlap.
+            The second sketch makes the same point with a bigger hole, sixteen
+            edges. A thin rhombus fits one of its edges with zero overlap, and
+            nothing about the move looks wrong.
           </p>
           <p>
             Place it, fill in the rest as far as the shapes allow, and a red gap
-            remains that no rhombus fits. Not because a rule says no, but
-            because the shapes collide. Of all the ways to start, only one
-            finishes the hole.
+            remains that no rhombus fits, not because a rule says no, but
+            because the shapes collide. A move can look fine and still be a
+            trap: of all the ways to start, only one finishes the hole.
           </p>
         </div>
 
