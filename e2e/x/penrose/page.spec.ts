@@ -19,9 +19,13 @@ test("the badge derives the experiment number from publication order", async ({
 
 test("hovering a tile surfaces its golden-ratio detail", async ({ page }) => {
   await page.goto("/x/penrose");
-  // The thick rhombus is the first of the two polygons; hovering it surfaces its
-  // angle and golden-ratio detail in the live caption.
-  const thick = page.locator("svg polygon").first();
+  // The thick rhombus is the first polygon of the two-tiles sketch (scoped to
+  // that sketch's svg: the decorative header tiling also renders polygons).
+  // Hovering it surfaces its angle and golden-ratio detail in the live caption.
+  const thick = page
+    .getByRole("img", { name: /two Penrose rhombi side by side/i })
+    .locator("polygon")
+    .first();
   await thick.scrollIntoViewIfNeeded();
   await thick.hover();
   await expect(page.getByText(/long diagonal is exactly/i)).toBeVisible();

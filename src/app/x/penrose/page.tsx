@@ -9,6 +9,7 @@ import CutAndProject from "./_components/CutAndProject";
 import EmergentPatterns from "./_components/EmergentPatterns";
 import FibonacciStrip from "./_components/FibonacciStrip";
 import GoldenRatio from "./_components/GoldenRatio";
+import HeaderTiling from "./_components/HeaderTiling";
 import InterferenceOverlay from "./_components/InterferenceOverlay";
 import MeetTheTiles from "./_components/MeetTheTiles";
 import PentaGrid from "./_components/PentaGrid";
@@ -66,6 +67,8 @@ export default function PenrosePage() {
           <span>experiment {number}</span>
           <span>2026-05-11</span>
         </div>
+
+        <HeaderTiling />
 
         {/* 0. The narrator: why this page exists. */}
         <div className={PROSE}>
@@ -190,10 +193,10 @@ export default function PenrosePage() {
         <h2 className={H2}>Lay them into a tiling</h2>
         <div className={PROSE}>
           <p>
-            Drop the two tiles together by the thousands and they cover the plane:
-            no gaps, every edge meeting an edge. Gold is the thick tile, teal the
-            thin one, the colours we keep for the rest of the page. Hover any tile to
-            check which it is.
+            Drop the two tiles together by the thousands, arcs matching across
+            every edge, and they cover the plane: no gaps, every edge meeting an
+            edge. Gold is the thick tile, teal the thin one, the colours we keep
+            for the rest of the page. Hover any tile to check which it is.
           </p>
           <p>
             The catch is what&#39;s missing. There&#39;s no repeat. Slide this tiling any
@@ -247,11 +250,11 @@ export default function PenrosePage() {
         <h2 className={H2}>A piece fits, and still strands you</h2>
         <div className={PROSE}>
           <p>
-            Now it gets sneaky. Start with the gentle version, and make it
-            airtight. Carve a small hole out of a real patch, six edges, and try
-            to fill it back. This hole has exactly one filling. One. Watch the
-            constrained edge: two different rhombi fit it with no overlap at
-            all, so both look fine.
+            So far you&#39;ve only watched finished floors. Now try to lay one
+            yourself, because this is where it gets sneaky. Carve a small hole
+            out of a real patch, six edges, and try to fill it back. This hole
+            has exactly one filling. One. Watch the constrained edge: two
+            different rhombi fit it with no overlap at all, so both look fine.
           </p>
           <p>
             The sketch below takes the tempting one and seats it cleanly. It
@@ -360,7 +363,7 @@ export default function PenrosePage() {
         <h2 className={H2}>Where the dead-ends come from</h2>
         <div className={PROSE}>
           <p>
-            The window also explains the trap. Run the test backward. When you
+            The window also explains the dead-ends. Run the test backward. When you
             tile by hand you don&#39;t know where the window sits, and every
             tile you lay is a clue: the window must be somewhere that accepts
             every tile placed so far.
@@ -489,7 +492,7 @@ export default function PenrosePage() {
           </p>
           <p>
             Count the fat tiles and the thin ones and stack them up. Below, the gold
-            stack grows out to φ times the blue as you deflate, landing on the
+            stack grows out to φ times the teal as you deflate, landing on the
             golden-ratio mark. The count of fat to thin tiles is the golden ratio,
             the same φ that set the angles in the first place.
           </p>
@@ -502,7 +505,7 @@ export default function PenrosePage() {
             The reason is the same self-similarity, seen the other way. Those
             smaller tiles aren&#39;t just finer, they group back into larger tiles of
             the very same two shapes. Below, each deflation level is drawn as a line
-            grid in its own colour, gold and blue alternating so neighbouring levels
+            grid in its own colour, gold and teal alternating so neighbouring levels
             stay distinct. Zoom in and a finer grid nests inside every tile, the
             same two shapes 1/φ the size, diving level after level.
           </p>
