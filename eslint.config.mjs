@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Research scripts have their own lifecycle. Run them with bun, not lint.
+    "research/**",
   ]),
 ]);
 

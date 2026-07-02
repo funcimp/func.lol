@@ -19,6 +19,17 @@ type Lab = {
 
 const labs: Lab[] = [
   {
+    slug: "penrose",
+    title: "Penrose",
+    blurb:
+      "A Penrose tiling you can pan forever, generated on the fly for whatever you are looking at, every tile carrying its exact coordinate.",
+    publishedAt: "2026-05-11",
+    links: {
+      github:
+        "https://github.com/funcimp/func.lol/tree/main/research/penrose",
+    },
+  },
+  {
     slug: "tripwire",
     title: "Tripwire",
     blurb:
@@ -41,6 +52,18 @@ const labs: Lab[] = [
     },
   },
 ];
+
+// The experiment's number is its position in publication order: oldest is 01. It is
+// derived from the labs data, never hand-numbered, so adding or reordering an
+// experiment renumbers the rest automatically. Returns the 1-based index of `slug`,
+// or 0 if the slug is unknown (no experiment should render a zero, so a caller that
+// sees one has a bad slug).
+export function experimentNumber(slug: string): number {
+  const ordered = [...labs].sort((a, b) =>
+    a.publishedAt.localeCompare(b.publishedAt),
+  );
+  return ordered.findIndex((lab) => lab.slug === slug) + 1;
+}
 
 export default function LabsIndexPage() {
   return (

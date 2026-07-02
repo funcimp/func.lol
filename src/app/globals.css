@@ -16,11 +16,19 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Constellation ring — the only color on the site */
+  /* Constellation ring. The site's only hues. Experiments may reuse
+     them through scoped tokens (e.g. --color-penrose-* below); no new
+     hue enters the language. */
   --color-moment-1: #C89B3C;
   --color-moment-2: #C64F3C;
   --color-moment-3: #8B4670;
   --color-moment-4: #3E6B7C;
+
+  /* Penrose explorer roles. Reuse constellation hues. Thick rhombus =
+     gold (moment-1), thin rhombus = teal (moment-4). Grout reuses
+     --color-paper; the pin ring reuses --color-ink. */
+  --color-penrose-thick: #C89B3C;
+  --color-penrose-thin: #3E6B7C;
 }
 
 /* Dark-mode override. The server-rendered layout sets
@@ -30,6 +38,10 @@
   --color-paper: #0f0e0c;
   --color-ink: #ede9d8;
   --color-subtle: #1c1a16;
+
+  /* Teal nudged lighter for contrast on the dark paper. Thick (gold) is
+     identical in both modes. */
+  --color-penrose-thin: #4f7d92;
 }
 
 /* ============================================================

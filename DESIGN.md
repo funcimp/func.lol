@@ -50,6 +50,17 @@ Two tokens per mode. No accent color. Ever.
 
 In `globals.css` the tokens carry the `--color-` prefix (`--color-paper` etc.) that Tailwind v4's `@theme` requires to generate `bg-paper` / `text-ink` utilities. Same tokens, two forms.
 
+### Scoped experiment hues
+
+An experiment may bind a constellation hue to a named role through a scoped token. No new hue enters the language. The Penrose explorer does this:
+
+| Token | Reuses | Role |
+| --- | --- | --- |
+| `--color-penrose-thick` | `--color-moment-1` (gold) | thick rhombus fill |
+| `--color-penrose-thin` | `--color-moment-4` (teal) | thin rhombus fill |
+
+Grout reuses `--color-paper`; the pin ring reuses `--color-ink`. The only new value is a dark teal (`#4f7d92`) that `--color-penrose-thin` takes in dark mode, nudged lighter for contrast on the dark paper. `thick` is identical in both modes.
+
 ## Dither
 
 The visual signature. Three roles, strict territories, strict density.
@@ -121,6 +132,14 @@ The visual signature. Three roles, strict territories, strict density.
 - **Active.** Fill at ink `0.1`.
 - **Disabled.** Opacity `0.4`, `cursor: not-allowed`.
 
+## Teaching animation (scoped)
+
+Animation is otherwise not in the language. Teaching experiments are the one exception, under a hard contract.
+
+- **User-initiated only.** Motion happens on an explicit play, step, or slider drag. Never on load, never ambient, never on scroll.
+- **Reduced-motion is honored.** Under `prefers-reduced-motion`, play is disabled and the sketch renders its representative end state, stationary. The query is read live, so a mid-session change takes effect.
+- **Confined to teaching sketches.** This applies to the framed sketch primitive inside a teaching experiment (the Penrose spine's `Sketch` harness). It does not relax the no-animation rule for site chrome, forms, or data viz.
+
 ## Light/dark toggle
 
 - **State.** Cookie `theme` = `"light"` | `"dark"`. Absent = `"dark"`.
@@ -138,12 +157,12 @@ The visual signature. Three roles, strict territories, strict density.
 - MDX for experiment writeups
 - Open Graph / social cards
 - Tags, categories, search
-- A second accent color
+- A second accent color (relaxed: an experiment may bind an existing constellation hue to a named role through a scoped token, as the Penrose explorer does; no new hue)
 - Custom icon set beyond toggle and row-delete `×`
 - Photography or non-dithered illustration
-- Animation beyond focus and hover
+- Animation beyond focus and hover (relaxed: user-initiated motion inside a teaching sketch, under the "Teaching animation" contract above)
 - A second typeface family
-- Per-experiment custom styling
+- Per-experiment custom styling (relaxed: scoped tokens that reuse existing constellation hues are allowed)
 - Multi-column layouts, dashboards, dense tables
 
 ## Adding a new experiment
