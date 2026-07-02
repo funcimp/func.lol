@@ -71,7 +71,7 @@ export default function Sketch({
   className,
 }: SketchProps) {
   return (
-    <figure className={`my-10${className ? ` ${className}` : ""}`}>
+    <figure className={`mt-12 mb-10${className ? ` ${className}` : ""}`}>
       <div className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-55 mb-2">
         {label}
       </div>
