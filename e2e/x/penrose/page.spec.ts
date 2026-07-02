@@ -22,13 +22,15 @@ test("hovering a tile surfaces its golden-ratio detail", async ({ page }) => {
   // The thick rhombus is the first polygon of the two-tiles sketch (scoped to
   // that sketch's svg: the decorative header tiling also renders polygons).
   // Hovering it surfaces its angle and golden-ratio detail in the live caption.
-  const thick = page
-    .getByRole("img", { name: /two Penrose rhombi side by side/i })
-    .locator("polygon")
-    .first();
+  const figure = page.locator("figure").filter({
+    has: page.getByRole("img", { name: /two Penrose rhombi side by side/i }),
+  });
+  const thick = figure.locator("polygon").first();
   await thick.scrollIntoViewIfNeeded();
   await thick.hover();
-  await expect(page.getByText(/long diagonal is exactly/i)).toBeVisible();
+  // scoped to the sketch's live caption: the page prose also says "long
+  // diagonal is exactly" now, and an unscoped getByText matches both
+  await expect(figure.getByText(/long diagonal is exactly/i)).toBeVisible();
 });
 
 const tilingFigure = (page: import("@playwright/test").Page) =>
