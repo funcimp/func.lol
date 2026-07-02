@@ -156,21 +156,25 @@ export default function PenrosePage() {
         <h2 className={H2}>The two tiles</h2>
         <div className={PROSE}>
           <p>
-            A <strong>thick</strong> rhombus, wide and squat, and
-            a <strong>thin</strong> one, long and narrow. Same edge length,
-            different angles. Every tile in the explorer is one of these two,
-            rotated and dropped into place.
-          </p>
-          <p>
-            The angles come from tenths of a turn: 36, 72, 108, 144, and that
-            family is the golden ratio φ (pronounced &#8220;fye,&#8221; rhymes
-            with pie) in disguise: the thick tile&#39;s long diagonal is exactly
-            φ, the thin one&#39;s short diagonal exactly 1/φ. Here&#39;s the thing, though: the shapes alone aren&#39;t
-            enough. Left to themselves they&#39;d happily tile the plane in a
-            plain repeating pattern. It&#39;s Penrose&#39;s edge rule that
-            forbids every repeating arrangement, and the coloured arcs below
-            carry that rule: two tiles may share an edge only if the arcs
-            continue across it, in colour and in position.
+            A <strong>thick</strong> rhombus, wide and squat, and a{" "}
+            <strong>thin</strong> one, long and narrow, cut to the same edge
+            length. In this exploration you&#39;ll see a recurring theme: the{" "}
+            <a
+              href="https://en.wikipedia.org/wiki/Golden_ratio"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              golden ratio
+            </a>{" "}
+            φ (pronounced &#8220;fye&#8221;) shows up everywhere, starting with
+            these tiles&#39; angles and diagonals; hover a tile below to see it.
+            The shapes alone aren&#39;t enough, though. Left to themselves
+            they&#39;d happily tile the plane in a plain repeating pattern.
+            It&#39;s Penrose&#39;s edge rule that forbids every repeating
+            arrangement, and the coloured arcs below carry that rule: two tiles
+            may share an edge only if the arcs continue across it, in colour and
+            in position.
           </p>
         </div>
 
