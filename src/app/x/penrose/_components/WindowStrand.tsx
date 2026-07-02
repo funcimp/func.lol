@@ -9,8 +9,8 @@ import {
   type WindowStrand as WS,
 } from "./lib/windowStrand";
 
-// "The dead-ends, seen in the window": the spine sketch that ties the hand-tiling
-// dead-ends (02/03) to cut and project (05). Left, physical space: a correct patch is
+// "The window runs out": the spine sketch that ties the hand-tiling dead-ends
+// (sketches 04/05) to cut and project (06/07). Left, physical space: a correct patch is
 // laid tile by tile, then a tempting tile is placed that FITS with zero overlap. Right,
 // window-centre space: the set of window centres still consistent with the patch, which
 // shrinks as each correct tile lands but never empties (it always holds the true
@@ -253,7 +253,7 @@ export default function WindowStrand() {
         caption(ctx, "each tile narrows the windows that still work", X0R + PANEL / 2, VB_H - 14, ink, "center", 0.7);
       } else {
         caption(ctx, "the tempting tile fits, and strands you", X0L + PANEL / 2, VB_H - 14, stranded ? RED : ink, "center", Math.max(0.7, wrongAlpha));
-        caption(ctx, stranded ? "no window left — dead end" : "the last windows vanish", X0R + PANEL / 2, VB_H - 14, stranded ? RED : ink, "center", Math.max(0.7, wrongAlpha));
+        caption(ctx, stranded ? "no window left, dead end" : "the last windows vanish", X0R + PANEL / 2, VB_H - 14, stranded ? RED : ink, "center", Math.max(0.7, wrongAlpha));
       }
     },
     [ws, fitL, fitR, refreshColors],
@@ -267,7 +267,7 @@ export default function WindowStrand() {
 
   return (
     <Sketch
-      label="sketch 09 · the dead-ends, seen in the window"
+      label="sketch 08 · the window runs out"
       animation={{ duration: 13000, render, slider: { label: "place" } }}
     >
       <canvas
@@ -275,21 +275,21 @@ export default function WindowStrand() {
         style={{ width: "100%", height: "auto", aspectRatio: `${VB_W} / ${VB_H}` }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="Two panels tying the hand-tiling dead-ends to cut and project. Left, physical space: a correct Penrose patch is laid tile by tile, then a tempting tile is placed that fits with zero overlap. Right, window-centre space: the set of window centres still consistent with the patch, which shrinks as each correct tile is placed but never empties, always holding the tiling's true window. When the tempting tile is placed, that region collapses to nothing: no window accepts the patch, so it can never be completed. The culprit corner's acceptance pentagon, drawn in red, excludes the whole region. A piece fits, and still strands you, and the reason is visible in the window."
+        aria-label="Two panels tying the hand-tiling dead-ends to cut and project. Left: a correct Penrose patch is laid tile by tile, then a tempting tile is placed that fits with zero overlap. Right: the region of places the window could still sit, which shrinks as each correct tile lands but never empties, always holding the true window. When the tempting tile lands, that region collapses to nothing: no window accepts the patch, so it can never be finished. The culprit corner's acceptance pentagon, drawn in red, excludes the whole region."
       />
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
-          Each tile you place is a constraint on where a single consistent window could
-          sit. Lay correct tiles and that region shrinks but never empties: it always
-          holds the tiling&#39;s true window. The tempting tile fits with no overlap, yet
-          its corner&#39;s shadow lands where no surviving window can hold it, so the
-          region collapses to nothing.
+          Left: tiles go down by hand. Right: every place the window could still sit,
+          given those tiles. Correct tiles shrink the region but never empty it, because
+          the true window (the small cross) is always inside. The tempting tile fits on
+          the floor with no overlap, yet its corner&#39;s shadow demands a window
+          position nothing else allows, and the region collapses to nothing.
         </p>
         <p className="mt-2 opacity-70">
           That is the dead-end of sketches 04 and 05, seen from the inside. Tiling by
-          hand gropes for a consistent window one move at a time, and a move can leave
-          none. Cut and project picks the window first and tests every tile against it,
-          so the region is never in doubt and the plane never strands.
+          hand is a blind search for a window that fits your patch, and one fitting
+          tile can end the search. Cut and project picks the window first, so it never
+          searches and never strands.
         </p>
       </div>
     </Sketch>

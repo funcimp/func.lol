@@ -57,8 +57,8 @@ export default function PenrosePage() {
             penrose
           </h1>
           <p className="text-[18px] leading-[1.45] opacity-85 max-w-[44ch] mt-3">
-            Two tiles cover the infinite plane and never repeat. Here is how, in
-            order, ending at a plane you can walk.
+            Two tiles cover the infinite plane and never repeat. The whole
+            story, from the first question to a plane you can walk.
           </p>
         </header>
 
@@ -67,7 +67,38 @@ export default function PenrosePage() {
           <span>2026-05-11</span>
         </div>
 
+        {/* 0. The narrator: why this page exists. */}
+        <div className={PROSE}>
+          <p>
+            I have been fascinated by Penrose tilings for years, ever since I
+            first heard that two shapes could cover an infinite floor and never
+            repeat. I watched{" "}
+            <a
+              href="https://www.youtube.com/watch?v=th3YMEamzmw"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Penrose himself
+            </a>{" "}
+            lecture on them, watched the{" "}
+            <a
+              href="https://www.veritasium.com/videos/2020/9/30/the-infinite-pattern-that-never-repeats"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Veritasium video
+            </a>{" "}
+            more than once, and still wanted to know <em>why</em> it works. So
+            I dug in, with Claude as a collaborator: I asked questions, we
+            built a sketch to answer each one, and this page is what we
+            learned, in the order I wish someone had told me.
+          </p>
+        </div>
+
         {/* 1. The question. */}
+        <h2 className={H2}>The question</h2>
         <div className={PROSE}>
           <p>
             Take a bag of tiles. Lay them edge to edge across a floor that runs
@@ -88,10 +119,18 @@ export default function PenrosePage() {
         <h2 className={H2}>Two tiles, after a long climb down</h2>
         <div className={PROSE}>
           <p>
-            In 1961 Hao Wang asked a sharper version. He worked with square
-            tiles whose edges carry colors, joined only where colors match. His
-            conjecture: any such set that can tile the plane at all can also tile
-            it periodically. If true, a tiling that never repeats was impossible.
+            In 1961 Hao Wang asked a sharper version. He worked with{" "}
+            <a
+              href="https://en.wikipedia.org/wiki/Wang_tile"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              square tiles whose edges carry colors
+            </a>
+            , joined only where colors match. His conjecture: any such set that
+            can tile the plane at all can also tile it periodically. If true, a
+            tiling that never repeats was impossible.
           </p>
           <p>
             Wang was wrong. In 1966 his student Robert Berger built a set that
@@ -101,9 +140,21 @@ export default function PenrosePage() {
             Raphael Robinson reached <strong>six</strong> in 1971.
           </p>
           <p>
-            Then in 1974 Roger Penrose reached <strong>two</strong>. Two simple
-            rhombi, plus a rule about how their edges may meet. That is the floor
-            this whole page stands on, and it is the one the explorer paints.
+            Then came Roger Penrose. His 1974 set still used six tiles, built
+            from pentagons. Within two years he had it down to{" "}
+            <strong>two</strong>: a kite and a dart, or equivalently the two
+            simple rhombi this page uses, plus a rule about how their edges may
+            meet.{" "}
+            <a
+              href="https://www.scientificamerican.com/article/mathematical-games-1977-01/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Martin Gardner&#39;s January 1977 column
+            </a>{" "}
+            made them famous. That is the floor this whole page stands on, and
+            it is the one the explorer paints.
           </p>
         </div>
 
@@ -120,8 +171,12 @@ export default function PenrosePage() {
             The angles are not arbitrary. They come from fifths of a turn: 36,
             72, 108, 144. That family is the golden ratio φ in disguise. Draw the
             long diagonal of the thick rhombus and its length is exactly φ. Draw
-            the short diagonal of the thin one and it is exactly 1/φ. φ is why
-            these two shapes fit the plane with no repeat.
+            the short diagonal of the thin one and it is exactly 1/φ. The shapes
+            alone are not enough, though. Left to themselves, these two rhombi
+            would happily tile the plane in a plain repeating pattern. It is
+            Penrose&#39;s edge rule that outlaws every repeating arrangement,
+            and φ, baked into the angles, is what leaves a non-repeating one
+            possible at all.
           </p>
         </div>
 
@@ -138,8 +193,16 @@ export default function PenrosePage() {
           </p>
           <p>
             The catch is what is missing. There is no repeat. Slide this tiling any
-            distance in any direction and it never lands back on itself. That is a
-            Penrose tiling.
+            distance in any direction and it never lands back on itself. That is a{" "}
+            <a
+              href="https://en.wikipedia.org/wiki/Penrose_tiling"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Penrose tiling
+            </a>
+            .
           </p>
         </div>
 
@@ -158,8 +221,16 @@ export default function PenrosePage() {
           <p>
             Switch between them below. The bands are lit by dimming the rest of the
             tiling, so each one stays real tiles in their true colours. They are the
-            skeleton the famous <strong>Ammann bars</strong> trace, the straight lines
-            hidden in any Penrose tiling.
+            skeleton the famous{" "}
+            <a
+              href="https://en.wikipedia.org/wiki/Robert_Ammann"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Ammann bars
+            </a>{" "}
+            trace, the straight lines hidden in any Penrose tiling.
           </p>
         </div>
 
@@ -265,13 +336,37 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            The dead-ends came from deciding locally. Here every tile is decided
-            by where its 5D shadow falls, a test that never traps you, and that
-            same coordinate is the address the explorer reads under your cursor.
+            Keep hold of that 5D coordinate. It is not just bookkeeping: it is
+            the address the explorer reads under your cursor, and it comes back
+            at the end of the page.
           </p>
         </div>
 
-        {/* 6b. The dual view: de Bruijn's pentagrid draws the tiles. */}
+        {/* 6b. The dead-ends, explained: the window region collapses. */}
+        <h2 className={H2}>Where the dead-ends come from</h2>
+        <div className={PROSE}>
+          <p>
+            The window also explains the trap. Run the test backward. When you
+            tile by hand you do not know where the window sits, and every tile
+            you lay is a clue: the window must be somewhere that accepts every
+            tile placed so far.
+          </p>
+          <p>
+            The sketch below tracks those clues. On the left, tiles go down by
+            hand. On the right, the shaded region is every place the window
+            could still sit. Correct tiles shrink the region but never empty
+            it, because the true window is always inside. Then the tempting
+            tile lands, the one that fits with no overlap, and the region
+            collapses to nothing. No window anywhere accepts that patch, so it
+            can never be finished. That is what stranding is. Cut and project
+            never gets trapped because it fixes the window first and asks every
+            tile the same question.
+          </p>
+        </div>
+
+        <WindowStrand />
+
+        {/* 6c. The dual view: de Bruijn's pentagrid draws the tiles. */}
         <h2 className={H2}>The tiles fall out of a grid of lines</h2>
         <div className={PROSE}>
           <p>
@@ -279,7 +374,16 @@ export default function PenrosePage() {
             see the same tiling, and it draws the whole thing at once. Take five
             families of evenly spaced parallel lines, one family running in each
             of the five pentagon directions. Lay them over each other and they
-            cross everywhere. de Bruijn proved that every crossing is one tile.
+            cross everywhere.{" "}
+            <a
+              href="https://www.sciencedirect.com/science/article/pii/1385725881900160"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              de Bruijn proved
+            </a>{" "}
+            that every crossing is one tile.
             Where two families meet at a shallow angle you get a fat rhombus,
             where they meet at a steep angle you get a thin one.
           </p>
@@ -305,28 +409,6 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 6c. The dead-ends, explained: the window region collapses. */}
-        <h2 className={H2}>Why a piece can fit and still strand you</h2>
-        <div className={PROSE}>
-          <p>
-            Now look back at the dead-ends with the window in hand. Each tile you place
-            is a constraint on where a single consistent window could sit: it must
-            accept that tile&#39;s corners. Lay correct tiles and the set of windows
-            still consistent shrinks, but never empties. It always holds the tiling&#39;s
-            true window, so you could still finish.
-          </p>
-          <p>
-            A tempting tile can fit with no overlap and still be fatal. Watch the right
-            panel: when it lands, the consistent-window region collapses to nothing. No
-            window accepts the patch, so it can never be completed. That is the dead-end
-            of the earlier sketches, seen from the inside. Cut and project never strands
-            because it fixes the window first and tests each tile against it, so the
-            region is never in doubt.
-          </p>
-        </div>
-
-        <WindowStrand />
-
         {/* 7. The overlay. */}
         <h2 className={H2}>Slide one over another</h2>
         <div className={PROSE}>
@@ -346,14 +428,12 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p>
-            Overlay two of these tilings and turn one, and you see broad regions
-            agree while veins of mismatch ripple between them, organized by the
-            five-fold symmetry. That is the strange part. Any two Penrose tilings
-            share every finite patch you could name. Whatever stretch you see in
-            one, you will find an exact copy somewhere in the other. Yet slide and
-            rotate all you like, the two never line up everywhere at once.
-            Infinitely alike up close, never the same as a whole. This is what
-            Penrose saw on his projector.
+            Here is the strange part. Any two Penrose tilings share every finite
+            patch you could name: whatever stretch you find in one, an exact
+            copy sits somewhere in the other. Yet no shift and no turn ever
+            lines them up everywhere at once. Infinitely alike up close, never
+            the same as a whole. That is what Penrose was looking at on his
+            projector.
           </p>
         </div>
 
@@ -444,26 +524,95 @@ export default function PenrosePage() {
 
         <div className="mt-16 pt-7 border-t border-ink">
           <h2 className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-50 mb-4">
-            research
+            go deeper
           </h2>
           <div className={PROSE}>
             <p>
-              Five substrate questions decided before any explorer code landed:
-              precision drift of Float64 vs BigInt, URL share-link encoding,
-              enumeration throughput, the BigInt-truth / Float64-view
-              viewport-anchor pattern, and a Go comparison. The findings inform
-              the engine and its addressing.
+              Everything on this page is classical mathematics, rebuilt here
+              under test. These are the sources I learned it from, roughly in
+              the order I would hand them to a friend.
             </p>
-            <p>
-              <a
-                href={RESEARCH_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                research on github →
-              </a>
-            </p>
+            <ul className="flex flex-col gap-2 text-[15px] leading-[1.6]">
+              <li>
+                <a
+                  href="https://www.veritasium.com/videos/2020/9/30/the-infinite-pattern-that-never-repeats"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Veritasium, The Infinite Pattern That Never Repeats
+                </a>{" "}
+                <span className="opacity-70">
+                  · the best on-ramp there is, from Kepler to quasicrystals
+                </span>
+              </li>
+              <li>
+                <a
+                  href="https://www.youtube.com/watch?v=th3YMEamzmw"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Roger Penrose, Forbidden Crystal Symmetry
+                </a>{" "}
+                <span className="opacity-70">
+                  · the Royal Institution lecture, the story from the man himself
+                </span>
+              </li>
+              <li>
+                <a
+                  href="https://www.scientificamerican.com/article/mathematical-games-1977-01/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Martin Gardner, Mathematical Games, January 1977
+                </a>{" "}
+                <span className="opacity-70">
+                  · the column that introduced the tiles to the world
+                </span>
+              </li>
+              <li>
+                <a
+                  href="https://www.sciencedirect.com/science/article/pii/1385725881900160"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  N. G. de Bruijn, Algebraic theory of Penrose&#39;s
+                  non-periodic tilings, 1981
+                </a>{" "}
+                <span className="opacity-70">
+                  · the pentagrid and the window; the paper the explorer runs on
+                </span>
+              </li>
+              <li>
+                <a
+                  href="https://arxiv.org/abs/2310.18950"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Francesco D&#39;Andrea, A Guide to Penrose Tilings, 2023
+                </a>{" "}
+                <span className="opacity-70">
+                  · the modern book, free on arXiv, with every proof
+                </span>
+              </li>
+              <li>
+                <a
+                  href={RESEARCH_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  the research notes behind this page
+                </a>{" "}
+                <span className="opacity-70">
+                  · our worked math, experiments, and what each result cites
+                </span>
+              </li>
+            </ul>
           </div>
         </div>
 
