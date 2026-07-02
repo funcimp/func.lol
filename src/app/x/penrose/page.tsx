@@ -126,7 +126,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 2. The history. */}
-        <h2 className={H2}>Two tiles, after a long climb down</h2>
+        <h2 className={H2}>A little history</h2>
         <div className={PROSE}>
           <p>
             In 1961 Hao Wang asked a sharper version. He worked with{" "}
