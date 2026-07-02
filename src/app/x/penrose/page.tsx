@@ -230,7 +230,7 @@ export default function PenrosePage() {
         <EmergentPatterns />
 
         {/* 4. A geometric dead-end: a piece fits, then strands you. */}
-        <h2 className={H2}>The first dead-end</h2>
+        <h2 className={H2}>Two examples of dead-ends</h2>
         <div className={PROSE}>
           <p>
             So far you&#39;ve only watched finished floors. Now try to lay one
@@ -263,8 +263,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 5. Deeper: the move an expert says fits, followed through. */}
-        <h2 className={H2}>The expert&#39;s dead-end</h2>
-        <div className={PROSE}>
+        <div className={`${PROSE} mt-4`}>
           <p>
             Here&#39;s the hard one, and it answers the obvious objection. Take
             a bigger hole, sixteen edges. A Penrose expert looks at one edge and
