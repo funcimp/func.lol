@@ -180,13 +180,23 @@ export default function PenrosePage() {
         <h2 className={H2}>Tiling the plane</h2>
         <div className={PROSE}>
           <p>
-            Drop the two tiles together by the thousands, arcs matching across
-            every edge, and they cover the plane. Gold is the thick tile, teal
-            the thin, the colours we keep for the rest of the page.
+            From here on, every sketch uses the same tile set: gold for the
+            thick rhombus, teal for the thin. Press play below and watch the two
+            tiles settle into a patch of the plane.
           </p>
           <p>
-            The catch is what&#39;s missing. There&#39;s no repeat. Slide this tiling any
-            distance in any direction and it never lands back on itself. That&#39;s a{" "}
+            What grows is a{" "}
+            <a
+              href="https://en.wikipedia.org/wiki/Quasicrystal"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              quasicrystal
+            </a>{" "}
+            pattern: fully ordered, but never periodic. Slide the finished
+            tiling any distance in any direction and it never lands back on
+            itself. That&#39;s a{" "}
             <a
               href="https://en.wikipedia.org/wiki/Penrose_tiling"
               target="_blank"

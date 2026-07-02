@@ -182,9 +182,9 @@ export default function TilingIntro() {
           </span>
         </div>
         <p className="mt-2 opacity-70">
-          Two shapes, dropped together, cover the plane with no gaps. But the pattern
-          never repeats: slide this tiling any distance in any direction and it never
-          lands back on itself. That&#39;s what makes it a Penrose tiling.
+          Two shapes cover the plane with no gaps, and the order is quasiperiodic,
+          never periodic: slide the tiling any distance in any direction and it
+          never lands back on itself.
         </p>
       </div>
     </Sketch>
