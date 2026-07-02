@@ -16,7 +16,6 @@ import PentaGrid from "./_components/PentaGrid";
 import StopTilingByHand from "./_components/StopTilingByHand";
 import TilingIntro from "./_components/TilingIntro";
 import UnsolvableFuture from "./_components/UnsolvableFuture";
-import WindowStrand from "./_components/WindowStrand";
 import ZoomHierarchy from "./_components/ZoomHierarchy";
 
 export const metadata: Metadata = {
@@ -344,27 +343,7 @@ export default function PenrosePage() {
           </p>
         </div>
 
-        {/* 6b. The dead-ends, explained: the window region collapses. */}
-        <h2 className={H2}>Why dead-ends happen</h2>
-        <div className={PROSE}>
-          <p>
-            The window also explains the dead-ends. When you tile by hand you
-            don&#39;t know where the window sits, and every tile you lay is a
-            clue: it must be somewhere that accepts every tile placed so far.
-          </p>
-          <p>
-            Press play below: tiles go down by hand on the left, while on the
-            right the shaded region is every place the window could still sit.
-            Correct tiles shrink it but never empty it. Then the tempting tile
-            lands, the one that fits with no overlap, and the region collapses
-            to nothing. That&#39;s what stranding is. Cut and project never gets
-            trapped because it fixes the window first.
-          </p>
-        </div>
-
-        <WindowStrand />
-
-        {/* 6c. The dual view: de Bruijn's pentagrid draws the tiles. */}
+        {/* 6b. The dual view: de Bruijn's pentagrid draws the tiles. */}
         <h2 className={H2}>The pentagrid</h2>
         <div className={PROSE}>
           <p>

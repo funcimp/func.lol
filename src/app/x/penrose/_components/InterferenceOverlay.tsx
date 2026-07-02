@@ -136,7 +136,7 @@ export default function InterferenceOverlay() {
 
   return (
     <Sketch
-      label="sketch 10 · two tilings, one turned over the other"
+      label="sketch 09 · two tilings, one turned over the other"
       animation={{ duration: 13000, render: renderKeep, slider: { label: "scrub" } }}
     >
       {/* the two edge classes, defined once, instanced by both layers */}
