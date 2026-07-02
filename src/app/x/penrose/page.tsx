@@ -93,11 +93,9 @@ export default function PenrosePage() {
             >
               Veritasium video
             </a>{" "}
-            more than once, and I still couldn&#39;t have told you <em>why</em>{" "}
-            it works. That bugged me. So I dug in, with Claude as a
-            collaborator: I asked questions, we built a sketch for every
-            answer, and this page is what we learned, in the order I wish
-            someone had explained it to me.
+            more than once, and I knew that I had so much more to learn. So I
+            dug in and built this sketch to explore the topic and share what
+            I&#39;ve learned.
           </p>
         </div>
 
