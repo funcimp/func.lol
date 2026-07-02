@@ -95,13 +95,17 @@ export default function PenrosePage() {
             </a>{" "}
             more than once, and I knew that I had so much more to learn. So I
             dug in and built this sketch to explore the topic and share what
-            I&#39;ve learned. And if you&#39;re just here to wander the tiling,
-            jump straight to{" "}
-            <Link href="/x/penrose/explore" className="underline">
-              the explorer
-            </Link>
-            .
+            I&#39;ve learned.
           </p>
+        </div>
+
+        <div className="mt-6">
+          <Link
+            href="/x/penrose/explore"
+            className="inline-block font-mono text-[12px] uppercase tracking-[0.14em] border border-ink px-4 py-2 no-underline hover:bg-ink hover:text-paper transition-colors"
+          >
+            open explorer →
+          </Link>
         </div>
 
         {/* 1. The question. */}
