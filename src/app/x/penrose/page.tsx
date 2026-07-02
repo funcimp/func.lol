@@ -133,8 +133,8 @@ export default function PenrosePage() {
               square tiles whose edges carry colors
             </a>
             , joined only where colors match. His conjecture: any such set that
-            can tile the plane at all can also tile it periodically. If true, a
-            tiling that never repeats was impossible.
+            can tile the plane at all can also tile it periodically. If true, no
+            tile set could ever force non-repetition.
           </p>
           <p>
             Wang was wrong. In 1966 his student Robert Berger built a set that
@@ -147,8 +147,8 @@ export default function PenrosePage() {
           <p>
             Then Roger Penrose took it to <strong>two</strong>. His 1974 set
             still used six tiles, built from pentagons. Within two years he had
-            the pair this page uses: two simple rhombi (equivalently, his kite
-            and dart), plus a rule about how their edges may meet.{" "}
+            it down to a pair: first a kite and a dart, then the two simple
+            rhombi this page uses, plus a rule about how their edges may meet.{" "}
             <a
               href="https://www.scientificamerican.com/article/mathematical-games-1977-01/"
               target="_blank"
@@ -172,7 +172,7 @@ export default function PenrosePage() {
             rotated and dropped into place.
           </p>
           <p>
-            The angles aren&#39;t arbitrary. They come from fifths of a turn:
+            The angles aren&#39;t arbitrary. They come from tenths of a turn:
             36, 72, 108, 144. That family is the golden ratio φ in disguise.
             Draw the long diagonal of the thick rhombus and its length is
             exactly φ. Draw the short diagonal of the thin one and it is exactly
@@ -273,11 +273,12 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            On the open plane the bare shapes never trap you like this; they
-            would tile, boringly, forever. That&#39;s exactly why Penrose added
-            the matching marks. Inside a bounded hole the geometry can speak for
-            itself, and here it does: the gap is empty space you can see, not a
-            rule you have to take on faith.
+            Out on the open plane the bare shapes never have to strand: the
+            boring repeating pattern is always available as an escape. That&#39;s
+            exactly why Penrose added the matching marks, to outlaw the escape.
+            Inside a bounded hole carved from a real patch, the geometry can
+            speak for itself, and here it does: the gap is empty space you can
+            see, not a rule you have to take on faith.
           </p>
         </div>
 
@@ -322,7 +323,7 @@ export default function PenrosePage() {
             It&#39;s easiest to see one dimension down, so start there. Take the
             integer grid in the plane. Draw a line through it at the golden
             slope, and a thin strip along the line. Keep only the points that
-            fall inside the strip, and drop each one straight down onto the
+            fall inside the strip, and drop each one perpendicularly onto the
             line.
           </p>
         </div>
@@ -340,9 +341,10 @@ export default function PenrosePage() {
             Here&#39;s the part I love: Penrose is this exact construction, one
             stage up. The grid is the integer lattice ℤ⁵, five dimensions. The
             line becomes our plane, and the strip becomes a window shaped like
-            nested pentagons. A tile exists exactly when its 5D shadow lands in
-            that window, a test you run on one point alone, with no
-            backtracking. Each tile is decided on its own, so the plane is{" "}
+            nested pentagons. A corner of the tiling exists exactly when its 5D
+            shadow lands in that window, and a tile exists exactly when all four
+            of its corners do. Every check looks at one point on its own, with
+            no backtracking. Each tile is decided independently, so the plane is{" "}
             <em>computed</em>, never assembled, and it can never dead-end. The
             next sketches show how that plays out on the plane. This is what the
             explorer runs.
@@ -401,8 +403,8 @@ export default function PenrosePage() {
               de Bruijn proved
             </a>{" "}
             that every crossing is one tile.
-            Where two families meet at a shallow angle you get a fat rhombus,
-            where they meet at a steep angle you get a thin one.
+            Where two families cross at 72 degrees you get a fat rhombus, and
+            where they cross at a glancing 36 you get a thin one.
           </p>
           <p>
             This is the same five dimensions, seen from the other side. Each
@@ -447,10 +449,11 @@ export default function PenrosePage() {
           <p>
             Here&#39;s the strange part. Any two Penrose tilings share every
             finite patch you could name: whatever stretch you find in one, an
-            exact copy sits somewhere in the other. Yet no shift and no turn
-            ever lines them up everywhere at once. Infinitely alike up close,
-            never the same as a whole. That&#39;s what Penrose was looking at on
-            his projector.
+            exact copy sits somewhere in the other. And yet there are
+            uncountably many genuinely different Penrose tilings, tilings no
+            shift or turn will ever line up with each other. Infinitely alike up
+            close, never the same as a whole. That&#39;s what Penrose was
+            looking at on his projector.
           </p>
         </div>
 
@@ -458,12 +461,13 @@ export default function PenrosePage() {
         <h2 className={H2}>Every tile knows its address</h2>
         <div className={PROSE}>
           <p>
-            Because every tile is the shadow of one lattice point, every tile
-            carries that point as a name: five integers, exact, no two tiles
-            alike. And every edge of the tiling runs in one of five fixed
-            directions, so you can walk to any tile along its edges. Trace the
-            route below from a starting tile and watch it land on the addressed
-            tile, right on the real boundaries.
+            Because every tile is the shadow of one little square face of the
+            lattice, every tile carries a name: the five integers of its base
+            corner, plus which two of the five directions span it. Exact, and no
+            two tiles share it. And every edge of the tiling runs in one of five
+            fixed directions, so you can walk to any tile along its edges. Trace
+            the route below from a starting tile and watch it land on the
+            addressed tile, right on the real boundaries.
           </p>
         </div>
 
@@ -475,8 +479,8 @@ export default function PenrosePage() {
             anywhere, zoom anywhere, and the tile under your cursor can tell you
             precisely where you are, by reading its own address off the lattice.
             It&#39;s a full coordinate system for a floor with no edges. A
-            shared link is just those five numbers, and it drops the next person
-            on the exact same tile.
+            shared link is just that name, seven small integers, and it drops
+            the next person on the exact same tile.
           </p>
         </div>
 
@@ -493,8 +497,11 @@ export default function PenrosePage() {
           <p>
             Count the fat tiles and the thin ones and stack them up. Below, the gold
             stack grows out to φ times the teal as you deflate, landing on the
-            golden-ratio mark. The count of fat to thin tiles is the golden ratio,
-            the same φ that set the angles in the first place.
+            golden-ratio mark. In the infinite tiling the ratio of fat to thin is
+            exactly φ, the same φ that set the angles. And that&#39;s its own
+            small proof of no-repeat: a repeating tiling repeats some finite
+            block, so its ratio would be a fraction, and φ is famously not a
+            fraction.
           </p>
         </div>
 

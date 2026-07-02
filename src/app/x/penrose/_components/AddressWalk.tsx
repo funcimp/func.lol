@@ -321,9 +321,9 @@ export default function AddressWalk() {
         <p className="mt-2 opacity-70">
           A tile far from the start carries big numbers, like{" "}
           <span className="font-mono">[33, 151, 151, 12, 0]</span>. Same rule, just more
-          steps. The explorer never actually walks there: it reads the five integers
-          straight off the lattice under your cursor, and a shared link is just those
-          five numbers.
+          steps. The explorer never actually walks there: it reads the address
+          straight off the lattice under your cursor, and a shared link is that
+          address plus which two of the five directions span the tile.
         </p>
       </div>
     </Sketch>
