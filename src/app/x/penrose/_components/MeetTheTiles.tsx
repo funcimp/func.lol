@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import Sketch from "./Sketch";
+import { arcPoints, rhombusArcs } from "./lib/arcs";
 import { PHI, THICK, THIN, type Pt, type Rhombus } from "./lib/tiles";
 
 // "Meet the two tiles": the first spine sketch. Two unit-edge Penrose rhombi side
@@ -50,6 +51,19 @@ function TileFigure({
   const pts = place(tile, cx, cy);
   const [right, top, left, bottom] = pts;
 
+  // The matching-rule arcs. rhombusArcs wants the marked/unmarked corner pair
+  // at cycle positions 0 and 2: the 72° corners (right/left) on the thick, the
+  // 144° corners (top/bottom) on the thin.
+  const cycle: [Pt, Pt, Pt, Pt] =
+    tile.kind === "thick"
+      ? [right, top, left, bottom]
+      : [top, left, bottom, right];
+  const arcs = rhombusArcs(cycle, tile.kind, 0);
+  const arcPath = (arc: (typeof arcs)[number]) =>
+    arcPoints(arc)
+      .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
+      .join(" ");
+
   // The acute angle sits at the left/right (x-axis) corners; the obtuse at
   // top/bottom. Label one of each.
   return (
@@ -70,6 +84,21 @@ function TileFigure({
         strokeLinejoin="round"
         style={{ transition: "stroke-width 0.15s ease" }}
       />
+
+      {/* The matching-rule arcs, on a thin paper casing so they read over the
+          tile fill. One colour per arrow kind, constant across the page. */}
+      {arcs.map((arc) => (
+        <g key={arc.kind}>
+          <path d={arcPath(arc)} fill="none" stroke="var(--color-paper)" strokeWidth={4.5} strokeLinecap="round" />
+          <path
+            d={arcPath(arc)}
+            fill="none"
+            stroke={arc.kind === "single" ? "var(--color-moment-2)" : "var(--color-moment-3)"}
+            strokeWidth={2.2}
+            strokeLinecap="round"
+          />
+        </g>
+      ))}
 
       {/* Long diagonal, dashed in ink, revealed on hover. This is the line whose
           length carries phi (thick) or 1/phi (thin). */}
@@ -134,7 +163,7 @@ export default function MeetTheTiles() {
       ? `Thick rhombus. Angles ${THICK.acute}° and ${THICK.obtuse}°. With a unit edge its long diagonal is exactly φ ≈ ${PHI.toFixed(3)}.`
       : hover === "thin"
         ? `Thin rhombus. Angles ${THIN.acute}° and ${THIN.obtuse}°. With a unit edge its short diagonal is exactly 1/φ ≈ ${(1 / PHI).toFixed(3)}.`
-        : "Hover a tile to reveal its diagonal. The angle family 36 / 72 / 108 / 144 is the golden ratio in disguise.";
+        : "The coloured arcs are the matching rule: tiles may only meet so every arc continues across the shared edge. Hover a tile for its golden-ratio detail.";
 
   return (
     <Sketch label="sketch 01 · meet the two tiles">
@@ -143,7 +172,7 @@ export default function MeetTheTiles() {
         xmlns="http://www.w3.org/2000/svg"
         className="block w-full h-auto bg-paper"
         role="img"
-        aria-label="Two Penrose rhombi side by side: a thick rhombus with 72 and 108 degree angles, and a thin rhombus with 36 and 144 degree angles"
+        aria-label="Two Penrose rhombi side by side: a thick rhombus with 72 and 108 degree angles, and a thin rhombus with 36 and 144 degree angles. Each carries two coloured matching-rule arcs; tiles may only meet so the arcs continue across shared edges."
       >
         <TileFigure
           tile={THICK}

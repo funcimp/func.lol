@@ -176,7 +176,9 @@ export default function PenrosePage() {
             would happily tile the plane in a plain repeating pattern. It is
             Penrose&#39;s edge rule that outlaws every repeating arrangement,
             and φ, baked into the angles, is what leaves a non-repeating one
-            possible at all.
+            possible at all. The coloured arcs drawn on the tiles below carry
+            that rule: two tiles may share an edge only if the arcs continue
+            across it, in colour and in position.
           </p>
         </div>
 
@@ -219,7 +221,10 @@ export default function PenrosePage() {
             the tiles share.
           </p>
           <p>
-            Switch between them below. The bands are lit by dimming the rest of the
+            Switch between them below, and then try <strong>arcs</strong>: the
+            matching-rule arcs from the two tiles, drawn on every tile at once.
+            Watch them run across the edges unbroken and join into long winding
+            strands. The bands are lit by dimming the rest of the
             tiling, so each one stays real tiles in their true colours. They are the
             skeleton the famous{" "}
             <a

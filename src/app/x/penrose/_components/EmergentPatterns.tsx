@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Sketch from "./Sketch";
+import { arcPoints, faceArcs } from "./lib/arcs";
 import { PCOS, PSIN } from "../explore/lib/cap";
 import { facesInViewport, GAMMA, type Rect } from "../explore/lib/pentagrid";
 import { ribbonsForFamily } from "../explore/lib/ribbons";
@@ -15,6 +16,9 @@ import type { RenderFace, Pt } from "../explore/lib/patch";
 //     the motif your eye catches first.
 //   RIBBONS — one family of de Bruijn bands lights up by dimming everything else back, so
 //     the band reads as a strip of REAL tiles, not a paint stripe; pick its direction.
+//   ARCS — the matching rule made visible: every tile's two rule arcs (lib/arcs.ts,
+//     bound by its shared-edge continuity test) stroked over the dimmed tiling, so the
+//     curves visibly continue across every edge and join into long emergent strands.
 // The Ammann bars (the straight lines idealising the ribbons) are a later addition once
 // the exact construction is in hand.
 //
@@ -37,9 +41,9 @@ function readVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-type Colors = { thick: string; thin: string; paper: string; ink: string };
+type Colors = { thick: string; thin: string; paper: string; ink: string; single: string; double: string };
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-type Mode = "rosettes" | "ribbons";
+type Mode = "rosettes" | "ribbons" | "arcs";
 
 type Scene = {
   faces: RenderFace[];
@@ -51,6 +55,9 @@ type Scene = {
   byFamily: { face: RenderFace; perp: number }[][];
   famLo: number[];
   famHi: number[];
+  // per face: the two matching-rule arcs as px polylines, with the face's
+  // radial distance for the reveal sweep
+  arcsPx: { kind: "single" | "double"; pts: [number, number][]; r: number }[];
 };
 
 function buildScene(): Scene {
@@ -83,12 +90,21 @@ function buildScene(): Scene {
     }
     byFamily.push(list); famLo.push(lo); famHi.push(hi);
   }
-  return { faces, toPx, sunsPx, sunR: 1.6 * s, maxR, byFamily, famLo, famHi };
+
+  const arcsPx: Scene["arcsPx"] = [];
+  for (const f of faces) {
+    const r = Math.hypot(f.centroid[0], f.centroid[1]);
+    for (const arc of faceArcs(f)) {
+      arcsPx.push({ kind: arc.kind, pts: arcPoints(arc, 16).map(toPx), r });
+    }
+  }
+
+  return { faces, toPx, sunsPx, sunR: 1.6 * s, maxR, byFamily, famLo, famHi, arcsPx };
 }
 
 export default function EmergentPatterns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const colorsRef = useRef<Colors>({ thick: "#C89B3C", thin: "#3E6B7C", paper: "#0f0e0c", ink: "#ede9d8" });
+  const colorsRef = useRef<Colors>({ thick: "#C89B3C", thin: "#3E6B7C", paper: "#0f0e0c", ink: "#ede9d8", single: "#C64F3C", double: "#8B4670" });
   const dprRef = useRef(0);
   const lastTRef = useRef(1);
   const scene = useMemo(() => buildScene(), []);
@@ -104,6 +120,8 @@ export default function EmergentPatterns() {
       thin: readVar("--color-penrose-thin", "#3E6B7C"),
       paper: readVar("--color-paper", "#0f0e0c"),
       ink: readVar("--color-ink", "#ede9d8"),
+      single: readVar("--color-moment-2", "#C64F3C"),
+      double: readVar("--color-moment-3", "#8B4670"),
     };
   }, []);
 
@@ -129,7 +147,7 @@ export default function EmergentPatterns() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         refreshColors();
       }
-      const { thick, thin, paper, ink } = colorsRef.current;
+      const { thick, thin, paper, ink, single, double } = colorsRef.current;
       const fillFor = (f: RenderFace) => (f.type === "thick" ? thick : thin);
       ctx.clearRect(0, 0, VB, VB);
       ctx.fillStyle = paper;
@@ -148,7 +166,10 @@ export default function EmergentPatterns() {
       }
       for (const f of scene.faces) {
         let a = 0.9;
-        if (m === "ribbons") {
+        if (m === "arcs") {
+          // the tiling steps back so the rule arcs carry the image
+          a = 0.3;
+        } else if (m === "ribbons") {
           const incident = f.j === fam || f.k === fam;
           if (incident) {
             // soft sweep edge for the lit band tiles
@@ -169,6 +190,25 @@ export default function EmergentPatterns() {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+
+      // arcs: the matching rule stroked over the dimmed tiling, revealed from
+      // the centre outward so the strands visibly grow across edges
+      if (m === "arcs") {
+        const front = t * (scene.maxR + 1);
+        ctx.lineCap = "round";
+        for (const arc of scene.arcsPx) {
+          const aArc = clamp01((front - arc.r + 0.8) / 0.8);
+          if (aArc <= 0.01) continue;
+          ctx.beginPath();
+          ctx.moveTo(arc.pts[0][0], arc.pts[0][1]);
+          for (let i = 1; i < arc.pts.length; i++) ctx.lineTo(arc.pts[i][0], arc.pts[i][1]);
+          ctx.globalAlpha = aArc;
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = arc.kind === "single" ? single : double;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
 
       // rosettes: soft halos on the suns, revealed from the centre outward
       if (m === "rosettes") {
@@ -218,11 +258,12 @@ export default function EmergentPatterns() {
           style={{ width: "100%", height: "auto", aspectRatio: "1 / 1" }}
           className="block w-full bg-paper"
           role="img"
-          aria-label="The same Penrose tiling, gold thick and teal thin, with hidden patterns revealed on top without recolouring the tiles. Rosettes mode glows the suns, the five-petal flowers where five thick rhombi meet. Ribbons mode dims the tiling back and lights up one family of de Bruijn bands, long strips of real tiles running across the patch in one of five directions, chosen with the picker. These are emergent patterns hidden in any Penrose tiling."
+          aria-label="The same Penrose tiling, gold thick and teal thin, with hidden patterns revealed on top without recolouring the tiles. Rosettes mode glows the suns, the five-petal flowers where five thick rhombi meet. Ribbons mode dims the tiling back and lights up one family of de Bruijn bands, long strips of real tiles running across the patch in one of five directions, chosen with the picker. Arcs mode dims the tiling and strokes every tile's two matching-rule arcs, which continue across every edge and join into long winding strands. These are emergent patterns hidden in any Penrose tiling."
         />
         <div className="pointer-events-auto absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-ink/40 bg-paper/70 px-1.5 py-0.5 backdrop-blur-sm">
           <button type="button" onClick={() => pickMode("rosettes")} aria-pressed={mode === "rosettes"} className={modeBtn("rosettes")}>rosettes</button>
           <button type="button" onClick={() => pickMode("ribbons")} aria-pressed={mode === "ribbons"} className={modeBtn("ribbons")}>ribbons</button>
+          <button type="button" onClick={() => pickMode("arcs")} aria-pressed={mode === "arcs"} className={modeBtn("arcs")}>arcs</button>
           {mode === "ribbons" && (
             <span className="ml-1 flex items-center gap-1 border-l border-ink/30 pl-2">
               {FAMILIES.map((fam) => {
@@ -246,12 +287,16 @@ export default function EmergentPatterns() {
           <strong>Rosettes</strong> are the five-petal suns, where five thick tiles meet,
           the motif the eye catches first. <strong>Ribbons</strong> are long bands of
           tiles running clear across the plane in five directions, lit here by dimming the
-          rest so each band stays real tiles, not paint.
+          rest so each band stays real tiles, not paint. <strong>Arcs</strong> are the
+          matching rule itself: every tile carries its two rule arcs, and because this
+          tiling is legal everywhere, they flow across every edge unbroken.
         </p>
         <p className="mt-2 opacity-70">
           Every tile sits on exactly two ribbons, one per axis, and the bands never line
           up the same way twice. They are the skeleton the famous Ammann bars, the straight
-          lines hidden in any Penrose tiling, idealise.
+          lines hidden in any Penrose tiling, idealise. And the little arcs from sketch 01
+          join into winding strands and closed loops you could trace for as long as you
+          care to follow them.
         </p>
       </div>
     </Sketch>
