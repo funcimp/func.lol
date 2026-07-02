@@ -156,7 +156,7 @@ export default function PenrosePage() {
         <h2 className={H2}>The two tiles</h2>
         <div className={PROSE}>
           <p>
-            Here they are. A <strong>thick</strong> rhombus, wide and squat, and
+            A <strong>thick</strong> rhombus, wide and squat, and
             a <strong>thin</strong> one, long and narrow. Same edge length,
             different angles. Every tile in the explorer is one of these two,
             rotated and dropped into place.
@@ -265,9 +265,8 @@ export default function PenrosePage() {
           <p className="text-[14px] leading-[1.6] opacity-70">
             On the open plane the bare shapes never have to strand: the plain
             repeating pattern is always an escape, which is why Penrose added
-            the marks to outlaw it. Inside a bounded hole, the geometry speaks
-            for itself: the gap is empty space you can see, not a rule you take
-            on faith.
+            the marks to outlaw it. Inside the hole there is no escape, and the
+            gap is empty space you can see, not a rule you take on faith.
           </p>
         </div>
 
