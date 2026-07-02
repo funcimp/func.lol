@@ -9,18 +9,16 @@ import type { Pt } from "./lib/overlay";
 // "Slide one over another": the spine's section-7 sketch, Penrose's overhead-projector
 // demo as a told story. Two copies of the SAME real tiling, centred on a sun. The play
 // sequence: start in complete overlap (one tiling), turn the top copy a fifth of a turn
-// about the sun, slide it down a hair, then light up the VEINS, the places where the two
-// fall out of registry. One colour for the tiling so the moiré reads as density; gold marks
-// the rotated copy's unmatched edges.
+// about the sun, slide it down a hair. The interference pattern needs no annotation:
+// where the copies agree the edges land on each other and draw once; where they
+// disagree the doubled edges read as denser bands. One colour, so the moiré is density.
 //
 // HONEST BY CONSTRUCTION. Both layers are the SAME enumerator tiling, centred on a real
 // sun vertex. A fifth-of-a-turn about the sun is exact: each edge's rotated image either
-// lands on an original edge (agreement) or does not (a vein). That split is computed
-// against the real edge set (~50/50, a true island-and-vein structure), so the gold is
-// where the tilings genuinely disagree, not decoration. Drawn as crisp SVG, non-scaling
+// lands on an original edge (agreement) or does not. Drawn as crisp SVG, non-scaling
 // stroke, geometry instanced via <use>.
 //
-// The harness drives render(t) through the four beats; reset returns to overlap, the
+// The harness drives render(t) through the beats; reset returns to overlap, the
 // slider scrubs. Stroke colours are CSS vars, so they invert with the theme.
 
 const VIEW_HALF = 24; // data half-width shown in the frame
@@ -35,10 +33,9 @@ const OVER = R_PATH / VIEW_HALF;
 const LAYER_OFFSET_PCT = ((1 - OVER) / 2) * 100;
 
 // Beats of the play timeline.
-const T_OVERLAP = 0.18; // hold complete overlap
-const T_TURN = 0.48; // turn 0 -> 288 about the sun
-const T_SLIDE = 0.64; // slide down
-// 0.64 -> 1: the veins light up and the note fades in.
+const T_OVERLAP = 0.2; // hold complete overlap
+const T_TURN = 0.7; // turn 0 -> -72 about the sun
+const T_SLIDE = 0.95; // slide down, then rest on the finished pattern
 
 const smooth = (e0: number, e1: number, x: number): number => {
   const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
@@ -103,8 +100,6 @@ function buildScene(): { agree: string; vein: string } {
 export default function InterferenceOverlay() {
   const scene = useMemo(() => buildScene(), []);
   const topRef = useRef<SVGSVGElement>(null);
-  const veinRef = useRef<SVGUseElement>(null);
-  const noteRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const render = useCallback((t: number) => {
@@ -112,13 +107,10 @@ export default function InterferenceOverlay() {
     if (!top || !c) return;
     const angle = smooth(T_OVERLAP, T_TURN, t) * TURN; // 0 -> -72 about the sun
     const slide = smooth(T_TURN, T_SLIDE, t); // 0 -> 1 of the downward nudge
-    const veinHi = smooth(T_SLIDE, 1, t); // 0 -> 1, the veins light up
     const w = c.getBoundingClientRect().width || 1;
     const pxPerUnit = w / (2 * VIEW_HALF);
     const ox = SLIDE[0] * slide, oy = SLIDE[1] * slide;
     top.style.transform = `translate(${ox * pxPerUnit}px, ${-oy * pxPerUnit}px) rotate(${(angle * 180) / Math.PI}deg)`;
-    if (veinRef.current) veinRef.current.style.strokeOpacity = String(veinHi);
-    if (noteRef.current) noteRef.current.style.opacity = String(veinHi);
   }, []);
 
   const lastT = useRef(1);
@@ -139,7 +131,7 @@ export default function InterferenceOverlay() {
   return (
     <Sketch
       label="sketch 09 · two tilings, one turned over the other"
-      animation={{ duration: 13000, render: renderKeep, slider: { label: "scrub" } }}
+      animation={{ duration: 9000, render: renderKeep, slider: { label: "scrub" } }}
     >
       {/* the two edge classes, defined once, instanced by both layers */}
       <svg width="0" height="0" aria-hidden="true" style={{ position: "absolute" }}>
@@ -149,7 +141,7 @@ export default function InterferenceOverlay() {
         </defs>
       </svg>
       <div ref={containerRef} className="relative w-full overflow-hidden bg-paper" style={{ aspectRatio: "1 / 1" }} role="img"
-        aria-label="Two copies of the same real Penrose tiling, one colour, centred on a sun. The animation starts in complete overlap (a single tiling), turns the top copy a fifth of a turn about the sun, slides it down slightly, then lights up the veins in gold: the edges of the turned copy that no longer land on the original. Bright islands where the two agree are separated by veins where they fall out of registry, the whole network five-fold. The two tilings share every finite patch yet never align everywhere at once, which is what Penrose saw on his overhead projector.">
+        aria-label="Two copies of the same real Penrose tiling, one colour, centred on a sun. The animation starts in complete overlap (a single tiling), turns the top copy a fifth of a turn about the sun, and slides it down slightly. Where the copies agree their edges land on each other and draw once; where they disagree the doubled edges read as denser bands, so bright islands of agreement emerge separated by darker bands, the whole network five-fold. The two tilings share every finite patch yet never align everywhere at once, which is what Penrose saw on his overhead projector.">
         <svg style={layer} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <use href="#ov-agree" {...inkStroke} />
           <use href="#ov-vein" {...inkStroke} />
@@ -157,30 +149,19 @@ export default function InterferenceOverlay() {
         <svg ref={topRef} style={{ ...layer, transformOrigin: "center", willChange: "transform" }} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <use href="#ov-agree" {...inkStroke} />
           <use href="#ov-vein" {...inkStroke} />
-          {/* the gold overlay on the turned copy's unmatched edges; opacity driven by t */}
-          <use ref={veinRef} href="#ov-vein" stroke="var(--color-penrose-thick)" strokeWidth={1.1} strokeOpacity={0} />
         </svg>
-        <div
-          ref={noteRef}
-          className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-ink/40 bg-paper/70 px-3 py-1 text-center font-mono text-[11px] backdrop-blur-sm"
-          style={{ color: "var(--color-ink)", opacity: 0 }}
-        >
-          <span style={{ color: "var(--color-penrose-thick)" }}>gold</span> = the veins, where the two fall out of registry
-        </div>
       </div>
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
           Press play: the two copies start in perfect overlap, one clean tiling. Turn the
-          top one a fifth of a turn about the sun and slide it a hair, and the plane breaks
-          into bright islands where the two agree, separated by veins where they fall out
-          of registry.
+          top one a fifth of a turn about the sun, slide it a hair, and a new pattern
+          emerges on its own.
         </p>
         <p className="mt-2 opacity-70">
-          The veins are the turned copy&#39;s edges that no longer land on the original
-          (gold). Because both tilings contain every finite patch yet never align
-          everywhere at once, the plane can only agree in islands, and the boundaries
-          between them are forced. That vein network carries the same five-fold symmetry
-          that built the tiles.
+          Where the copies agree, their edges land on each other and draw once: those are
+          the bright islands. Where they disagree, the doubled edges read as denser bands
+          between the islands. The whole network carries the same five-fold symmetry as
+          the tiles.
         </p>
       </div>
     </Sketch>

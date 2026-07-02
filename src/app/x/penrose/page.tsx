@@ -386,9 +386,9 @@ export default function PenrosePage() {
           <p>
             Penrose noticed something on his overhead projector: lay two of
             these tilings over each other and turn one, and large regions snap
-            into agreement while veins of disagreement ripple between them.
-            Press play below: the top copy turns a fifth about a sun, slides a
-            hair, and the veins light up.
+            into agreement while bands of disagreement run between them. Press
+            play below: the top copy turns a fifth of a turn about a sun,
+            slides a hair, and the pattern emerges.
           </p>
         </div>
 
