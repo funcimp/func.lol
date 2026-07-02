@@ -177,7 +177,7 @@ export default function PenrosePage() {
         <MeetTheTiles />
 
         {/* 3b. Lay them into a tiling: gentle on-ramp, proper colours, no structure. */}
-        <h2 className={H2}>Lay them into a tiling</h2>
+        <h2 className={H2}>Tiling the plane</h2>
         <div className={PROSE}>
           <p>
             Drop the two tiles together by the thousands, arcs matching across
@@ -202,7 +202,7 @@ export default function PenrosePage() {
         <TilingIntro />
 
         {/* 3c. Patterns surface: rosettes and ribbons, on the same coloured tiling. */}
-        <h2 className={H2}>Patterns start to surface</h2>
+        <h2 className={H2}>Hidden patterns</h2>
         <div className={PROSE}>
           <p>
             Sit with that tiling for a minute and patterns start to surface.{" "}
@@ -230,7 +230,7 @@ export default function PenrosePage() {
         <EmergentPatterns />
 
         {/* 4. A geometric dead-end: a piece fits, then strands you. */}
-        <h2 className={H2}>A piece fits, and still strands you</h2>
+        <h2 className={H2}>The first dead-end</h2>
         <div className={PROSE}>
           <p>
             So far you&#39;ve only watched finished floors. Now try to lay one
@@ -263,7 +263,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 5. Deeper: the move an expert says fits, followed through. */}
-        <h2 className={H2}>The thin fits. Place it. Now nothing fits.</h2>
+        <h2 className={H2}>The expert&#39;s dead-end</h2>
         <div className={PROSE}>
           <p>
             Here&#39;s the hard one, and it answers the obvious objection. Take
@@ -289,7 +289,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 6. So you solve it globally. */}
-        <h2 className={H2}>So you stop tiling by hand</h2>
+        <h2 className={H2}>Cut and project</h2>
         <div className={PROSE}>
           <p>
             The trick is a method called <strong>cut and project</strong>:
@@ -331,7 +331,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 6b. The dead-ends, explained: the window region collapses. */}
-        <h2 className={H2}>Where the dead-ends come from</h2>
+        <h2 className={H2}>Why dead-ends happen</h2>
         <div className={PROSE}>
           <p>
             The window also explains the dead-ends. When you tile by hand you
@@ -351,7 +351,7 @@ export default function PenrosePage() {
         <WindowStrand />
 
         {/* 6c. The dual view: de Bruijn's pentagrid draws the tiles. */}
-        <h2 className={H2}>The tiles fall out of a grid of lines</h2>
+        <h2 className={H2}>The pentagrid</h2>
         <div className={PROSE}>
           <p>
             There&#39;s a second way to see the same tiling, and it draws the
@@ -388,7 +388,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 7. The overlay. */}
-        <h2 className={H2}>Slide one over another</h2>
+        <h2 className={H2}>Two tilings overlaid</h2>
         <div className={PROSE}>
           <p>
             Penrose noticed something on his overhead projector: lay two of
@@ -411,7 +411,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 8. A coordinate system: the address is a walk along five directions. */}
-        <h2 className={H2}>Every tile knows its address</h2>
+        <h2 className={H2}>Every tile has an address</h2>
         <div className={PROSE}>
           <p>
             Every tile is the shadow of one little square face of the lattice,
@@ -435,7 +435,7 @@ export default function PenrosePage() {
         </div>
 
         {/* 9. More magic: scaling. */}
-        <h2 className={H2}>It folds into itself</h2>
+        <h2 className={H2}>Self-similarity</h2>
         <div className={PROSE}>
           <p>
             One more piece of magic. Cut each tile into smaller rhombi by a
@@ -466,7 +466,7 @@ export default function PenrosePage() {
         <ZoomHierarchy />
 
         {/* 10. The explorer. */}
-        <h2 className={H2}>Now walk it</h2>
+        <h2 className={H2}>The explorer</h2>
         <div className={PROSE}>
           <p>
             The explorer generates whatever patch you&#39;re looking at on the
