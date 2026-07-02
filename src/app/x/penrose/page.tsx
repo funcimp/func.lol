@@ -70,9 +70,9 @@ export default function PenrosePage() {
         {/* 0. The narrator: why this page exists. */}
         <div className={PROSE}>
           <p>
-            I have been fascinated by Penrose tilings for years, ever since I
-            first heard that two shapes could cover an infinite floor and never
-            repeat. I watched{" "}
+            I&#39;ve been fascinated by Penrose tilings for years. Two shapes
+            that cover an infinite floor and never repeat the same pattern? I
+            watched{" "}
             <a
               href="https://www.youtube.com/watch?v=th3YMEamzmw"
               target="_blank"
@@ -90,10 +90,11 @@ export default function PenrosePage() {
             >
               Veritasium video
             </a>{" "}
-            more than once, and still wanted to know <em>why</em> it works. So
-            I dug in, with Claude as a collaborator: I asked questions, we
-            built a sketch to answer each one, and this page is what we
-            learned, in the order I wish someone had told me.
+            more than once, and I still couldn&#39;t have told you <em>why</em>{" "}
+            it works. That bugged me. So I dug in, with Claude as a
+            collaborator: I asked questions, we built a sketch for every
+            answer, and this page is what we learned, in the order I wish
+            someone had explained it to me.
           </p>
         </div>
 
@@ -108,9 +109,9 @@ export default function PenrosePage() {
             wallpaper in your hallway does it.
           </p>
           <p>
-            So here is the question. Is there a set of tiles that covers the
+            So here&#39;s the question. Is there a set of tiles that covers the
             whole plane but <em>never</em> falls into that march? A pattern that
-            keeps going forever and never once repeats itself? For a long time
+            keeps going forever and never once repeats itself? For a long time,
             nobody knew.
           </p>
         </div>
@@ -134,17 +135,17 @@ export default function PenrosePage() {
           </p>
           <p>
             Wang was wrong. In 1966 his student Robert Berger built a set that
-            tiles the plane and only ever aperiodically. The catch was the size.
-            His first set used <strong>20,426</strong> tiles. Over the years that
-            number fell. Berger himself trimmed it, Donald Knuth got it lower,
-            Raphael Robinson reached <strong>six</strong> in 1971.
+            tiles the plane and only ever aperiodically. The catch was the size:
+            his first set used <strong>20,426</strong> tiles. What I love is
+            what happened next, a decade-long countdown. Berger himself trimmed
+            it, Donald Knuth got it lower, Raphael Robinson reached{" "}
+            <strong>six</strong> in 1971.
           </p>
           <p>
-            Then came Roger Penrose. His 1974 set still used six tiles, built
-            from pentagons. Within two years he had it down to{" "}
-            <strong>two</strong>: a kite and a dart, or equivalently the two
-            simple rhombi this page uses, plus a rule about how their edges may
-            meet.{" "}
+            Then Roger Penrose took it to <strong>two</strong>. His 1974 set
+            still used six tiles, built from pentagons. Within two years he had
+            the pair this page uses: two simple rhombi (equivalently, his kite
+            and dart), plus a rule about how their edges may meet.{" "}
             <a
               href="https://www.scientificamerican.com/article/mathematical-games-1977-01/"
               target="_blank"
@@ -153,8 +154,8 @@ export default function PenrosePage() {
             >
               Martin Gardner&#39;s January 1977 column
             </a>{" "}
-            made them famous. That is the floor this whole page stands on, and
-            it is the one the explorer paints.
+            made them famous. Those two tiles are the floor this whole page
+            stands on, and the one the explorer paints.
           </p>
         </div>
 
@@ -168,17 +169,18 @@ export default function PenrosePage() {
             rotated and dropped into place.
           </p>
           <p>
-            The angles are not arbitrary. They come from fifths of a turn: 36,
-            72, 108, 144. That family is the golden ratio φ in disguise. Draw the
-            long diagonal of the thick rhombus and its length is exactly φ. Draw
-            the short diagonal of the thin one and it is exactly 1/φ. The shapes
-            alone are not enough, though. Left to themselves, these two rhombi
-            would happily tile the plane in a plain repeating pattern. It is
-            Penrose&#39;s edge rule that outlaws every repeating arrangement,
-            and φ, baked into the angles, is what leaves a non-repeating one
-            possible at all. The coloured arcs drawn on the tiles below carry
-            that rule: two tiles may share an edge only if the arcs continue
-            across it, in colour and in position.
+            The angles aren&#39;t arbitrary. They come from fifths of a turn:
+            36, 72, 108, 144. That family is the golden ratio φ in disguise.
+            Draw the long diagonal of the thick rhombus and its length is
+            exactly φ. Draw the short diagonal of the thin one and it is exactly
+            1/φ. Here&#39;s the thing, though: the shapes alone aren&#39;t
+            enough. Left to themselves, these two rhombi would happily tile the
+            plane in a plain repeating pattern. It&#39;s Penrose&#39;s edge rule
+            that outlaws every repeating arrangement, and φ, baked into the
+            angles, is what leaves a non-repeating one possible at all. The
+            coloured arcs drawn on the tiles below carry that rule: two tiles
+            may share an edge only if the arcs continue across it, in colour and
+            in position.
           </p>
         </div>
 
@@ -194,8 +196,8 @@ export default function PenrosePage() {
             check which it is.
           </p>
           <p>
-            The catch is what is missing. There is no repeat. Slide this tiling any
-            distance in any direction and it never lands back on itself. That is a{" "}
+            The catch is what&#39;s missing. There&#39;s no repeat. Slide this tiling any
+            distance in any direction and it never lands back on itself. That&#39;s a{" "}
             <a
               href="https://en.wikipedia.org/wiki/Penrose_tiling"
               target="_blank"
@@ -214,7 +216,7 @@ export default function PenrosePage() {
         <h2 className={H2}>Patterns start to surface</h2>
         <div className={PROSE}>
           <p>
-            Sit with that tiling and patterns begin to surface. First the{" "}
+            Sit with that tiling for a minute and patterns start to surface. First the{" "}
             <strong>rosettes</strong>: five-petal suns, where five thick tiles meet,
             scattered through the plane. Then the <strong>ribbons</strong>: long bands
             of tiles running clear across it in five directions, one per edge direction
@@ -245,10 +247,11 @@ export default function PenrosePage() {
         <h2 className={H2}>A piece fits, and still strands you</h2>
         <div className={PROSE}>
           <p>
-            Start with the gentle version, and make it airtight. Carve a small
-            hole out of a real patch, six edges, and try to fill it back. This
-            hole has exactly one filling. One. Watch the constrained edge: two
-            different rhombi fit it with no overlap at all, so both look fine.
+            Now it gets sneaky. Start with the gentle version, and make it
+            airtight. Carve a small hole out of a real patch, six edges, and try
+            to fill it back. This hole has exactly one filling. One. Watch the
+            constrained edge: two different rhombi fit it with no overlap at
+            all, so both look fine.
           </p>
           <p>
             The sketch below takes the tempting one and seats it cleanly. It
@@ -256,10 +259,10 @@ export default function PenrosePage() {
             red, is two triangles, and no rhombus fits a triangle. No rule was
             invoked to say so. Only the other first move completes the hole, and
             the shapes alone tell you which. And watch the arcs when the red
-            appears: the tempting piece cannot continue its neighbours&#39; arcs
-            no matter how it is marked, while the right filling lets them flow
-            straight through. The rule reaches the same verdict, at the moment
-            the tile lands.
+            appears: the tempting piece can&#39;t continue its neighbours&#39;
+            arcs no matter how it&#39;s marked, while the right filling lets
+            them flow straight through. The rule reaches the same verdict, at
+            the moment the tile lands.
           </p>
         </div>
 
@@ -267,9 +270,9 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            On the open plane the bare shapes never trap you like this; they would
-            tile, boringly, forever. That is exactly why Penrose added the
-            matching marks. Inside a bounded hole the geometry can speak for
+            On the open plane the bare shapes never trap you like this; they
+            would tile, boringly, forever. That&#39;s exactly why Penrose added
+            the matching marks. Inside a bounded hole the geometry can speak for
             itself, and here it does: the gap is empty space you can see, not a
             rule you have to take on faith.
           </p>
@@ -279,14 +282,14 @@ export default function PenrosePage() {
         <h2 className={H2}>The thin fits. Place it. Now nothing fits.</h2>
         <div className={PROSE}>
           <p>
-            Here is the hard one, and it answers the obvious objection. Take a
-            bigger hole, sixteen edges, carved from a real patch. A Penrose
+            Here&#39;s the hard one, and it answers the obvious objection. Take
+            a bigger hole, sixteen edges, carved from a real patch. A Penrose
             expert looks at one edge and says, rightly, a thin rhombus fits
             there. It does. Zero overlap. The piece sits in the gap.
           </p>
           <p>
             So place it. Lay a few more legal tiles, all fine, then fill in the
-            rest of the hole as far as the shapes allow. Tiles still cannot cover
+            rest of the hole as far as the shapes allow. Tiles still can&#39;t cover
             everything. A gap is left, shown in red, that no rhombus fits. The
             thin fit, you placed it, you filled the rest, and the red gap remains.
             Not because a rule says no. Because the shapes collide. Out of all the
@@ -298,11 +301,11 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            A move can fit and still doom you, and whether it does is not
+            A move can fit and still doom you, and whether it does isn&#39;t
             something the edge in front of you can tell. Only one continuation
-            survives, and nothing local points to it. The fix is not a smarter
-            local move. It is to stop tiling by hand and compute the plane
-            globally.
+            survives, and nothing local points to it. The fix isn&#39;t a
+            smarter local move. It&#39;s to stop tiling by hand and compute the
+            plane globally.
           </p>
         </div>
 
@@ -310,13 +313,14 @@ export default function PenrosePage() {
         <h2 className={H2}>So you stop tiling by hand</h2>
         <div className={PROSE}>
           <p>
-            If laying tiles one at a time can dead-end, stop laying them one at a
-            time. Compute the whole plane at once, with a method called{" "}
-            <strong>cut and project</strong>. It is easiest to see one dimension
-            down, so start there. Take the integer grid in the plane. Draw a line
-            through it at the golden slope, and a thin strip along the line. Keep
-            only the points that fall inside the strip, and drop each one straight
-            down onto the line.
+            If laying tiles one at a time can dead-end, stop laying them one at
+            a time. The trick is a method called{" "}
+            <strong>cut and project</strong>: compute the whole plane at once.
+            It&#39;s easiest to see one dimension down, so start there. Take the
+            integer grid in the plane. Draw a line through it at the golden
+            slope, and a thin strip along the line. Keep only the points that
+            fall inside the strip, and drop each one straight down onto the
+            line.
           </p>
         </div>
 
@@ -326,18 +330,19 @@ export default function PenrosePage() {
           <p>
             Those dropped points tile the line with just two gaps, long and short,
             in the ratio φ, in an order that never repeats. <em>Cut</em> is the
-            strip. <em>Project</em> is the drop. That is the whole method, and the
-            two lengths are already a hint of the two tiles to come.
+            strip. <em>Project</em> is the drop. That&#39;s the whole method, and
+            the two lengths are already a hint of the two tiles to come.
           </p>
           <p>
-            Penrose is this same construction one stage up. The grid is the integer
-            lattice ℤ⁵, five dimensions. The line becomes our plane, and the strip
-            becomes a window shaped like nested pentagons. A tile exists exactly when
-            its 5D shadow lands in that window, a test you run on one point alone,
-            with no backtracking. Each tile is decided on its own, so the plane is{" "}
-            <em>computed</em>, never assembled, and it can never dead-end. The next
-            sketches show how that plays out on the plane. This is what the explorer
-            runs.
+            Here&#39;s the part I love: Penrose is this exact construction, one
+            stage up. The grid is the integer lattice ℤ⁵, five dimensions. The
+            line becomes our plane, and the strip becomes a window shaped like
+            nested pentagons. A tile exists exactly when its 5D shadow lands in
+            that window, a test you run on one point alone, with no
+            backtracking. Each tile is decided on its own, so the plane is{" "}
+            <em>computed</em>, never assembled, and it can never dead-end. The
+            next sketches show how that plays out on the plane. This is what the
+            explorer runs.
           </p>
         </div>
 
@@ -345,9 +350,9 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            Keep hold of that 5D coordinate. It is not just bookkeeping: it is
-            the address the explorer reads under your cursor, and it comes back
-            at the end of the page.
+            Keep hold of that 5D coordinate. It&#39;s not just bookkeeping:
+            it&#39;s the address the explorer reads under your cursor, and it
+            comes back at the end of the page.
           </p>
         </div>
 
@@ -356,9 +361,9 @@ export default function PenrosePage() {
         <div className={PROSE}>
           <p>
             The window also explains the trap. Run the test backward. When you
-            tile by hand you do not know where the window sits, and every tile
-            you lay is a clue: the window must be somewhere that accepts every
-            tile placed so far.
+            tile by hand you don&#39;t know where the window sits, and every
+            tile you lay is a clue: the window must be somewhere that accepts
+            every tile placed so far.
           </p>
           <p>
             The sketch below tracks those clues. On the left, tiles go down by
@@ -367,7 +372,7 @@ export default function PenrosePage() {
             it, because the true window is always inside. Then the tempting
             tile lands, the one that fits with no overlap, and the region
             collapses to nothing. No window anywhere accepts that patch, so it
-            can never be finished. That is what stranding is. Cut and project
+            can never be finished. That&#39;s what stranding is. Cut and project
             never gets trapped because it fixes the window first and asks every
             tile the same question.
           </p>
@@ -379,8 +384,8 @@ export default function PenrosePage() {
         <h2 className={H2}>The tiles fall out of a grid of lines</h2>
         <div className={PROSE}>
           <p>
-            Cut and project tests one point at a time. There is a second way to
-            see the same tiling, and it draws the whole thing at once. Take five
+            Cut and project tests one point at a time. There&#39;s a second way
+            to see the same tiling, and it draws the whole thing at once. Take five
             families of evenly spaced parallel lines, one family running in each
             of the five pentagon directions. Lay them over each other and they
             cross everywhere.{" "}
@@ -437,12 +442,12 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p>
-            Here is the strange part. Any two Penrose tilings share every finite
-            patch you could name: whatever stretch you find in one, an exact
-            copy sits somewhere in the other. Yet no shift and no turn ever
-            lines them up everywhere at once. Infinitely alike up close, never
-            the same as a whole. That is what Penrose was looking at on his
-            projector.
+            Here&#39;s the strange part. Any two Penrose tilings share every
+            finite patch you could name: whatever stretch you find in one, an
+            exact copy sits somewhere in the other. Yet no shift and no turn
+            ever lines them up everywhere at once. Infinitely alike up close,
+            never the same as a whole. That&#39;s what Penrose was looking at on
+            his projector.
           </p>
         </div>
 
@@ -463,12 +468,12 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p>
-            That is the trick that makes the explorer possible. Move anywhere,
-            zoom anywhere, and the tile under your cursor can tell you precisely
-            where you are, by reading its own address off the lattice. It is a
-            full coordinate system for a floor with no edges. A shared link is
-            just those five numbers, and it drops the next person on the exact
-            same tile.
+            That&#39;s the trick that makes the explorer possible. Move
+            anywhere, zoom anywhere, and the tile under your cursor can tell you
+            precisely where you are, by reading its own address off the lattice.
+            It&#39;s a full coordinate system for a floor with no edges. A
+            shared link is just those five numbers, and it drops the next person
+            on the exact same tile.
           </p>
         </div>
 
@@ -495,7 +500,7 @@ export default function PenrosePage() {
         <div className={PROSE}>
           <p>
             The reason is the same self-similarity, seen the other way. Those
-            smaller tiles are not just finer, they group back into larger tiles of
+            smaller tiles aren&#39;t just finer, they group back into larger tiles of
             the very same two shapes. Below, each deflation level is drawn as a line
             grid in its own colour, gold and blue alternating so neighbouring levels
             stay distinct. Zoom in and a finer grid nests inside every tile, the
@@ -514,11 +519,11 @@ export default function PenrosePage() {
         <h2 className={H2}>Now walk it</h2>
         <div className={PROSE}>
           <p>
-            The explorer generates whatever patch you are looking at on the fly,
-            from the cut-and-project method, so you can pan in any direction
-            forever. There is no edge to reach. Every tile carries its exact
-            coordinate, shown under the cursor, and any view is a link you can
-            share.
+            The explorer generates whatever patch you&#39;re looking at on the
+            fly, from the cut-and-project method, so you can pan in any
+            direction forever. There&#39;s no edge to reach. Every tile carries
+            its exact coordinate, shown under the cursor, and any view is a link
+            you can share. Go get lost in it.
           </p>
         </div>
 
@@ -539,7 +544,7 @@ export default function PenrosePage() {
             <p>
               Everything on this page is classical mathematics, rebuilt here
               under test. These are the sources I learned it from, roughly in
-              the order I would hand them to a friend.
+              the order I&#39;d hand them to a friend.
             </p>
             <ul className="flex flex-col gap-2 text-[15px] leading-[1.6]">
               <li>

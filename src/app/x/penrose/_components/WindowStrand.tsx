@@ -286,7 +286,7 @@ export default function WindowStrand() {
           position nothing else allows, and the region collapses to nothing.
         </p>
         <p className="mt-2 opacity-70">
-          That is the dead-end of sketches 04 and 05, seen from the inside. Tiling by
+          That&#39;s the dead-end of sketches 04 and 05, seen from the inside. Tiling by
           hand is a blind search for a window that fits your patch, and one fitting
           tile can end the search. Cut and project picks the window first, so it never
           searches and never strands.
