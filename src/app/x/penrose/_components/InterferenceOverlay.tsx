@@ -8,13 +8,13 @@ import type { Pt } from "./lib/overlay";
 
 // "Slide one over another": the spine's section-7 sketch, Penrose's overhead-projector
 // demo as a told story. Two copies of the SAME real tiling, centred on a sun. The play
-// sequence: start in complete overlap (one tiling), turn the top copy 288 degrees about
-// the sun, slide it down a hair, then light up the VEINS, the places where the two fall
-// out of registry. One colour for the tiling so the moiré reads as density; gold marks
+// sequence: start in complete overlap (one tiling), turn the top copy a fifth of a turn
+// about the sun, slide it down a hair, then light up the VEINS, the places where the two
+// fall out of registry. One colour for the tiling so the moiré reads as density; gold marks
 // the rotated copy's unmatched edges.
 //
 // HONEST BY CONSTRUCTION. Both layers are the SAME enumerator tiling, centred on a real
-// sun vertex. A 288-degree turn about the sun is exact: each edge's rotated image either
+// sun vertex. A fifth-of-a-turn about the sun is exact: each edge's rotated image either
 // lands on an original edge (agreement) or does not (a vein). That split is computed
 // against the real edge set (~50/50, a true island-and-vein structure), so the gold is
 // where the tilings genuinely disagree, not decoration. Drawn as crisp SVG, non-scaling
@@ -24,7 +24,9 @@ import type { Pt } from "./lib/overlay";
 // slider scrubs. Stroke colours are CSS vars, so they invert with the theme.
 
 const VIEW_HALF = 24; // data half-width shown in the frame
-const TURN = (288 * Math.PI) / 180; // the chosen turn about the sun (= -72 deg)
+// The chosen turn about the sun: one fifth of a turn, clockwise. Same rotation
+// as +288 deg, but animated as -72 so the top copy takes the short way around.
+const TURN = (-72 * Math.PI) / 180;
 const SLIDE: [number, number] = [0, -0.4]; // the downward nudge, in tile-edge units
 // Rotation is about the sun (frame centre) and preserves distance, so the layer only has
 // to cover the frame's diagonal plus the small slide.
@@ -108,7 +110,7 @@ export default function InterferenceOverlay() {
   const render = useCallback((t: number) => {
     const top = topRef.current, c = containerRef.current;
     if (!top || !c) return;
-    const angle = smooth(T_OVERLAP, T_TURN, t) * TURN; // 0 -> 288 about the sun
+    const angle = smooth(T_OVERLAP, T_TURN, t) * TURN; // 0 -> -72 about the sun
     const slide = smooth(T_TURN, T_SLIDE, t); // 0 -> 1 of the downward nudge
     const veinHi = smooth(T_SLIDE, 1, t); // 0 -> 1, the veins light up
     const w = c.getBoundingClientRect().width || 1;
@@ -147,7 +149,7 @@ export default function InterferenceOverlay() {
         </defs>
       </svg>
       <div ref={containerRef} className="relative w-full overflow-hidden bg-paper" style={{ aspectRatio: "1 / 1" }} role="img"
-        aria-label="Two copies of the same real Penrose tiling, one colour, centred on a sun. The animation starts in complete overlap (a single tiling), turns the top copy 288 degrees about the sun, slides it down slightly, then lights up the veins in gold: the edges of the turned copy that no longer land on the original. Bright islands where the two agree are separated by veins where they fall out of registry, the whole network five-fold. The two tilings share every finite patch yet never align everywhere at once, which is what Penrose saw on his overhead projector.">
+        aria-label="Two copies of the same real Penrose tiling, one colour, centred on a sun. The animation starts in complete overlap (a single tiling), turns the top copy a fifth of a turn about the sun, slides it down slightly, then lights up the veins in gold: the edges of the turned copy that no longer land on the original. Bright islands where the two agree are separated by veins where they fall out of registry, the whole network five-fold. The two tilings share every finite patch yet never align everywhere at once, which is what Penrose saw on his overhead projector.">
         <svg style={layer} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <use href="#ov-agree" {...inkStroke} />
           <use href="#ov-vein" {...inkStroke} />
@@ -169,8 +171,9 @@ export default function InterferenceOverlay() {
       <div className="border-t border-ink px-3 py-2.5 text-[13px] leading-[1.5]">
         <p>
           Press play: the two copies start in perfect overlap, one clean tiling. Turn the
-          top one 288° about the sun and slide it a hair, and the plane breaks into bright
-          islands where the two agree, separated by veins where they fall out of registry.
+          top one a fifth of a turn about the sun and slide it a hair, and the plane breaks
+          into bright islands where the two agree, separated by veins where they fall out
+          of registry.
         </p>
         <p className="mt-2 opacity-70">
           The veins are the turned copy&#39;s edges that no longer land on the original
