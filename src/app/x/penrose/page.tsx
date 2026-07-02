@@ -255,7 +255,11 @@ export default function PenrosePage() {
             fits. But it fills the hole the wrong way. What it leaves, shown in
             red, is two triangles, and no rhombus fits a triangle. No rule was
             invoked to say so. Only the other first move completes the hole, and
-            the shapes alone tell you which.
+            the shapes alone tell you which. And watch the arcs when the red
+            appears: the tempting piece cannot continue its neighbours&#39; arcs
+            no matter how it is marked, while the right filling lets them flow
+            straight through. The rule reaches the same verdict, at the moment
+            the tile lands.
           </p>
         </div>
 

@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import Sketch from "./Sketch";
+import {
+  arcPoints,
+  decorationBreaks,
+  decorationMap,
+  decoratePatch,
+  endPair,
+  tileArcs,
+  type PolyTile,
+} from "./lib/decorate";
 import type { SceneA, Tile } from "./lib/geomWall";
 import walls from "./lib/geomWalls.json";
 import type { Pt } from "./lib/overlap";
@@ -20,6 +29,12 @@ import type { Pt } from "./lib/overlap";
 // still shows is the uncovered gap, and it is triangles, which no rhombus fits. Then
 // the one correct filling replaces it, clean. The red is geometry (hole minus the
 // tiles drawn), not a label; the dead-end itself is the proof in geomWall.test.ts.
+//
+// THE ARCS, a second witness. When the red appears, the matching-rule arcs fade in
+// too (lib/decorate.ts): the wall's decoration is forced (unique, tested), and the
+// tempting tile breaks it under BOTH of its markings (also tested), so the drawn
+// break is reporting, not staging. The correct filling's arcs flow through clean.
+// The red gap stays the geometric proof; the arcs show the rule saying no sooner.
 //
 // Canvas: the harness drives render(t); theme colours are read live so the patch
 // inverts with the toggle.
@@ -40,7 +55,7 @@ function readVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-type Colors = { thick: string; thin: string; grout: string; ink: string };
+type Colors = { thick: string; thin: string; grout: string; ink: string; single: string; double: string };
 
 const smooth = (e0: number, e1: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
@@ -52,9 +67,15 @@ const smooth = (e0: number, e1: number, x: number) => {
 // tiles for context. Computed once; the scene is static data.
 // ---------------------------------------------------------------------------
 
+type PxArc = { kind: "single" | "double"; pts: [number, number][] };
+
 type View = {
   toPx: (p: Pt) => [number, number];
   wall: Tile[];
+  wallArcs: PxArc[]; // arcs of the visible wall ring, forced decoration
+  wrongArcs: PxArc[]; // the tempting tile under its most legible marking
+  compArcs: PxArc[][]; // per completion tile, in placement order
+  breakPts: [number, number][]; // both sides of every broken crossing
 };
 
 function centroid(v: readonly Pt[]): Pt {
@@ -98,7 +119,32 @@ function buildView(): View {
     VB_W / 2 + (p[0] - cx) * scale,
     VB_H / 2 - (p[1] - cy) * scale, // canvas y grows downward
   ];
-  return { toPx, wall };
+
+  // The matching-rule decoration. The full patch (wall + completion) forces a
+  // unique assignment; decorate.test.ts pins uniqueness and pins that the wrong
+  // move breaks the wall's arcs under both of its markings.
+  const patch: PolyTile[] = [...scene.wall, ...scene.uniqueCompletion];
+  const choices = decoratePatch(patch);
+  const wallIndex = new Map(scene.wall.map((t, i) => [t, i]));
+  const arcsPx = (t: PolyTile, m: number): PxArc[] =>
+    tileArcs(t, m).map((arc) => ({
+      kind: arc.kind,
+      pts: arcPoints(arc, 16).map(toPx),
+    }));
+  const wallArcs = wall.flatMap((t) => arcsPx(t, choices[wallIndex.get(t)!]));
+  const compArcs = scene.uniqueCompletion.map((t, k) =>
+    arcsPx(t, choices[scene.wall.length + k]),
+  );
+  // draw the wrong move under whichever of its two markings breaks the most
+  // crossings (both break; the test guards that), and mark every break point
+  const wallDeco = decorationMap(scene.wall, choices.slice(0, scene.wall.length));
+  const pair = endPair(scene.wrongMove);
+  const breaksFor = pair.map((m) => decorationBreaks(scene.wrongMove, m, wallDeco));
+  const wrongPick = breaksFor[0].length >= breaksFor[1].length ? 0 : 1;
+  const wrongArcs = arcsPx(scene.wrongMove, pair[wrongPick]);
+  const breakPts = breaksFor[wrongPick].flatMap((b) => [toPx(b.theirs), toPx(b.ours)]);
+
+  return { toPx, wall, wallArcs, wrongArcs, compArcs, breakPts };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +225,25 @@ function strokeLoop(
   ctx.restore();
 }
 
+function strokeArc(
+  ctx: CanvasRenderingContext2D,
+  arc: { pts: [number, number][] },
+  color: string,
+  alpha: number,
+) {
+  if (alpha <= 0.001) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.moveTo(arc.pts[0][0], arc.pts[0][1]);
+  for (let i = 1; i < arc.pts.length; i++) ctx.lineTo(arc.pts[i][0], arc.pts[i][1]);
+  ctx.lineWidth = 1.7;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function caption(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -219,8 +284,9 @@ function paint(
   view: View,
   colors: Colors,
 ) {
-  const { thick, thin, grout, ink } = colors;
-  const { toPx, wall } = view;
+  const { thick, thin, grout, ink, single, double } = colors;
+  const { toPx, wall, wallArcs, wrongArcs, compArcs, breakPts } = view;
+  const arcColor = (kind: "single" | "double") => (kind === "single" ? single : double);
 
   ctx.clearRect(0, 0, VB_W, VB_H);
   ctx.fillStyle = grout;
@@ -233,6 +299,7 @@ function paint(
   const gap = smooth(GAP_FROM, GAP_TO, t);
   const comp = smooth(COMP_FROM, COMP_TO, t);
   const clear = 1 - smooth(CLEAR_FROM, CLEAR_FROM + 0.06, t); // wrong move + red fade
+  const arcsIn = gap; // the rule arcs arrive with the red, then stay
 
   // 1. The committed wall ring, muted while the hole is the subject, brightening to
   // a finished patch as the correct filling completes.
@@ -278,16 +345,47 @@ function paint(
     });
   }
 
+  // 5. The rule arcs, arriving with the red. The wall's decoration is forced;
+  // the tempting tile cannot continue it (both markings break, tested), and
+  // the correct filling lets it flow straight through.
+  if (arcsIn > 0) {
+    for (const arc of wallArcs) strokeArc(ctx, arc, arcColor(arc.kind), arcsIn * (0.55 + 0.35 * comp));
+    const wrongArcA = arcsIn * seat * clear;
+    for (const arc of wrongArcs) strokeArc(ctx, arc, arcColor(arc.kind), wrongArcA);
+    if (comp > 0) {
+      const per = 1 / compArcs.length;
+      compArcs.forEach((arcs, k) => {
+        const appear = smooth(k * per, (k + 1) * per, comp);
+        for (const arc of arcs) strokeArc(ctx, arc, arcColor(arc.kind), appear * 0.9);
+      });
+    }
+    // the exact break points: both sides of every crossing the wrong move fails
+    const ringA = arcsIn * seat * clear;
+    if (ringA > 0.001) {
+      ctx.save();
+      ctx.globalAlpha = ringA;
+      ctx.strokeStyle = RED;
+      ctx.lineWidth = 1.6;
+      for (const [bx, by] of breakPts) {
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   // Captions, one beat at a time.
   if (t < GAP_FROM) {
     caption(ctx, "one small hole, exactly one filling", VB_W / 2, 22, ink, wallIn * 0.8);
     if (seat > 0) caption(ctx, "this piece fits cleanly", VB_W / 2, VB_H - 22, ink, seat * 0.85);
   } else if (t < CLEAR_FROM) {
-    caption(ctx, "but no tile can fill the red it leaves", VB_W / 2, VB_H - 22, ink, gap * clear * 0.9);
+    caption(ctx, "but no tile can fill the red it leaves", VB_W / 2, VB_H - 30, ink, gap * clear * 0.9);
+    caption(ctx, "and its arcs break, no matter how you mark it", VB_W / 2, VB_H - 14, ink, gap * clear * 0.65);
   } else if (comp > 0.35) {
     const lead = (comp - 0.35) / 0.65;
-    caption(ctx, "only this filling works", VB_W / 2, VB_H - 30, ink, lead * 0.85);
-    caption(ctx, "no rule invoked, the shapes alone decide", VB_W / 2, VB_H - 14, ink, lead * 0.62);
+    caption(ctx, "only this filling works, and the arcs flow through", VB_W / 2, VB_H - 30, ink, lead * 0.85);
+    caption(ctx, "the shapes alone decide, the arcs just say it sooner", VB_W / 2, VB_H - 14, ink, lead * 0.62);
   }
 }
 
@@ -298,6 +396,8 @@ export default function StopTilingByHand() {
     thin: "#3E6B7C",
     grout: "#0f0e0c",
     ink: "#ede9d8",
+    single: "#C64F3C",
+    double: "#8B4670",
   });
   const dprRef = useRef(0);
   const view = useMemo(() => buildView(), []);
@@ -308,6 +408,8 @@ export default function StopTilingByHand() {
       thin: readVar("--color-penrose-thin", "#3E6B7C"),
       grout: readVar("--color-paper", "#0f0e0c"),
       ink: readVar("--color-ink", "#ede9d8"),
+      single: readVar("--color-moment-2", "#C64F3C"),
+      double: readVar("--color-moment-3", "#8B4670"),
     };
   }, []);
 
@@ -356,7 +458,7 @@ export default function StopTilingByHand() {
         }}
         className="block w-full bg-paper"
         role="img"
-        aria-label="A small six-edge hole carved from a real Penrose patch has exactly one filling by pure geometry. A tempting rhombus seats on the constrained edge with zero overlap, so it looks fine. But it covers the hole the wrong way: what it leaves is shown in red, two triangles that no rhombus can fill. The animation then clears the wrong move and grows the one correct filling, which leaves no red. A piece can fit and still strand you, and the shapes alone show it, with no matching rule invoked."
+        aria-label="A small six-edge hole carved from a real Penrose patch has exactly one filling by pure geometry. A tempting rhombus seats on the constrained edge with zero overlap, so it looks fine. But it covers the hole the wrong way: what it leaves is shown in red, two triangles that no rhombus can fill. As the red appears, the matching-rule arcs fade in across the patch: the tempting tile's arcs cannot continue its neighbours' arcs no matter how it is marked, and the break points are circled in red. The animation then clears the wrong move and grows the one correct filling, which leaves no red and lets every arc flow through unbroken. A piece can fit and still strand you: the shapes alone show it, and the rule's arcs say it the moment the tile lands."
       />
     </Sketch>
   );
