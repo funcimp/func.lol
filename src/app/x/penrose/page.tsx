@@ -168,7 +168,7 @@ export default function PenrosePage() {
             φ, the thin one&#39;s short diagonal exactly 1/φ. Here&#39;s the thing, though: the shapes alone aren&#39;t
             enough. Left to themselves they&#39;d happily tile the plane in a
             plain repeating pattern. It&#39;s Penrose&#39;s edge rule that
-            outlaws every repeating arrangement, and the coloured arcs below
+            forbids every repeating arrangement, and the coloured arcs below
             carry that rule: two tiles may share an edge only if the arcs
             continue across it, in colour and in position.
           </p>
@@ -263,10 +263,10 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            On the open plane the bare shapes never have to strand: the plain
-            repeating pattern is always an escape, which is why Penrose added
-            the marks to outlaw it. Inside the hole there is no escape, and the
-            gap is empty space you can see, not a rule you take on faith.
+            On the open plane the bare shapes never have to strand, because the
+            plain repeating pattern is always available. That&#39;s why Penrose
+            added the matching marks. Inside a bounded hole that option is gone,
+            so the shapes alone can show you the dead-end.
           </p>
         </div>
 
@@ -289,9 +289,9 @@ export default function PenrosePage() {
 
         <div className={PROSE}>
           <p className="text-[14px] leading-[1.6] opacity-70">
-            A move can fit and still doom you, and nothing local warns you. The
-            fix isn&#39;t a smarter local move: it&#39;s to stop tiling by hand
-            and compute the whole plane at once.
+            A move can fit and still lead to a dead-end, and nothing nearby
+            warns you. The fix isn&#39;t a smarter local move: it&#39;s to stop
+            tiling by hand and compute the whole plane at once.
           </p>
         </div>
 
