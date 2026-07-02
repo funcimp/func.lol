@@ -58,8 +58,7 @@ export default function PenrosePage() {
             penrose
           </h1>
           <p className="text-[18px] leading-[1.45] opacity-85 max-w-[44ch] mt-3">
-            Two tiles cover the infinite plane and never repeat. The whole
-            story, from the first question to a plane you can walk.
+            An interactive exploration of Penrose tilings.
           </p>
         </header>
 
