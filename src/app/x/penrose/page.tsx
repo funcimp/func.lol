@@ -167,7 +167,8 @@ export default function PenrosePage() {
             >
               golden ratio
             </a>{" "}
-            φ (pronounced &#8220;fye&#8221;) shows up everywhere, starting with
+            φ (the Greek letter phi, pronounced &#8220;fye&#8221;) shows up
+            everywhere, starting with
             these tiles&#39; angles and diagonals; hover a tile below to see it.
             The shapes alone aren&#39;t enough, though. Left to themselves
             they&#39;d happily tile the plane in a plain repeating pattern.
