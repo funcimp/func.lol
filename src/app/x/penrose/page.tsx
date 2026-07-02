@@ -163,9 +163,9 @@ export default function PenrosePage() {
           </p>
           <p>
             The angles come from tenths of a turn: 36, 72, 108, 144, and that
-            family is the golden ratio φ in disguise: the thick tile&#39;s long
-            diagonal is exactly φ, the thin one&#39;s short diagonal exactly
-            1/φ. Here&#39;s the thing, though: the shapes alone aren&#39;t
+            family is the golden ratio φ (pronounced &#8220;fye,&#8221; rhymes
+            with pie) in disguise: the thick tile&#39;s long diagonal is exactly
+            φ, the thin one&#39;s short diagonal exactly 1/φ. Here&#39;s the thing, though: the shapes alone aren&#39;t
             enough. Left to themselves they&#39;d happily tile the plane in a
             plain repeating pattern. It&#39;s Penrose&#39;s edge rule that
             outlaws every repeating arrangement, and the coloured arcs below
