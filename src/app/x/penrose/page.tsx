@@ -112,13 +112,6 @@ export default function PenrosePage() {
         <h2 className={H2}>The question</h2>
         <div className={PROSE}>
           <p>
-            Take a bag of tiles and lay them edge to edge across a floor that
-            runs on forever, no gaps, no overlaps. Every tile you&#39;d
-            naturally reach for falls into a march: shift the pattern by some
-            fixed amount and it lands on itself, exact. Squares do it. Hexagons
-            do it. The wallpaper in your hallway does it.
-          </p>
-          <p>
             So here&#39;s the question. Is there a set of tiles that covers the
             whole plane but <em>never</em> falls into that march? For a long
             time, nobody knew.
